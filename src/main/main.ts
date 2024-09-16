@@ -32,17 +32,32 @@ ipcMain.handle('readAllPerson', () => {
   }
 });
 
-// Handler to insert a new person into the database
-ipcMain.handle('insertPerson', (event, name, surname, birthdate, category, club, sail_number, model) => {
-  try {
-    db.prepare('INSERT INTO person (name, surname, birthdate, category, club, sail_number, model) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(name, surname, birthdate, category, club, sail_number, model);
-    return { success: true };
-  } catch (error) {
-    console.error('Error inserting person:', error);
-    throw error;
+interface SqliteError extends Error {
+  code: string;
+}
+
+ipcMain.handle('insertPerson', async (event, name, surname, birthdate, category, club, sail_number, model) => {
+  const maxRetries = 5;
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      db.prepare('INSERT INTO person (name, surname, birthdate, category, club, sail_number, model) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(name, surname, birthdate, category, club, sail_number, model);
+      return { success: true };
+    } catch (error) {
+      const sqliteError = error as SqliteError;
+      if (sqliteError.code === 'SQLITE_BUSY' && attempt < maxRetries) {
+        console.warn(`Database is locked, retrying attempt ${attempt}...`);
+        await delay(100 * attempt); // Exponential backoff
+      } else {
+        console.error('Error inserting person:', error);
+        throw error;
+      }
+    }
   }
 });
+
 
 
 if (process.env.NODE_ENV === 'production') {

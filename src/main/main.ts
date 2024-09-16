@@ -1,20 +1,10 @@
-/* eslint global-require: off, no-console: off, promise/always-return: off */
-
-/**
- * This module executes inside of electron's main process. You can start
- * electron renderer process from here and communicate with the other processes
- * through IPC.
- *
- * When running `npm run build` or `npm run build:main`, this file is compiled to
- * `./src/main.js` using webpack. This gives us some performance wins.
- */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-
+import { db } from '../../public/Database/DBManager';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -30,6 +20,30 @@ ipcMain.on('ipc-example', async (event, arg) => {
   console.log(msgTemplate(arg));
   event.reply('ipc-example', msgTemplate('pong'));
 });
+
+// Handler to read all persons from the database
+ipcMain.handle('readAllPerson', () => {
+  try {
+    const rows = db.prepare('SELECT * FROM person').all();
+    return rows;
+  } catch (error) {
+    console.error('Error reading persons:', error);
+    throw error;
+  }
+});
+
+// Handler to insert a new person into the database
+ipcMain.handle('insertPerson', (event, name, surname, birthdate, category, club, sail_number, model) => {
+  try {
+    db.prepare('INSERT INTO person (name, surname, birthdate, category, club, sail_number, model) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(name, surname, birthdate, category, club, sail_number, model);
+    return { success: true };
+  } catch (error) {
+    console.error('Error inserting person:', error);
+    throw error;
+  }
+});
+
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
@@ -51,7 +65,7 @@ const installExtensions = async () => {
   return installer
     .default(
       extensions.map((name) => installer[name]),
-      forceDownload,
+      forceDownload
     )
     .catch(console.log);
 };
@@ -78,6 +92,8 @@ const createWindow = async () => {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
+      contextIsolation: true,
+
     },
   });
 

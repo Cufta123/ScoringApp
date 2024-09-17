@@ -162,3 +162,5 @@ MIT © [Electron React Boilerplate](https://github.com/electron-react-boilerplat
 # ScorringApp
 ScoringApp
 >>>>>>> b5d317acea81ff1bfd84bb538aff5b81251fffc7
+#   S c o r i n g A p p  
+ 

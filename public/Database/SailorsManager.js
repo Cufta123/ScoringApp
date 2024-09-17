@@ -28,14 +28,12 @@ const readAllSailors = () => {
   }
 };
 
-const insertSailor = (name, surname, birthdate, category_id, club_id, sail_number, model) => {
-  if (!name || !surname || !birthdate || !category_id || !club_id) {
-    throw new Error("Name, surname, birthdate, category_id, and club_id are required.");
+const insertSailor = (name, surname, birthdate, category_id, club_id, boat_id) => {
+  if (!name || !surname || !birthdate || !category_id || !club_id || !boat_id) {
+    throw new Error("Name, surname, birthdate, category_id, club_id, and boat_id are required.");
   }
 
   try {
-
-    // Insert the sailor with the boat_id
     const insertSailorQuery = db.prepare(
       `INSERT INTO Sailors (name, surname, birthdate, category_id, club_id, boat_id)
        VALUES (?, ?, ?, ?, ?, ?)`

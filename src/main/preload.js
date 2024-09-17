@@ -27,7 +27,7 @@ const electronHandler = {
   sailorDB: {
     readAllSailors: sailorDB.readAllSailors,
     insertSailor: sailorDB.insertSailor,
-    insertClub: sailorDB.insertClub,e
+    insertClub: sailorDB.insertClub,
     insertBoat: sailorDB.insertBoat,
     readAllCategories: sailorDB.readAllCategories,
     readAllClubs: sailorDB.readAllClubs,

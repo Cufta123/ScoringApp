@@ -8,6 +8,7 @@ const SailorsForm = () => {
   const [clubs, setClubs] = useState([]);
   const [sailNumber, setSailNumber] = useState('');
   const [model, setModel] = useState('');
+  const [boats, setBoats] = useState([]);
   const [sailors, setSailors] = useState([]);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ const SailorsForm = () => {
   const fetchBoats = async () => {
     try {
       const allBoats = await window.electron.sqlite.sailorDB.readAllBoats();
+      setBoats(allBoats);
     } catch (error) {
       console.error('Error fetching boats:', error);
     }
@@ -81,14 +83,25 @@ const SailorsForm = () => {
         club_id = await insertClubWithRetry();
       }
 
-      // Ensure sail_number is provided
-      if (!sailNumber) {
-        throw new Error("Sail number is required.");
+      // Check if the boat exists, if not insert it
+      let boat_id = boats.find(b => b.sail_number === sailNumber)?.boat_id;
+      if (!boat_id) {
+        const insertBoatWithRetry = async (retries = 5) => {
+          try {
+            const result = await window.electron.sqlite.sailorDB.insertBoat(sailNumber, 'Country', model); // Replace 'Country' with actual country if needed
+            return result.lastInsertRowid;
+          } catch (error) {
+            if (error.code === 'SQLITE_BUSY' && retries > 0) {
+              console.warn('Database is busy, retrying...');
+              await new Promise(resolve => setTimeout(resolve, 100)); // Wait for 100ms before retrying
+              return insertBoatWithRetry(retries - 1);
+            } else {
+              throw error;
+            }
+          }
+        };
+        boat_id = await insertBoatWithRetry();
       }
-
-      // Insert the boat
-      const boatResult = await window.electron.sqlite.sailorDB.insertBoat(sailNumber, 'Country', model); // Replace 'Country' with actual country if needed
-      const boat_id = boatResult.lastInsertRowid;
 
       // Insert the sailor with the boat_id
       await window.electron.sqlite.sailorDB.insertSailor(
@@ -97,13 +110,14 @@ const SailorsForm = () => {
         birthday,
         category_id,
         club_id,
-        boat_id
+        boat_id // Ensure boat_id is passed here
       );
       fetchSailors();
     } catch (error) {
       console.error('Error inserting sailor into the database:', error);
     }
   };
+
   return (
     <form onSubmit={handleSubmit}>
       <input

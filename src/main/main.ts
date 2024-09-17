@@ -1,64 +1,12 @@
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
-import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-import { db } from '../../public/Database/DBManager';
-class AppUpdater {
-  constructor() {
-    log.transports.file.level = 'info';
-    autoUpdater.logger = log;
-    autoUpdater.checkForUpdatesAndNotify();
-  }
-}
+import AppUpdater from './AppUpdater';
+import './ipcHandlers/PersonHandler';
+import './ipcHandlers/SailorHandler';
 
 let mainWindow: BrowserWindow | null = null;
-
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
-});
-
-// Handler to read all persons from the database
-ipcMain.handle('readAllPerson', () => {
-  try {
-    const rows = db.prepare('SELECT * FROM person').all();
-    return rows;
-  } catch (error) {
-    console.error('Error reading persons:', error);
-    throw error;
-  }
-});
-
-interface SqliteError extends Error {
-  code: string;
-}
-
-ipcMain.handle('insertPerson', async (event, name, surname, birthdate, category, club, sail_number, model) => {
-  const maxRetries = 5;
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      db.prepare('INSERT INTO person (name, surname, birthdate, category, club, sail_number, model) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(name, surname, birthdate, category, club, sail_number, model);
-      return { success: true };
-    } catch (error) {
-      const sqliteError = error as SqliteError;
-      if (sqliteError.code === 'SQLITE_BUSY' && attempt < maxRetries) {
-        console.warn(`Database is locked, retrying attempt ${attempt}...`);
-        await delay(100 * attempt); // Exponential backoff
-      } else {
-        console.error('Error inserting person:', error);
-        throw error;
-      }
-    }
-  }
-});
-
-
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
@@ -108,7 +56,6 @@ const createWindow = async () => {
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
       contextIsolation: true,
-
     },
   });
 
@@ -132,24 +79,15 @@ const createWindow = async () => {
   const menuBuilder = new MenuBuilder(mainWindow);
   menuBuilder.buildMenu();
 
-  // Open urls in the user's browser
   mainWindow.webContents.setWindowOpenHandler((edata) => {
     shell.openExternal(edata.url);
     return { action: 'deny' };
   });
 
-  // Remove this if your app does not use auto updates
-  // eslint-disable-next-line
   new AppUpdater();
 };
 
-/**
- * Add event listeners...
- */
-
 app.on('window-all-closed', () => {
-  // Respect the OSX convention of having the application in memory even
-  // after all windows have been closed
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -160,8 +98,6 @@ app
   .then(() => {
     createWindow();
     app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
     });
   })

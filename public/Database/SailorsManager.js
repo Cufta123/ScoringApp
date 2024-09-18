@@ -1,9 +1,12 @@
-const Database = require("better-sqlite3");
-const path = require("path");
+/* eslint-disable no-console */
+/* eslint-disable camelcase */
+const Database = require('better-sqlite3');
+const path = require('path');
 
-const dbPath = process.env.NODE_ENV === "development"
-    ? "./demo_table.db"
-    : path.join(process.resourcesPath, "./../../demo_table.db");
+const dbPath =
+  process.env.NODE_ENV === 'development'
+    ? './demo_table.db'
+    : path.join(process.resourcesPath, './../../demo_table.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
@@ -21,30 +24,58 @@ const readAllSailors = () => {
       LEFT JOIN Boats b ON s.boat_id = b.boat_id
     `;
     const readQuery = db.prepare(query);
-    return readQuery.all();
+    const results = readQuery.all();
+    console.log('Raw results from readAllSailors:', results); // Log the raw results
+    return results;
   } catch (err) {
-    console.error("Error reading all sailors from the database:", err.message);
+    console.error('Error reading all sailors from the database:', err.message);
     throw err;
   }
 };
 
-const insertSailor = (name, surname, birthdate, category_id, club_id, boat_id) => {
+const insertSailor = (
+  name,
+  surname,
+  birthdate,
+  category_id,
+  club_id,
+  boat_id,
+) => {
   if (!name || !surname || !birthdate || !category_id || !club_id || !boat_id) {
-    throw new Error("Name, surname, birthdate, category_id, club_id, and boat_id are required.");
+    throw new Error(
+      'Name, surname, birthdate, category_id, club_id, and boat_id are required.',
+    );
   }
-
   try {
+    // Log the received parameters
+    console.log('Inserting sailor with parameters:', {
+      name,
+      surname,
+      birthdate,
+      category_id,
+      club_id,
+      boat_id,
+    });
     const insertSailorQuery = db.prepare(
       `INSERT INTO Sailors (name, surname, birthdate, category_id, club_id, boat_id)
-       VALUES (?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    const sailorInfo = insertSailorQuery.run(name, surname, birthdate, category_id, club_id, boat_id);
-    console.log(`Inserted ${sailorInfo.changes} row(s) with last ID ${sailorInfo.lastInsertRowid} into Sailors.`);
+    const sailorInfo = insertSailorQuery.run(
+      name,
+      surname,
+      birthdate,
+      category_id,
+      club_id,
+      boat_id,
+    );
+    console.log(
+      `Inserted ${sailorInfo.changes} row(s) with last ID ${sailorInfo.lastInsertRowid} into Sailors.`,
+    );
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT') {
-      console.error("Error: The sailor already exists.");
+      console.error('Error: The sailor already exists.');
     } else {
-      console.error("Error inserting sailor into the database:", err.message);
+      console.error('Error inserting sailor into the database:', err.message);
     }
     throw err;
   }
@@ -52,23 +83,25 @@ const insertSailor = (name, surname, birthdate, category_id, club_id, boat_id) =
 
 const insertClub = (club_name, country) => {
   if (!club_name || !country) {
-    throw new Error("Club name and country are required.");
+    throw new Error('Club name and country are required.');
   }
 
   try {
     const insertQuery = db.prepare(
       `INSERT INTO Clubs (club_name, country)
-       VALUES (?, ?)`
+       VALUES (?, ?)`,
     );
 
     const info = insertQuery.run(club_name, country);
-    console.log(`Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Clubs.`);
+    console.log(
+      `Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Clubs.`,
+    );
     return { lastInsertRowid: info.lastInsertRowid };
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT') {
-      console.error("Error: The club already exists.");
+      console.error('Error: The club already exists.');
     } else {
-      console.error("Error inserting club into the database:", err.message);
+      console.error('Error inserting club into the database:', err.message);
     }
     throw err;
   }
@@ -76,23 +109,25 @@ const insertClub = (club_name, country) => {
 
 const insertBoat = (sail_number, country, model) => {
   if (!sail_number || !model) {
-    throw new Error("Sail number and model are required.");
+    throw new Error('Sail number and model are required.');
   }
 
   try {
     const insertQuery = db.prepare(
       `INSERT INTO Boats (sail_number, country, model)
-       VALUES (?, ?, ?)`
+       VALUES (?, ?, ?)`,
     );
 
     const info = insertQuery.run(sail_number, country, model);
-    console.log(`Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Boats.`);
+    console.log(
+      `Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Boats.`,
+    );
     return { lastInsertRowid: info.lastInsertRowid };
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT') {
-      console.error("Error: The sail number already exists.");
+      console.error('Error: The sail number already exists.');
     } else {
-      console.error("Error inserting boat into the database:", err.message);
+      console.error('Error inserting boat into the database:', err.message);
     }
     throw err;
   }
@@ -104,7 +139,10 @@ const readAllCategories = () => {
     const readQuery = db.prepare(query);
     return readQuery.all();
   } catch (err) {
-    console.error("Error reading all categories from the database:", err.message);
+    console.error(
+      'Error reading all categories from the database:',
+      err.message,
+    );
     throw err;
   }
 };
@@ -115,18 +153,19 @@ const readAllClubs = () => {
     const readQuery = db.prepare(query);
     return readQuery.all();
   } catch (err) {
-    console.error("Error reading all clubs from the database:", err.message);
+    console.error('Error reading all clubs from the database:', err.message);
     throw err;
   }
-
 };
 const readAllBoats = () => {
-  const query = `SELECT * FROM Boats`;
-  const readQuery = db.prepare(query);
-  return readQuery.all();
-} catch (err) {
-  console.error("Error reading all boats from the database:", err.message);
-  throw err;
+  try {
+    const query = `SELECT * FROM Boats`;
+    const readQuery = db.prepare(query);
+    return readQuery.all();
+  } catch (err) {
+    console.error('Error reading all boats from the database:', err.message);
+    throw err;
+  }
 };
 
 module.exports = {

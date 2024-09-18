@@ -1,7 +1,6 @@
-const { contextBridge, ipcRenderer } = require("electron");
-const personDB = require("../../public/Database/PersonManager");
-const sailorDB = require("../../public/Database/SailorsManager");
-const { read } = require("fs");
+const { contextBridge, ipcRenderer } = require('electron');
+const personDB = require('../../public/Database/PersonManager');
+const sailorDB = require('../../public/Database/SailorsManager');
 
 const electronHandler = {
   ipcRenderer: {
@@ -35,13 +34,4 @@ const electronHandler = {
   },
 };
 
-contextBridge.exposeInMainWorld('electron', {
-  ipcRenderer: {
-    send(channel, ...args) {
-      ipcRenderer.send(channel, ...args);
-    },
-    on(channel, func) {
-      ipcRenderer.on(channel, (event, ...args) => func(event, ...args));
-    }
-  }
-});
+contextBridge.exposeInMainWorld('electron', electronHandler);

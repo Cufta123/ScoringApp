@@ -1,2 +1,2 @@
 import './PersonHandler';
-import './SailorHandler'
+import './SailorHandler';

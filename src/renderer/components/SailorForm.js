@@ -1,6 +1,7 @@
+/* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
 
-const SailorsForm = () => {
+function SailorsForm() {
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -9,19 +10,11 @@ const SailorsForm = () => {
   const [sailNumber, setSailNumber] = useState('');
   const [model, setModel] = useState('');
   const [boats, setBoats] = useState([]);
-  const [sailors, setSailors] = useState([]);
-
-  useEffect(() => {
-    fetchSailors();
-    fetchBoats();
-    fetchClubs();
-  }, []);
 
   const fetchSailors = async () => {
     try {
       const allSailors = await window.electron.sqlite.sailorDB.readAllSailors();
       console.log('Fetched sailors:', allSailors);
-      setSailors(allSailors);
     } catch (error) {
       console.error('Error fetching sailors:', error);
     }
@@ -39,13 +32,20 @@ const SailorsForm = () => {
   const fetchBoats = async () => {
     try {
       const allBoats = await window.electron.sqlite.sailorDB.readAllBoats();
+      console.log('Fetched boats:', allBoats); // Log the structure of the fetched boats
       setBoats(allBoats);
     } catch (error) {
       console.error('Error fetching boats:', error);
     }
   };
 
-  const calculateCategory = (birthday) => {
+  useEffect(() => {
+    fetchSailors();
+    fetchClubs();
+    fetchBoats();
+  }, []);
+
+  const calculateCategory = () => {
     const birthYear = new Date(birthday).getFullYear();
     const currentYear = new Date().getFullYear();
     const age = currentYear - birthYear;
@@ -63,56 +63,82 @@ const SailorsForm = () => {
       const category_id = calculateCategory(birthday);
 
       // Check if the club exists, if not insert it
-      let club_id = clubs.find(c => c.club_name === club)?.club_id;
+      let club_id = clubs.find((c) => c.club_name === club)?.club_id;
       if (!club_id) {
         const insertClubWithRetry = async (retries = 5) => {
           try {
-            const result = await window.electron.sqlite.sailorDB.insertClub(club, 'Country'); // Replace 'Country' with actual country if needed
+            const result = await window.electron.sqlite.sailorDB.insertClub(
+              club,
+              'Country',
+            );
             return result.lastInsertRowid;
           } catch (error) {
             if (error.code === 'SQLITE_BUSY' && retries > 0) {
               console.warn('Database is busy, retrying...');
-              await new Promise(resolve => setTimeout(resolve, 100)); // Wait for 100ms before retrying
+              await new Promise((resolve) => {
+                setTimeout(resolve, 100);
+              });
               return insertClubWithRetry(retries - 1);
-            } else {
-              throw error;
             }
+            throw error;
           }
         };
 
         club_id = await insertClubWithRetry();
       }
 
-      // Check if the boat exists, if not insert it
-      let boat_id = boats.find(b => b.sail_number === sailNumber)?.boat_id;
+      let boat_id = boats.find((b) => b.sail_number === sailNumber)?.boat_id;
+      console.log('Found boat ID:', boat_id);
       if (!boat_id) {
+        console.log('Boat not found, inserting:', sailNumber, model);
         const insertBoatWithRetry = async (retries = 5) => {
           try {
-            const result = await window.electron.sqlite.sailorDB.insertBoat(sailNumber, 'Country', model); // Replace 'Country' with actual country if needed
+            const result = await window.electron.sqlite.sailorDB.insertBoat(
+              sailNumber,
+              'Country',
+              model,
+            );
             return result.lastInsertRowid;
           } catch (error) {
             if (error.code === 'SQLITE_BUSY' && retries > 0) {
               console.warn('Database is busy, retrying...');
-              await new Promise(resolve => setTimeout(resolve, 100)); // Wait for 100ms before retrying
+              await new Promise((resolve) => {
+                setTimeout(resolve, 100);
+              });
               return insertBoatWithRetry(retries - 1);
-            } else {
-              throw error;
             }
+            throw error;
           }
         };
         boat_id = await insertBoatWithRetry();
+        console.log('Inserted boat with ID:', boat_id);
+        // Refresh boats
+        await fetchBoats();
       }
 
-      // Insert the sailor with the boat_id
+      // Log the values before calling the IPC handler
+      console.log('Calling insertSailor IPC handler with values:', {
+        name,
+        surname,
+        birthday,
+        category_id,
+        club_id,
+        boat_id,
+      });
+
+      // Call the IPC handler to insert the sailor
       await window.electron.sqlite.sailorDB.insertSailor(
         name,
         surname,
         birthday,
         category_id,
         club_id,
-        boat_id // Ensure boat_id is passed here
+        boat_id,
       );
+      console.log('Sailor inserted successfully.');
       fetchSailors();
+
+      // Optionally, reset form fields
     } catch (error) {
       console.error('Error inserting sailor into the database:', error);
     }
@@ -164,6 +190,6 @@ const SailorsForm = () => {
       <button type="submit">Add Sailor</button>
     </form>
   );
-};
+}
 
 export default SailorsForm;

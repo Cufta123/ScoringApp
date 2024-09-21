@@ -15,13 +15,13 @@ const readAllSailors = () => {
   try {
     const query = `
       SELECT
-        s.sailor_id, s.name, s.surname, s.category_id, s.club_id, s.boat_id,
+        s.sailor_id, s.name, s.surname, s.birthday, s.category_id, s.club_id,
         b.sail_number, b.model,
         c.club_name, cat.category_name
       FROM Sailors s
       LEFT JOIN Clubs c ON s.club_id = c.club_id
       LEFT JOIN Categories cat ON s.category_id = cat.category_id
-      LEFT JOIN Boats b ON s.boat_id = b.boat_id
+      LEFT JOIN Boats b ON s.sailor_id = b.sailor_id
     `;
     const readQuery = db.prepare(query);
     const results = readQuery.all();
@@ -33,17 +33,10 @@ const readAllSailors = () => {
   }
 };
 
-const insertSailor = (
-  name,
-  surname,
-  birthdate,
-  category_id,
-  club_id,
-  boat_id,
-) => {
-  if (!name || !surname || !birthdate || !category_id || !club_id || !boat_id) {
+const insertSailor = (name, surname, birthday, category_id, club_id) => {
+  if (!name || !surname || !birthday || !category_id || !club_id) {
     throw new Error(
-      'Name, surname, birthdate, category_id, club_id, and boat_id are required.',
+      'Name, surname, birthday, category_id, and club_id are required.',
     );
   }
   try {
@@ -51,26 +44,25 @@ const insertSailor = (
     console.log('Inserting sailor with parameters:', {
       name,
       surname,
-      birthdate,
+      birthday,
       category_id,
       club_id,
-      boat_id,
     });
     const insertSailorQuery = db.prepare(
-      `INSERT INTO Sailors (name, surname, birthdate, category_id, club_id, boat_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO Sailors (name, surname, birthday, category_id, club_id)
+       VALUES (?, ?, ?, ?, ?)`,
     );
     const sailorInfo = insertSailorQuery.run(
       name,
       surname,
-      birthdate,
+      birthday,
       category_id,
       club_id,
-      boat_id,
     );
     console.log(
       `Inserted ${sailorInfo.changes} row(s) with last ID ${sailorInfo.lastInsertRowid} into Sailors.`,
     );
+    return { lastInsertRowid: sailorInfo.lastInsertRowid };
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT') {
       console.error('Error: The sailor already exists.');
@@ -107,18 +99,18 @@ const insertClub = (club_name, country) => {
   }
 };
 
-const insertBoat = (sail_number, country, model) => {
-  if (!sail_number || !model) {
-    throw new Error('Sail number and model are required.');
+const insertBoat = (sail_number, country, model, sailor_id) => {
+  if (!sail_number || !model || !sailor_id) {
+    throw new Error('Sail number, model, and sailor_id are required.');
   }
 
   try {
     const insertQuery = db.prepare(
-      `INSERT INTO Boats (sail_number, country, model)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO Boats (sail_number, country, model, sailor_id)
+       VALUES (?, ?, ?, ?)`,
     );
 
-    const info = insertQuery.run(sail_number, country, model);
+    const info = insertQuery.run(sail_number, country, model, sailor_id);
     console.log(
       `Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Boats.`,
     );

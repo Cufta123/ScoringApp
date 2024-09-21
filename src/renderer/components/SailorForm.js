@@ -87,6 +87,16 @@ function SailorsForm() {
         club_id = await insertClubWithRetry();
       }
 
+      // Insert the sailor and get the sailor_id
+      const sailorResult = await window.electron.sqlite.sailorDB.insertSailor(
+        name,
+        surname,
+        birthday,
+        category_id,
+        club_id,
+      );
+      const sailor_id = sailorResult.lastInsertRowid;
+
       let boat_id = boats.find((b) => b.sail_number === sailNumber)?.boat_id;
       console.log('Found boat ID:', boat_id);
       if (!boat_id) {
@@ -97,6 +107,7 @@ function SailorsForm() {
               sailNumber,
               'Country',
               model,
+              sailor_id,
             );
             return result.lastInsertRowid;
           } catch (error) {
@@ -126,15 +137,6 @@ function SailorsForm() {
         boat_id,
       });
 
-      // Call the IPC handler to insert the sailor
-      await window.electron.sqlite.sailorDB.insertSailor(
-        name,
-        surname,
-        birthday,
-        category_id,
-        club_id,
-        boat_id,
-      );
       console.log('Sailor inserted successfully.');
       fetchSailors();
 

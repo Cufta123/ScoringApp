@@ -22,13 +22,13 @@ ipcMain.handle('readAllSailors', () => {
       .prepare(
         `
 SELECT
-  s.sailor_id, s.name, s.surname, s.birthday, s.category_id, s.club_id, s.boat_id,
+  s.sailor_id, s.name, s.surname, s.birthday, s.category_id, s.club_id,
   b.sail_number, b.model,
   c.club_name, cat.category_name
 FROM Sailors s
 LEFT JOIN Clubs c ON s.club_id = c.club_id
 LEFT JOIN Categories cat ON s.category_id = cat.category_id
-LEFT JOIN Boats b ON s.boat_id = b.boat_id
+LEFT JOIN Boats b ON s.sailor_id = b.sailor_id
     `,
       )
       .all();
@@ -51,19 +51,22 @@ ipcMain.handle('insertClub', async (event, club_name, country) => {
   }
 });
 
-ipcMain.handle('insertBoat', async (event, sail_number, country, model) => {
-  try {
-    const result = db
-      .prepare(
-        'INSERT INTO Boats (sail_number, country, model) VALUES (?, ?, ?)',
-      )
-      .run(sail_number, country, model);
-    return { lastInsertRowid: result.lastInsertRowid };
-  } catch (error) {
-    log(`Error inserting boat: ${error}`);
-    throw error;
-  }
-});
+ipcMain.handle(
+  'insertBoat',
+  async (event, sail_number, country, model, sailor_id) => {
+    try {
+      const result = db
+        .prepare(
+          'INSERT INTO Boats (sail_number, country, model, sailor_id) VALUES (?, ?, ?, ?)',
+        )
+        .run(sail_number, country, model, sailor_id);
+      return { lastInsertRowid: result.lastInsertRowid };
+    } catch (error) {
+      log(`Error inserting boat: ${error}`);
+      throw error;
+    }
+  },
+);
 
 ipcMain.handle('readAllCategories', () => {
   try {
@@ -97,7 +100,7 @@ ipcMain.handle('readAllBoats', () => {
 
 ipcMain.handle(
   'insertSailor',
-  async (event, name, surname, birthday, category_id, club_id, boat_id) => {
+  async (event, name, surname, birthday, category_id, club_id) => {
     const maxRetries = 5;
     const delay = (ms: number) =>
       new Promise((resolve) => {
@@ -106,17 +109,19 @@ ipcMain.handle(
 
     const insertSailorWithRetry = async (
       attempt: number,
-    ): Promise<{ success: boolean }> => {
+    ): Promise<{ lastInsertRowid: number }> => {
       try {
         // Log the received parameters
         log(
-          `Inserting sailor with parameters: ${name}, ${surname}, ${birthday}, ${category_id}, ${club_id}, ${boat_id}`,
+          `Inserting sailor with parameters: ${name}, ${surname}, ${birthday}, ${category_id}, ${club_id}`,
         );
 
-        db.prepare(
-          'INSERT INTO Sailors (name, surname, birthday, category_id, club_id, boat_id) VALUES (?, ?, ?, ?, ?, ?)',
-        ).run(name, surname, birthday, category_id, club_id, boat_id);
-        return { success: true };
+        const result = db
+          .prepare(
+            'INSERT INTO Sailors (name, surname, birthday, category_id, club_id) VALUES (?, ?, ?, ?, ?)',
+          )
+          .run(name, surname, birthday, category_id, club_id);
+        return { lastInsertRowid: result.lastInsertRowid };
       } catch (error) {
         const sqliteError = error as SqliteError;
         if (sqliteError.code === 'SQLITE_BUSY' && attempt < maxRetries) {

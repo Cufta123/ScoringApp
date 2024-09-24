@@ -29,72 +29,31 @@ const readAllSailors = () => {
     return results;
   } catch (err) {
     console.error('Error reading all sailors from the database:', err.message);
-    throw err;
-  }
-};
-
-const insertSailor = (name, surname, birthday, category_id, club_id) => {
-  if (!name || !surname || !birthday || !category_id || !club_id) {
-    throw new Error(
-      'Name, surname, birthday, category_id, and club_id are required.',
-    );
-  }
-  try {
-    // Log the received parameters
-    console.log('Inserting sailor with parameters:', {
-      name,
-      surname,
-      birthday,
-      category_id,
-      club_id,
-    });
-    const insertSailorQuery = db.prepare(
-      `INSERT INTO Sailors (name, surname, birthday, category_id, club_id)
-       VALUES (?, ?, ?, ?, ?)`,
-    );
-    const sailorInfo = insertSailorQuery.run(
-      name,
-      surname,
-      birthday,
-      category_id,
-      club_id,
-    );
-    console.log(
-      `Inserted ${sailorInfo.changes} row(s) with last ID ${sailorInfo.lastInsertRowid} into Sailors.`,
-    );
-    return { lastInsertRowid: sailorInfo.lastInsertRowid };
-  } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT') {
-      console.error('Error: The sailor already exists.');
-    } else {
-      console.error('Error inserting sailor into the database:', err.message);
-    }
-    throw err;
+    return [];
   }
 };
 
 const insertClub = (club_name, country) => {
-  if (!club_name || !country) {
-    throw new Error('Club name and country are required.');
-  }
-
   try {
+    // Check if the club already exists
+    const existingClub = db
+      .prepare('SELECT club_id FROM Clubs WHERE club_name = ?')
+      .get(club_name);
+    if (existingClub) {
+      return { lastInsertRowid: existingClub.club_id };
+    }
+
     const insertQuery = db.prepare(
       `INSERT INTO Clubs (club_name, country)
        VALUES (?, ?)`,
     );
-
     const info = insertQuery.run(club_name, country);
     console.log(
       `Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into Clubs.`,
     );
     return { lastInsertRowid: info.lastInsertRowid };
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT') {
-      console.error('Error: The club already exists.');
-    } else {
-      console.error('Error inserting club into the database:', err.message);
-    }
+    console.error('Error inserting club into the database:', err.message);
     throw err;
   }
 };
@@ -125,47 +84,8 @@ const insertBoat = (sail_number, country, model, sailor_id) => {
   }
 };
 
-const readAllCategories = () => {
-  try {
-    const query = `SELECT * FROM Categories`;
-    const readQuery = db.prepare(query);
-    return readQuery.all();
-  } catch (err) {
-    console.error(
-      'Error reading all categories from the database:',
-      err.message,
-    );
-    throw err;
-  }
-};
-
-const readAllClubs = () => {
-  try {
-    const query = `SELECT * FROM Clubs`;
-    const readQuery = db.prepare(query);
-    return readQuery.all();
-  } catch (err) {
-    console.error('Error reading all clubs from the database:', err.message);
-    throw err;
-  }
-};
-const readAllBoats = () => {
-  try {
-    const query = `SELECT * FROM Boats`;
-    const readQuery = db.prepare(query);
-    return readQuery.all();
-  } catch (err) {
-    console.error('Error reading all boats from the database:', err.message);
-    throw err;
-  }
-};
-
 module.exports = {
   readAllSailors,
-  insertSailor,
   insertClub,
   insertBoat,
-  readAllCategories,
-  readAllClubs,
-  readAllBoats,
 };

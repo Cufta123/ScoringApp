@@ -1,16 +1,18 @@
 import React from 'react';
-import PersonForm from './components/PersonForm';
-import SailorsForm from './components/SailorForm';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import LandingPage from './pages/LandingPage/LandingPage';
+import EventPage from './pages/EventPage/EventPage';
 
 function App() {
-  return (
-    <div>
-      <h1>Person Management</h1>
-      <PersonForm />
+  console.log('App component rendered');
 
-      <h1>Sailor Managmet</h1>
-      <SailorsForm />
-    </div>
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/event/:name" element={<EventPage />} />
+      </Routes>
+    </Router>
   );
 }
 

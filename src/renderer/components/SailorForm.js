@@ -87,27 +87,35 @@ function SailorsForm() {
         club_id = await insertClubWithRetry();
       }
 
-      // Insert the sailor and get the sailor_id
-      const sailorResult = await window.electron.sqlite.sailorDB.insertSailor(
-        name,
-        surname,
-        birthday,
-        category_id,
-        club_id,
-      );
-      const sailor_id = sailorResult.lastInsertRowid;
+      // Check if the sailor already exists
+      const allSailors = await window.electron.sqlite.sailorDB.readAllSailors();
+      let sailor_id = allSailors.find(
+        (s) =>
+          s.name === name && s.surname === surname && s.birthday === birthday,
+      )?.sailor_id;
 
+      if (!sailor_id) {
+        // Insert the sailor and get the sailor_id
+        const sailorResult = await window.electron.sqlite.sailorDB.insertSailor(
+          name,
+          surname,
+          birthday,
+          category_id,
+          club_id,
+        );
+        sailor_id = sailorResult.lastInsertRowid;
+      }
+
+      // Insert the boat with the existing or new sailor_id
       let boat_id = boats.find((b) => b.sail_number === sailNumber)?.boat_id;
-      console.log('Found boat ID:', boat_id);
       if (!boat_id) {
-        console.log('Boat not found, inserting:', sailNumber, model);
         const insertBoatWithRetry = async (retries = 5) => {
           try {
             const result = await window.electron.sqlite.sailorDB.insertBoat(
               sailNumber,
               'Country',
               model,
-              sailor_id,
+              sailor_id, // Ensure sailor_id is passed here
             );
             return result.lastInsertRowid;
           } catch (error) {
@@ -118,31 +126,29 @@ function SailorsForm() {
               });
               return insertBoatWithRetry(retries - 1);
             }
+            if (error.code === 'SQLITE_CONSTRAINT') {
+              console.error('Error: The sail number already exists.');
+              alert(
+                'The sail number already exists. Please use a different sail number.',
+              );
+              return null;
+            }
             throw error;
           }
         };
         boat_id = await insertBoatWithRetry();
-        console.log('Inserted boat with ID:', boat_id);
-        // Refresh boats
-        await fetchBoats();
+        if (boat_id) {
+          // Refresh boats
+          await fetchBoats();
+        }
       }
 
-      // Log the values before calling the IPC handler
-      console.log('Calling insertSailor IPC handler with values:', {
-        name,
-        surname,
-        birthday,
-        category_id,
-        club_id,
-        boat_id,
-      });
-
-      console.log('Sailor inserted successfully.');
+      console.log('Sailor and boat inserted successfully.');
       fetchSailors();
 
       // Optionally, reset form fields
     } catch (error) {
-      console.error('Error inserting sailor into the database:', error);
+      console.error('Error inserting sailor or boat into the database:', error);
     }
   };
 

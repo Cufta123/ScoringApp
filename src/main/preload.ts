@@ -85,7 +85,6 @@ const electronHandler = {
         birthday: string,
         category_id: string,
         club_id: string,
-        boat_id: string,
       ) {
         try {
           return await ipcRenderer.invoke(
@@ -95,7 +94,6 @@ const electronHandler = {
             birthday,
             category_id,
             club_id,
-            boat_id,
           );
         } catch (error) {
           console.error('Error invoking insertSailor IPC:', error);
@@ -110,16 +108,30 @@ const electronHandler = {
           return false;
         }
       },
-      async insertBoat(sail_number: string, country: string, model: string) {
+      async insertBoat(
+        sail_number: string,
+        country: string,
+        model: string,
+        sailor_id: string,
+      ) {
         try {
           return await ipcRenderer.invoke(
             'insertBoat',
             sail_number,
             country,
             model,
+            sailor_id,
           );
         } catch (error) {
-          console.error('Error invoking insertBoat IPC:', error);
+          if (error === 'SQLITE_CONSTRAINT') {
+            console.error('Error: The sail number already exists.');
+            // eslint-disable-next-line no-alert
+            alert(
+              'The sail number already exists. Please use a different sail number.',
+            );
+          } else {
+            console.error('Error invoking insertBoat IPC:', error);
+          }
           return false;
         }
       },

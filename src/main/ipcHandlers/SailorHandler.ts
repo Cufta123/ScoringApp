@@ -62,7 +62,12 @@ ipcMain.handle(
         .run(sail_number, country, model, sailor_id);
       return { lastInsertRowid: result.lastInsertRowid };
     } catch (error) {
-      log(`Error inserting boat: ${error}`);
+      const sqliteError = error as SqliteError;
+      if (sqliteError.code === 'SQLITE_CONSTRAINT') {
+        console.error('Error: The sail number already exists.');
+        return { error: 'The sail number already exists.' };
+      }
+      console.error(`Error inserting boat: ${error}`);
       throw error;
     }
   },

@@ -14,7 +14,9 @@ export type Channels =
   | 'readAllClubs'
   | 'insertClub'
   | 'insertBoat'
-  | 'readAllBoats';
+  | 'readAllBoats'
+  | 'readAllEvents'
+  | 'insertEvent';
 
 const electronHandler = {
   ipcRenderer: {
@@ -156,6 +158,35 @@ const electronHandler = {
           return await ipcRenderer.invoke('readAllBoats');
         } catch (error) {
           console.error('Error invoking readAllBoats IPC:', error);
+          return false;
+        }
+      },
+    },
+    eventDB: {
+      async readAllEvents() {
+        try {
+          return await ipcRenderer.invoke('readAllEvents');
+        } catch (error) {
+          console.error('Error invoking readAllEvents IPC: ', error);
+          return false;
+        }
+      },
+      async insertEvent(
+        event_name: string,
+        event_location: string,
+        start_date: string,
+        end_date: string,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'insertEvent',
+            event_name,
+            event_location,
+            start_date,
+            end_date,
+          );
+        } catch (error) {
+          console.error('Error invoking insertEvent IPC:', error);
           return false;
         }
       },

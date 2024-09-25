@@ -1,8 +1,6 @@
-/* eslint-disable prettier/prettier */
-// src/pages/EventPage/EventPage.js
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import SailorForm from '../../components/SailorForm'
+import SailorForm from '../../components/SailorForm';
 
 function EventPage() {
   const location = useLocation();
@@ -15,9 +13,9 @@ function EventPage() {
 
   return (
     <div>
-      <h1>{event.name}</h1>
-      <p>Start Date: {event.startDate}</p>
-      <p>End Date: {event.endDate}</p>
+      <h1>{event.event_name}</h1>
+      <p>Start Date: {event.start_date}</p>
+      <p>End Date: {event.end_date}</p>
 
       <h2>Add Sailors</h2>
       <SailorForm onAddSailor={addSailor} />

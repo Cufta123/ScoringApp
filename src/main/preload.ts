@@ -16,7 +16,9 @@ export type Channels =
   | 'insertBoat'
   | 'readAllBoats'
   | 'readAllEvents'
-  | 'insertEvent';
+  | 'insertEvent'
+  | 'associateBoatWithEvent'
+  | 'readBoatsByEvent';
 
 const electronHandler = {
   ipcRenderer: {
@@ -187,6 +189,26 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking insertEvent IPC:', error);
+          return false;
+        }
+      },
+      async associateBoatWithEvent(boat_id: string, event_id: string) {
+        try {
+          return await ipcRenderer.invoke(
+            'associateBoatWithEvent',
+            boat_id,
+            event_id,
+          );
+        } catch (error) {
+          console.error('Error invoking associateBoatWithEvent IPC:', error);
+          return false;
+        }
+      },
+      async readBoatsByEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('readBoatsByEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking readBoatsByEvent IPC:', error);
           return false;
         }
       },

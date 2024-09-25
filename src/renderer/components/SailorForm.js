@@ -1,7 +1,13 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-function SailorsForm() {
+function SailorForm({ onAddSailor, eventId }) {
+  SailorForm.propTypes = {
+    onAddSailor: PropTypes.func.isRequired,
+    eventId: PropTypes.number.isRequired,
+  };
+
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -73,8 +79,8 @@ function SailorsForm() {
             );
             return result.lastInsertRowid;
           } catch (error) {
-            if (error.code === 'SQLITE_BUSY' && retries > 0) {
-              console.warn('Database is busy, retrying...');
+            if (retries > 0) {
+              console.error('Retrying insert club:', error);
               await new Promise((resolve) => {
                 setTimeout(resolve, 100);
               });
@@ -115,36 +121,35 @@ function SailorsForm() {
               sailNumber,
               'Country',
               model,
-              sailor_id, // Ensure sailor_id is passed here
+              sailor_id,
             );
             return result.lastInsertRowid;
           } catch (error) {
-            if (error.code === 'SQLITE_BUSY' && retries > 0) {
-              console.warn('Database is busy, retrying...');
+            if (retries > 0) {
+              console.error('Retrying insert boat:', error);
               await new Promise((resolve) => {
                 setTimeout(resolve, 100);
               });
               return insertBoatWithRetry(retries - 1);
             }
-            if (error.code === 'SQLITE_CONSTRAINT') {
-              console.error('Error: The sail number already exists.');
-              alert(
-                'The sail number already exists. Please use a different sail number.',
-              );
-              return null;
-            }
             throw error;
           }
         };
+
         boat_id = await insertBoatWithRetry();
-        if (boat_id) {
-          // Refresh boats
-          await fetchBoats();
-        }
       }
+
+      // Associate the boat with the event
+      await window.electron.sqlite.eventDB.associateBoatWithEvent(
+        boat_id,
+        eventId,
+      );
 
       console.log('Sailor and boat inserted successfully.');
       fetchSailors();
+
+      // Call the onAddSailor function to refresh the list in EventPage
+      onAddSailor();
 
       // Optionally, reset form fields
     } catch (error) {
@@ -200,4 +205,4 @@ function SailorsForm() {
   );
 }
 
-export default SailorsForm;
+export default SailorForm;

@@ -63,7 +63,7 @@ ipcMain.handle(
 ipcMain.handle('associateBoatWithEvent', async (event, boat_id, event_id) => {
   try {
     const result = db
-      .prepare('INSERT INTO BoatEvents (boat_id, event_id) VALUES (?, ?)')
+      .prepare('INSERT INTO Boat_Event (boat_id, event_id) VALUES (?, ?)')
       .run(boat_id, event_id);
     return { lastInsertRowid: result.lastInsertRowid };
   } catch (error) {
@@ -78,16 +78,17 @@ ipcMain.handle('readBoatsByEvent', async (event, event_id) => {
       .prepare(
         `
 SELECT
-  b.boat_id, b.sail_number, b.country, b.model, b.sailor_id
+  b.boat_id, b.sail_number, b.country, b.model, s.name, s.surname
 FROM Boats b
-JOIN BoatEvents be ON b.boat_id = be.boat_id
+JOIN Boat_Event be ON b.boat_id = be.boat_id
+JOIN Sailors s ON b.sailor_id = s.sailor_id
 WHERE be.event_id = ?
         `,
       )
       .all(event_id);
     return rows;
   } catch (error) {
-    log(`Error reading boats by event: ${error}`);
+    console.error('Error reading boats by event:', error);
     throw error;
   }
 });

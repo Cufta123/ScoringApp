@@ -36,6 +36,8 @@ const electronHandler = {
   eventDB: {
     readAllEvents: eventDB.readAllEvents,
     insertEvent: eventDB.insertEvent,
+    associateBoatWithEvent: eventDB.associateBoatWithEvent,
+    readBoatsByEvent: eventDB.readBoatsByEvent,
   },
 };
 

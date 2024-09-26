@@ -158,10 +158,3 @@ MIT © [Electron React Boilerplate](https://github.com/electron-react-boilerplat
 [github-tag-url]: https://github.com/electron-react-boilerplate/electron-react-boilerplate/releases/latest
 [stackoverflow-img]: https://img.shields.io/badge/stackoverflow-electron_react_boilerplate-blue.svg
 [stackoverflow-url]: https://stackoverflow.com/questions/tagged/electron-react-boilerplate
-=======
-# ScorringApp
-ScoringApp
->>>>>>> b5d317acea81ff1bfd84bb538aff5b81251fffc7
-#   S c o r i n g A p p  
- #   S c o r r i n g A p p  
- 

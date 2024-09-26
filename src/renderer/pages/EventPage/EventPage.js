@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
+import './EventPage.css';
 
 function EventPage() {
   const location = useLocation();
@@ -51,8 +52,25 @@ function EventPage() {
         event.event_id,
       );
       fetchBoatsWithSailors();
+      setAllBoats((prevBoats) =>
+        prevBoats.filter((boat) => boat.boat_id !== selectedBoatId),
+      );
     } catch (error) {
       console.error('Error associating boat with event:', error);
+    }
+  };
+
+  const handleRemoveBoat = async (boatId) => {
+    try {
+      await window.electron.sqlite.eventDB.removeBoatFromEvent(
+        boatId,
+        event.event_id,
+      );
+      fetchBoatsWithSailors();
+      const removedBoat = boats.find((boat) => boat.boat_id === boatId);
+      setAllBoats((prevBoats) => [...prevBoats, removedBoat]);
+    } catch (error) {
+      console.error('Error removing boat from event:', error);
     }
   };
 
@@ -80,7 +98,7 @@ function EventPage() {
           </option>
           {allBoats.map((boat) => (
             <option
-              key={`${boat.boat_id}-${boat.sail_number}`}
+              key={`${boat.boat_id}-${boat.sail_number}-${event.event_id}`}
               value={boat.boat_id}
             >
               {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
@@ -91,7 +109,7 @@ function EventPage() {
         <button type="submit">Add Boat</button>
       </form>
       <h3>Boats and Sailors</h3>
-      <SailorList sailors={boats} />
+      <SailorList sailors={boats} onRemoveBoat={handleRemoveBoat} />
     </div>
   );
 }

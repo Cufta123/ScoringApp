@@ -92,3 +92,14 @@ WHERE be.event_id = ?
     throw error;
   }
 });
+ipcMain.handle('removeBoatFromEvent', async (event, boat_id, event_id) => {
+  try {
+    db.prepare('DELETE FROM Boat_Event WHERE boat_id = ? AND event_id = ?').run(
+      boat_id,
+      event_id,
+    );
+  } catch (error) {
+    log(`Error removing boat from event: ${error}`);
+    throw error;
+  }
+});

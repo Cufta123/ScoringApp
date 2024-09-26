@@ -38,6 +38,7 @@ const electronHandler = {
     insertEvent: eventDB.insertEvent,
     associateBoatWithEvent: eventDB.associateBoatWithEvent,
     readBoatsByEvent: eventDB.readBoatsByEvent,
+    removeBoatFromEvent: eventDB.removeBoatFromEvent,
   },
 };
 

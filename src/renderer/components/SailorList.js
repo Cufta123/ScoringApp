@@ -1,8 +1,7 @@
-/* eslint-disable prettier/prettier */
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 
-function SailorList({ sailors }) {
+function SailorList({ sailors, onRemoveBoat }) {
   const [sortCriteria, setSortCriteria] = useState('name');
 
   const sortedSailors = [...sailors].sort((a, b) => {
@@ -30,6 +29,9 @@ function SailorList({ sailors }) {
           <li key={`${sailor.boat_id}-${sailor.sail_number}`}>
             {sailor.sail_number} - {sailor.model} (Sailor: {sailor.name}{' '}
             {sailor.surname}, Club: {sailor.club})
+            <button type="button" onClick={() => onRemoveBoat(sailor.boat_id)}>
+              Remove
+            </button>
           </li>
         ))}
       </ul>
@@ -48,6 +50,7 @@ SailorList.propTypes = {
       club: PropTypes.string.isRequired,
     }),
   ).isRequired,
+  onRemoveBoat: PropTypes.func.isRequired,
 };
 
 export default SailorList;

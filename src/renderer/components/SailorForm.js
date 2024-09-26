@@ -71,26 +71,25 @@ function SailorForm({ onAddSailor, eventId }) {
       // Check if the club exists, if not insert it
       let club_id = clubs.find((c) => c.club_name === club)?.club_id;
       if (!club_id) {
-        const insertClubWithRetry = async (retries = 5) => {
-          try {
-            const result = await window.electron.sqlite.sailorDB.insertClub(
-              club,
-              'Country',
-            );
-            return result.lastInsertRowid;
-          } catch (error) {
-            if (retries > 0) {
-              console.error('Retrying insert club:', error);
-              await new Promise((resolve) => {
-                setTimeout(resolve, 100);
-              });
-              return insertClubWithRetry(retries - 1);
+        try {
+          const result = await window.electron.sqlite.sailorDB.insertClub(
+            club,
+            'Country',
+          );
+          club_id = result.lastInsertRowid;
+        } catch (error) {
+          if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            // If the club already exists, fetch its ID
+            const existingClub = clubs.find((c) => c.club_name === club);
+            if (existingClub) {
+              club_id = existingClub.club_id;
+            } else {
+              throw new Error('Club exists but could not retrieve its ID');
             }
+          } else {
             throw error;
           }
-        };
-
-        club_id = await insertClubWithRetry();
+        }
       }
 
       // Check if the sailor already exists
@@ -115,28 +114,13 @@ function SailorForm({ onAddSailor, eventId }) {
       // Insert the boat with the existing or new sailor_id
       let boat_id = boats.find((b) => b.sail_number === sailNumber)?.boat_id;
       if (!boat_id) {
-        const insertBoatWithRetry = async (retries = 5) => {
-          try {
-            const result = await window.electron.sqlite.sailorDB.insertBoat(
-              sailNumber,
-              'Country',
-              model,
-              sailor_id,
-            );
-            return result.lastInsertRowid;
-          } catch (error) {
-            if (retries > 0) {
-              console.error('Retrying insert boat:', error);
-              await new Promise((resolve) => {
-                setTimeout(resolve, 100);
-              });
-              return insertBoatWithRetry(retries - 1);
-            }
-            throw error;
-          }
-        };
-
-        boat_id = await insertBoatWithRetry();
+        const boatResult = await window.electron.sqlite.sailorDB.insertBoat(
+          sailNumber,
+          'Country',
+          model,
+          sailor_id,
+        );
+        boat_id = boatResult.lastInsertRowid;
       }
 
       // Associate the boat with the event

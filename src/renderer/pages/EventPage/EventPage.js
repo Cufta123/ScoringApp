@@ -79,7 +79,10 @@ function EventPage() {
             Select a boat
           </option>
           {allBoats.map((boat) => (
-            <option key={boat.boat_id} value={boat.boat_id}>
+            <option
+              key={`${boat.boat_id}-${boat.sail_number}`}
+              value={boat.boat_id}
+            >
               {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
               {boat.surname})
             </option>
@@ -87,11 +90,10 @@ function EventPage() {
         </select>
         <button type="submit">Add Boat</button>
       </form>
-
       <h3>Boats and Sailors</h3>
       <ul>
         {boats.map((boat) => (
-          <li key={boat.boat_id}>
+          <li key={`${boat.boat_id}-${boat.sail_number}`}>
             {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
             {boat.surname})
           </li>
@@ -100,5 +102,4 @@ function EventPage() {
     </div>
   );
 }
-
 export default EventPage;

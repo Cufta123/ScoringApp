@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
+import SailorList from '../../components/SailorList';
 
 function EventPage() {
   const location = useLocation();
@@ -24,7 +25,6 @@ function EventPage() {
     try {
       const fetchedBoats = await window.electron.sqlite.sailorDB.readAllBoats();
       setAllBoats(fetchedBoats);
-      setAllBoats(() => fetchedBoats);
     } catch (error) {
       console.error('Error fetching all boats:', error);
     }
@@ -91,15 +91,9 @@ function EventPage() {
         <button type="submit">Add Boat</button>
       </form>
       <h3>Boats and Sailors</h3>
-      <ul>
-        {boats.map((boat) => (
-          <li key={`${boat.boat_id}-${boat.sail_number}`}>
-            {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
-            {boat.surname})
-          </li>
-        ))}
-      </ul>
+      <SailorList sailors={boats} />
     </div>
   );
 }
+
 export default EventPage;

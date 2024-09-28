@@ -95,7 +95,20 @@ ipcMain.handle('readAllClubs', () => {
 
 ipcMain.handle('readAllBoats', () => {
   try {
-    const rows = db.prepare('SELECT * FROM Boats').all();
+    const rows = db
+      .prepare(
+        `SELECT
+      b.boat_id, b.sail_number, b.country AS boat_country, b.model,
+      s.name, s.surname,
+      c.club_name, c.country AS club_country,
+      cat.category_name
+    FROM Boats b
+    JOIN Boat_Event be ON b.boat_id = be.boat_id
+    JOIN Sailors s ON b.sailor_id = s.sailor_id
+    JOIN Clubs c ON s.club_id = c.club_id
+    JOIN Categories cat ON s.category_id = cat.category_id`,
+      )
+      .all();
     return rows;
   } catch (error) {
     log(`Error reading boats: ${error}`);

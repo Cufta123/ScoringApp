@@ -4,8 +4,6 @@ import LandingPage from './pages/LandingPage/LandingPage';
 import EventPage from './pages/EventPage/EventPage';
 
 function App() {
-  console.log('App component rendered');
-
   return (
     <Router>
       <Routes>

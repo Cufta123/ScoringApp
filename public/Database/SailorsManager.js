@@ -32,6 +32,25 @@ const readAllSailors = () => {
     return [];
   }
 };
+const readAllBoats = () => {
+  try {
+    const query = `
+    SELECT
+      b.boat_id, b.sail_number, b.country, b.model, b.sailor_id,
+      s.name, s.surname, s.club_id, c.club_name
+    FROM Boats b
+    LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+    LEFT JOIN Clubs c ON s.club_id = c.club_id
+  `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all();
+    console.log('Raw results from readAllBoats:', results); // Log the raw results
+    return results;
+  } catch (err) {
+    console.error('Error reading all boats from the database:', err.message);
+    return [];
+  }
+};
 
 const insertClub = (club_name, country) => {
   try {
@@ -88,4 +107,5 @@ module.exports = {
   readAllSailors,
   insertClub,
   insertBoat,
+  readAllBoats,
 };

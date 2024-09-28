@@ -16,7 +16,14 @@ function EventPage() {
     try {
       const boatsWithSailors =
         await window.electron.sqlite.eventDB.readBoatsByEvent(event.event_id);
-      setBoats(boatsWithSailors);
+      console.log('Fetched boats with sailors:', boatsWithSailors);
+      const mappedBoats = boatsWithSailors.map((boat) => ({
+        ...boat,
+        sailor: boat.name,
+        club: boat.club_name, // Map club_name to club
+        category: boat.category_name, // Map category_name to category
+      }));
+      setBoats(mappedBoats);
     } catch (error) {
       alert('Error fetching boats with sailors. Please try again later.');
     }
@@ -109,7 +116,10 @@ function EventPage() {
         <button type="submit">Add Boat</button>
       </form>
       <h3>Boats and Sailors</h3>
-      <SailorList sailors={boats} onRemoveBoat={handleRemoveBoat} />
+      <SailorList
+        sailors={Array.isArray(boats) ? boats : []}
+        onRemoveBoat={handleRemoveBoat}
+      />
     </div>
   );
 }

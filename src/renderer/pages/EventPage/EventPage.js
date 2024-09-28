@@ -62,6 +62,7 @@ function EventPage() {
       setAllBoats((prevBoats) =>
         prevBoats.filter((boat) => boat.boat_id !== selectedBoatId),
       );
+      setSelectedBoatId(''); // Clear the selected boat
     } catch (error) {
       console.error('Error associating boat with event:', error);
     }
@@ -73,13 +74,39 @@ function EventPage() {
         boatId,
         event.event_id,
       );
-      fetchBoatsWithSailors();
+
+      // Find the removed boat
       const removedBoat = boats.find((boat) => boat.boat_id === boatId);
-      setAllBoats((prevBoats) => [...prevBoats, removedBoat]);
+
+      // Remove the boat from the boats state first
+      setBoats((prevBoats) =>
+        prevBoats.filter((boat) => boat.boat_id !== boatId),
+      );
+
+      // Then add the removed boat to the allBoats state
+      if (removedBoat) {
+        setAllBoats((prevBoats) => [...prevBoats, removedBoat]);
+      }
     } catch (error) {
       console.error('Error removing boat from event:', error);
     }
   };
+
+  useEffect(() => {
+    // Ensure that the allBoats state is updated when boats state changes
+    setAllBoats((prevBoats) => {
+      const updatedBoats = prevBoats.filter(
+        (boat) =>
+          !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+      );
+      return updatedBoats;
+    });
+  }, [boats]);
+
+  // Filter out boats that are already added to the event
+  const availableBoats = allBoats.filter(
+    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+  );
 
   return (
     <div>
@@ -103,7 +130,7 @@ function EventPage() {
           <option value="" disabled>
             Select a boat
           </option>
-          {allBoats.map((boat) => (
+          {availableBoats.map((boat) => (
             <option
               key={`${boat.boat_id}-${boat.sail_number}-${event.event_id}`}
               value={boat.boat_id}

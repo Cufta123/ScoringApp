@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
@@ -21,6 +22,7 @@ function EventPage() {
         ...boat,
         sailor: boat.name,
         club: boat.club_name, // Map club_name to club
+        country: boat.boat_country, // Map country_name to country
         category: boat.category_name, // Map category_name to category
       }));
       setBoats(mappedBoats);
@@ -132,11 +134,11 @@ function EventPage() {
           </option>
           {availableBoats.map((boat) => (
             <option
-              key={`${boat.boat_id}-${boat.sail_number}-${event.event_id}`}
+              key={`${boat.boat_id}-${boat.boat_country}-${boat.sail_number}-${event.event_id}`}
               value={boat.boat_id}
             >
-              {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
-              {boat.surname})
+              {boat.boat_country} {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
+              {boat.surname} )
             </option>
           ))}
         </select>

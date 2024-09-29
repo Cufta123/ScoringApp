@@ -27,8 +27,9 @@ function SailorList({ sailors, onRemoveBoat }) {
       <ul>
         {sortedSailors.map((sailor) => (
           <li key={`${sailor.boat_id}-${sailor.sail_number}`}>
-            {sailor.sail_number} - {sailor.model} Sailor: {sailor.name}{' '}
-            {sailor.surname}, Club: {sailor.club}, Category: {sailor.category}
+            {sailor.country}-{sailor.sail_number} - {sailor.model} Sailor:{' '}
+            {sailor.name} {sailor.surname}, Club: {sailor.club}, Country:{' '}
+            {sailor.country}, Category: {sailor.category}
             <button type="button" onClick={() => onRemoveBoat(sailor.boat_id)}>
               Remove
             </button>
@@ -43,6 +44,7 @@ SailorList.propTypes = {
   sailors: PropTypes.arrayOf(
     PropTypes.shape({
       boat_id: PropTypes.number.isRequired,
+      country: PropTypes.string.isRequired,
       sail_number: PropTypes.number.isRequired,
       model: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,

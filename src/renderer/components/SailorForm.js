@@ -1,6 +1,7 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { iso31661 } from 'iso-3166';
 import { toast } from 'react-toastify';
 
 function SailorForm({ onAddSailor, eventId }) {
@@ -14,6 +15,7 @@ function SailorForm({ onAddSailor, eventId }) {
   const [birthday, setBirthday] = useState('');
   const [club, setClub] = useState('');
   const [clubs, setClubs] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState('');
   const [sailNumber, setSailNumber] = useState('');
   const [model, setModel] = useState('');
   const [boats, setBoats] = useState([]);
@@ -75,7 +77,7 @@ function SailorForm({ onAddSailor, eventId }) {
         try {
           const result = await window.electron.sqlite.sailorDB.insertClub(
             club,
-            'Country',
+            selectedCountry,
           );
           club_id = result.lastInsertRowid;
           console.log(`Club inserted with ID: ${club_id}`);
@@ -173,7 +175,7 @@ function SailorForm({ onAddSailor, eventId }) {
         try {
           const boatResult = await window.electron.sqlite.sailorDB.insertBoat(
             sailNumber,
-            'Country',
+            selectedCountry,
             model,
             sailor_id,
           );
@@ -252,6 +254,20 @@ function SailorForm({ onAddSailor, eventId }) {
         onChange={(e) => setSailNumber(e.target.value)}
         required
       />
+      <select
+        value={selectedCountry}
+        onChange={(e) => setSelectedCountry(e.target.value)}
+        required
+      >
+        <option value="" disabled>
+          Select Country
+        </option>
+        {iso31661.map((country) => (
+          <option key={country.alpha3} value={country.alpha3}>
+            {country.name} ({country.alpha3})
+          </option>
+        ))}
+      </select>
       <input
         type="text"
         placeholder="Model"

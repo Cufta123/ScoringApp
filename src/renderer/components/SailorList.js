@@ -24,18 +24,39 @@ function SailorList({ sailors, onRemoveBoat }) {
         <option value="sail_number">Sail Number</option>
         <option value="model">Boat Model</option>
       </select>
-      <ul>
-        {sortedSailors.map((sailor) => (
-          <li key={`${sailor.boat_id}-${sailor.sail_number}`}>
-            {sailor.country}-{sailor.sail_number} - {sailor.model} Sailor:{' '}
-            {sailor.name} {sailor.surname}, Club: {sailor.club}, Country:{' '}
-            {sailor.country}, Category: {sailor.category}
-            <button type="button" onClick={() => onRemoveBoat(sailor.boat_id)}>
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>Country</th>
+            <th>Sail Number</th>
+            <th>Model</th>
+            <th>Skipper</th>
+            <th>Club</th>
+            <th>Category</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedSailors.map((sailor) => (
+            <tr key={`${sailor.boat_id}-${sailor.sail_number}`}>
+              <td>{sailor.country}</td>
+              <td>{sailor.sail_number}</td>
+              <td>{sailor.model}</td>
+              <td>{`${sailor.name} ${sailor.surname}`}</td>
+              <td>{sailor.club}</td>
+              <td>{sailor.category}</td>
+              <td>
+                <button
+                  type="button"
+                  onClick={() => onRemoveBoat(sailor.boat_id)}
+                >
+                  Remove
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -50,6 +71,7 @@ SailorList.propTypes = {
       name: PropTypes.string.isRequired,
       surname: PropTypes.string.isRequired,
       club: PropTypes.string.isRequired,
+      category: PropTypes.string.isRequired,
     }),
   ).isRequired,
   onRemoveBoat: PropTypes.func.isRequired,

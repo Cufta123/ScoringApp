@@ -242,9 +242,9 @@ function SailorForm({ onAddSailor, eventId }) {
       />
       <input
         type="text"
-        placeholder="Club"
         value={club}
         onChange={(e) => setClub(e.target.value)}
+        placeholder="Club name"
         required
       />
       <input

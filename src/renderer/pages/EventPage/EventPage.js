@@ -1,9 +1,11 @@
 /* eslint-disable prettier/prettier */
 import React, { useState, useEffect, useCallback } from 'react';
+import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import './EventPage.css';
+
 
 function EventPage() {
   const location = useLocation();
@@ -11,7 +13,8 @@ function EventPage() {
   const { event } = location.state;
   const [boats, setBoats] = useState([]);
   const [allBoats, setAllBoats] = useState([]);
-  const [selectedBoatId, setSelectedBoatId] = useState('');
+  const [selectedBoats, setSelectedBoats] = useState([]);
+
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -56,19 +59,32 @@ function EventPage() {
   const handleBoatSelection = async (e) => {
     e.preventDefault();
     try {
-      await window.electron.sqlite.eventDB.associateBoatWithEvent(
-        selectedBoatId,
-        event.event_id,
-      );
+      const boatIds = selectedBoats.map(option => option.value);
+      await Promise.all(boatIds.map(boatId =>
+        window.electron.sqlite.eventDB.associateBoatWithEvent(boatId, event.event_id)
+      ));
       fetchBoatsWithSailors();
       setAllBoats((prevBoats) =>
-        prevBoats.filter((boat) => boat.boat_id !== selectedBoatId),
+        prevBoats.filter((boat) => !boatIds.includes(boat.boat_id)),
       );
-      setSelectedBoatId(''); // Clear the selected boat
+      setSelectedBoats([]); // Clear the selected boats
     } catch (error) {
-      console.error('Error associating boat with event:', error);
+      console.error('Error associating boats with event:', error);
     }
   };
+  const handleBoatChange = (selectedOptions) => {
+    setSelectedBoats(selectedOptions);
+  };
+
+  // Filter out boats that are already added to the event
+  const availableBoats = allBoats.filter(
+    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+  );
+
+  const boatOptions = availableBoats.map((boat) => ({
+    value: boat.boat_id,
+    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`
+  }));
 
   const handleRemoveBoat = async (boatId) => {
     try {
@@ -105,10 +121,7 @@ function EventPage() {
     });
   }, [boats]);
 
-  // Filter out boats that are already added to the event
-  const availableBoats = allBoats.filter(
-    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
-  );
+
 
   return (
     <div>
@@ -124,25 +137,14 @@ function EventPage() {
 
       <h2>Add Existing Boat to Event</h2>
       <form onSubmit={handleBoatSelection}>
-        <select
-          value={selectedBoatId}
-          onChange={(e) => setSelectedBoatId(e.target.value)}
-          required
-        >
-          <option value="" disabled>
-            Select a boat
-          </option>
-          {availableBoats.map((boat) => (
-            <option
-              key={`${boat.boat_id}-${boat.boat_country}-${boat.sail_number}-${event.event_id}`}
-              value={boat.boat_id}
-            >
-              {boat.boat_country} {boat.sail_number} - {boat.model} (Sailor: {boat.name}{' '}
-              {boat.surname} )
-            </option>
-          ))}
-        </select>
-        <button type="submit">Add Boat</button>
+        <Select
+          isMulti
+          value={selectedBoats}
+          onChange={handleBoatChange}
+          options={boatOptions}
+          closeMenuOnSelect={false}
+        />
+        <button type="submit">Add Boats</button>
       </form>
       <h3>Boats and Sailors</h3>
       <SailorList

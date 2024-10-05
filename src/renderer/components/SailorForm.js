@@ -1,8 +1,8 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { iso31661 } from 'iso-3166';
 import { toast } from 'react-toastify';
+import iocCountries from '../constants/iocCountries.json';
 
 function SailorForm({ onAddSailor, eventId }) {
   SailorForm.propTypes = {
@@ -262,9 +262,9 @@ function SailorForm({ onAddSailor, eventId }) {
         <option value="" disabled>
           Select Country
         </option>
-        {iso31661.map((country) => (
-          <option key={country.alpha3} value={country.alpha3}>
-            {country.name} ({country.alpha3})
+        {Object.entries(iocCountries).map(([code, countryName]) => (
+          <option key={code} value={code}>
+            {countryName} ({code})
           </option>
         ))}
       </select>

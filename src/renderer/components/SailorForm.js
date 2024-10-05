@@ -72,7 +72,11 @@ function SailorForm({ onAddSailor, eventId }) {
       const category_id = calculateCategory(birthday);
       console.log(`Category ID calculated: ${category_id}`);
 
-      let club_id = clubs.find((c) => c.club_name === club)?.club_id;
+      // Check if the club already exists
+      console.log('Existing clubs:', clubs); // Log the existing clubs
+      let club_id = clubs.find(
+        (c) => c.club_name === club && c.country === selectedCountry,
+      )?.club_id;
       if (!club_id) {
         try {
           const result = await window.electron.sqlite.sailorDB.insertClub(
@@ -81,9 +85,17 @@ function SailorForm({ onAddSailor, eventId }) {
           );
           club_id = result.lastInsertRowid;
           console.log(`Club inserted with ID: ${club_id}`);
+
+          // Update the clubs state with the newly added club
+          setClubs([
+            ...clubs,
+            { club_id, club_name: club, country: selectedCountry },
+          ]);
         } catch (error) {
           if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            const existingClub = clubs.find((c) => c.club_name === club);
+            const existingClub = clubs.find(
+              (c) => c.club_name === club && c.country === selectedCountry,
+            );
             if (existingClub) {
               club_id = existingClub.club_id;
               console.log(`Club already exists with ID: ${club_id}`);

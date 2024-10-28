@@ -55,8 +55,10 @@ function EventPage() {
   const handleBackClick = () => {
     navigate('/');
   };
-
-  const handleBoatSelection = async (e) => {
+  const handleNextClick = () => {
+    navigate(`/event/${event.event_name}/scoring`, { state: { event } });
+  };
+ const handleBoatSelection = async (e) => {
     e.preventDefault();
     try {
       const boatIds = selectedBoats.map(option => option.value);
@@ -125,9 +127,15 @@ function EventPage() {
 
   return (
     <div>
+   <div className="button-container">
       <button type="button" onClick={handleBackClick}>
         Back to Landing Page
       </button>
+      <button type="button" onClick={handleNextClick} className="next-button">
+        Continue to scoring
+      </button>
+    </div>
+
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>

@@ -19,7 +19,7 @@ ipcMain.on('ipc-example', async (event, arg) => {
 
 ipcMain.handle('readAllEvents', async () => {
   try {
-    const events = await db.prepare('SELECT * FROM Event').all();
+    const events = await db.prepare('SELECT * FROM Events').all();
     return events;
   } catch (error) {
     console.error('Error reading all events:', error);
@@ -41,7 +41,7 @@ ipcMain.handle(
       try {
         const result = db
           .prepare(
-            'INSERT INTO Event (event_name, event_location, start_date, end_date) VALUES (?, ?, ?, ?)',
+            'INSERT INTO Events (event_name, event_location, start_date, end_date) VALUES (?, ?, ?, ?)',
           )
           .run(event_name, event_location, start_date, end_date);
         return { lastInsertRowid: result.lastInsertRowid };

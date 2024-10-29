@@ -1,12 +1,154 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const dbPath =
-  process.env.NODE_ENV === 'development'
-    ? './demo_table.db'
-    : path.join(process.resourcesPath, './demo_table.db');
+// Define the directory and filename for the database
+const dataDir = path.join(__dirname, '..', '..', 'public', 'Database', 'data');
+const dbFilename = 'scoring_app.db';
+const dbPath = path.join(dataDir, dbFilename);
 
-const db = new Database(dbPath);
+console.log(`Database directory: ${dataDir}`);
+console.log(`Database path: ${dbPath}`);
+
+// Ensure the data directory exists
+if (!fs.existsSync(dataDir)) {
+  console.log(`Data directory does not exist. Creating ${dataDir}`);
+  fs.mkdirSync(dataDir);
+} else {
+  console.log(`Data directory already exists: ${dataDir}`);
+}
+
+// Initialize the database
+console.log('Initializing database...');
+const db = new Database(dbPath); // Creates the database file when used
 db.pragma('journal_mode = WAL');
+console.log('Database initialized.');
 
-exports.db = db;
+// Function to initialize the database schema
+const initializeSchema = () => {
+  console.log('Initializing database schema...');
+
+  const createEventsTable = `
+    CREATE TABLE IF NOT EXISTS Events (
+      event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_name TEXT NOT NULL,
+      event_location TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL
+    );
+  `;
+
+  const createSailorsTable = `
+    CREATE TABLE IF NOT EXISTS Sailors (
+      sailor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      surname TEXT NOT NULL,
+      birthday TEXT NOT NULL,
+      category_id INTEGER,
+      club_id INTEGER,
+      FOREIGN KEY (category_id) REFERENCES Categories(category_id),
+      FOREIGN KEY (club_id) REFERENCES Clubs(club_id)
+    );
+  `;
+
+  const createBoatsTable = `
+    CREATE TABLE IF NOT EXISTS Boats (
+      boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sail_number TEXT NOT NULL UNIQUE,
+      country TEXT NOT NULL,
+      model TEXT NOT NULL,
+      sailor_id INTEGER,
+      FOREIGN KEY (sailor_id) REFERENCES Sailors(sailor_id)
+    );
+  `;
+
+  const createClubsTable = `
+    CREATE TABLE IF NOT EXISTS Clubs (
+      club_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      club_name TEXT NOT NULL,
+      country TEXT NOT NULL
+    );
+  `;
+
+  const createCategoriesTable = `
+  CREATE TABLE IF NOT EXISTS Categories (
+    category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_name TEXT NOT NULL
+  );
+  INSERT INTO Categories (category_id, category_name) VALUES (1, 'KADET')
+  ON CONFLICT(category_id) DO NOTHING;
+  INSERT INTO Categories (category_id, category_name) VALUES (2, 'CADET')
+  ON CONFLICT(category_id) DO NOTHING;
+  INSERT INTO Categories (category_id, category_name) VALUES (3, 'SENIOR')
+  ON CONFLICT(category_id) DO NOTHING;
+  INSERT INTO Categories (category_id, category_name) VALUES (4, 'JUNIOR')
+  ON CONFLICT(category_id) DO NOTHING;
+  INSERT INTO Categories (category_id, category_name) VALUES (5, 'MASTER')
+  ON CONFLICT(category_id) DO NOTHING;
+`;
+
+  const createBoatEventTable = `
+    CREATE TABLE IF NOT EXISTS Boat_Event (
+      boat_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      boat_id INTEGER,
+      event_id INTEGER,
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
+      FOREIGN KEY (event_id) REFERENCES Events(event_id)
+    );
+  `;
+
+  try {
+    console.log('Creating Events table...');
+    db.exec(createEventsTable);
+    console.log('Events table created or already exists.');
+
+    console.log('Creating Sailors table...');
+    db.exec(createSailorsTable);
+    console.log('Sailors table created or already exists.');
+
+    console.log('Creating Boats table...');
+    db.exec(createBoatsTable);
+    console.log('Boats table created or already exists.');
+
+    console.log('Creating Clubs table...');
+    db.exec(createClubsTable);
+    console.log('Clubs table created or already exists.');
+
+    console.log('Creating Categories table...');
+    db.exec(createCategoriesTable);
+    console.log('Categories table created or already exists.');
+
+    console.log('Creating Boat_Event table...');
+    db.exec(createBoatEventTable);
+    console.log('Boat_Event table created or already exists.');
+
+    console.log('Database schema initialized successfully.');
+  } catch (error) {
+    console.error('Error initializing database schema:', error);
+  }
+};
+
+// Function to check if the Events table exists
+const checkEventsTable = () => {
+  try {
+    const stmt = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='Events';",
+    );
+    const result = stmt.get();
+    if (result) {
+      console.log('Events table exists.');
+    } else {
+      console.log('Events table does not exist.');
+    }
+  } catch (error) {
+    console.error('Error checking Events table:', error);
+  }
+};
+
+// Initialize the database schema
+initializeSchema();
+
+// Check if the Events table exists
+checkEventsTable();
+
+module.exports = { db };

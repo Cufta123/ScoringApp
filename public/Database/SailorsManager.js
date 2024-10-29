@@ -5,8 +5,8 @@ const path = require('path');
 
 const dbPath =
   process.env.NODE_ENV === 'development'
-    ? './demo_table.db'
-    : path.join(process.resourcesPath, './../../demo_table.db');
+    ? './data/scoring_app.db'
+    : path.join(process.resourcesPath, './data/scoring_app.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');

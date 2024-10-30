@@ -54,7 +54,7 @@ const initializeSchema = () => {
   const createBoatsTable = `
     CREATE TABLE IF NOT EXISTS Boats (
       boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sail_number TEXT NOT NULL UNIQUE,
+      sail_number INTEGER NOT NULL UNIQUE,
       country TEXT NOT NULL,
       model TEXT NOT NULL,
       sailor_id INTEGER,

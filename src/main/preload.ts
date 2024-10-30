@@ -6,8 +6,6 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 export type Channels =
   | 'ipc-example'
-  | 'readAllPerson'
-  | 'insertPerson'
   | 'readAllSailors'
   | 'insertSailor'
   | 'readAllCategories'
@@ -40,41 +38,6 @@ const electronHandler = {
     },
   },
   sqlite: {
-    personDB: {
-      async readAllPerson() {
-        try {
-          return await ipcRenderer.invoke('readAllPerson');
-        } catch (error) {
-          console.error('Error invoking readAllPerson IPC:', error);
-          return false;
-        }
-      },
-      async insertPerson(
-        name: string,
-        surname: string,
-        birthday: string,
-        category: string,
-        club: string,
-        sail_number: string,
-        model: string,
-      ) {
-        try {
-          return await ipcRenderer.invoke(
-            'insertPerson',
-            name,
-            surname,
-            birthday,
-            category,
-            club,
-            sail_number,
-            model,
-          );
-        } catch (error) {
-          console.error('Error invoking insertPerson IPC:', error);
-          return false;
-        }
-      },
-    },
     sailorDB: {
       async readAllSailors() {
         try {

@@ -112,6 +112,10 @@ function EventPage() {
     }
   };
 
+  const handleEditBoat = () => {
+    console.log('Edit boat');
+  }
+
   useEffect(() => {
     // Ensure that the allBoats state is updated when boats state changes
     setAllBoats((prevBoats) => {
@@ -158,6 +162,7 @@ function EventPage() {
       <SailorList
         sailors={Array.isArray(boats) ? boats : []}
         onRemoveBoat={handleRemoveBoat}
+        onEditBoat={handleEditBoat}
       />
     </div>
   );

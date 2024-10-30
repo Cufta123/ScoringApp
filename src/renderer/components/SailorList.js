@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import '@fortawesome/fontawesome-free';
 
-function SailorList({ sailors, onRemoveBoat }) {
+function SailorList({ sailors, onRemoveBoat, onEditBoat }) {
   const [sortCriteria, setSortCriteria] = useState('name');
 
   const sortedSailors = [...sailors].sort((a, b) => {
@@ -46,14 +47,15 @@ function SailorList({ sailors, onRemoveBoat }) {
               <td>{sailor.club}</td>
               <td>{sailor.category}</td>
               <td>
-                <button
-                  type="button"
-                  onClick={() => onRemoveBoat(sailor.boat_id)}
-                >
-                  Remove
-                </button>
-              </td>
-            </tr>
+    <button style={{ color: 'blue' }}>
+      <i className="fas fa-edit"></i>
+    </button>
+    <button style={{ color: 'red' }}>
+      <i className="fas fa-trash"></i>
+    </button>
+  </td>
+</tr>
+
           ))}
         </tbody>
       </table>
@@ -75,6 +77,7 @@ SailorList.propTypes = {
     }),
   ).isRequired,
   onRemoveBoat: PropTypes.func.isRequired,
+  onEditBoat: PropTypes.func.isRequired,
 };
 
 export default SailorList;

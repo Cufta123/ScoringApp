@@ -3,7 +3,6 @@ import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import AppUpdater from './AppUpdater';
-import './ipcHandlers/PersonHandler';
 import './ipcHandlers/SailorHandler';
 import './ipcHandlers/EventHandler';
 

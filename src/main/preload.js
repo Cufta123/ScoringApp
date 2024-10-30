@@ -1,5 +1,4 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const personDB = require('../../public/Database/PersonManager');
 const sailorDB = require('../../public/Database/SailorsManager');
 const eventDB = require('../../public/Database/EventManager');
 
@@ -18,11 +17,6 @@ const electronHandler = {
     once(channel, func) {
       ipcRenderer.once(channel, (_event, ...args) => func(...args));
     },
-  },
-  personDB: {
-    readAllPerson: personDB.readAllPerson,
-    insertPerson: personDB.insertPerson,
-    getAllClubs: personDB.getAllClubs,
   },
   sailorDB: {
     readAllSailors: sailorDB.readAllSailors,

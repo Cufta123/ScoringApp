@@ -116,6 +116,32 @@ ipcMain.handle('readAllBoats', () => {
 });
 
 ipcMain.handle(
+  'updateSailor',
+  async (event, sailor_id, name, surname, birthday, category_id, club_id) => {
+    try {
+      console.log('Updating sailor:', {
+        sailor_id,
+        name,
+        surname,
+        birthday,
+        category_id,
+        club_id,
+      }); // Log the data being updated
+      const result = db
+        .prepare(
+          'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
+        )
+        .run(name, surname, birthday, category_id, club_id, sailor_id);
+      console.log('Update result:', result); // Log the result
+      return { changes: result.changes };
+    } catch (error) {
+      log(`Error updating sailor: ${error}`);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
   'insertSailor',
   async (event, name, surname, birthday, category_id, club_id) => {
     const maxRetries = 5;

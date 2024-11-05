@@ -47,6 +47,29 @@ const electronHandler = {
           return false;
         }
       },
+      async updateSailor(
+        sailor_id: string,
+        name: string,
+        surname: string,
+        birthday: string,
+        category_id: string,
+        club_id: string,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'updateSailor',
+            sailor_id,
+            name,
+            surname,
+            birthday,
+            category_id,
+            club_id,
+          );
+        } catch (error) {
+          console.error('Error invoking updateSailor IPC:', error);
+          return false;
+        }
+      },
       async insertSailor(
         name: string,
         surname: string,

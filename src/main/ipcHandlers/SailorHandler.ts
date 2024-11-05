@@ -114,28 +114,59 @@ ipcMain.handle('readAllBoats', () => {
     throw error;
   }
 });
-
 ipcMain.handle(
   'updateSailor',
-  async (event, sailor_id, name, surname, birthday, category_id, club_id) => {
+  async (event, sailorData) => {
+    const { originalName, originalSurname, name, surname, category_name, club_name, originalClubName, boat_id, sail_number, country, model } = sailorData;
+
+    console.log('Received sailorData:', sailorData); // Log the received data
+
     try {
-      console.log('Updating sailor:', {
-        sailor_id,
-        name,
-        surname,
-        birthday,
-        category_id,
-        club_id,
-      }); // Log the data being updated
-      const result = db
+      // Fetch sailor_id based on original name and surname
+      const sailor = db.prepare('SELECT sailor_id FROM Sailors WHERE name = ? AND surname = ?').get(originalName, originalSurname);
+      if (!sailor) throw new Error(`Sailor not found: ${originalName} ${originalSurname}`);
+      const sailor_id = sailor.sailor_id;
+
+      // Fetch category_id based on category_name
+      const category = db.prepare('SELECT category_id FROM Categories WHERE category_name = ?').get(category_name);
+      if (!category) throw new Error(`Category not found: ${category_name}`);
+      const category_id = category.category_id;
+
+      // Fetch club_id based on original club name
+      let club = db.prepare('SELECT club_id FROM Clubs WHERE club_name = ?').get(originalClubName);
+      if (!club) throw new Error(`Club not found: ${originalClubName}`);
+      let club_id = club.club_id;
+
+      if (club_name !== originalClubName) {
+        club = db.prepare('SELECT club_id FROM Clubs WHERE club_name = ?').get(club_name);
+        if (club) {
+          club_id = club.club_id;
+        } else {
+          // Insert new club and get the new club_id
+          const newClub = db.prepare('INSERT INTO Clubs (club_name, country) VALUES (?, ?)').run(club_name, country);
+          club_id = newClub.lastInsertRowid;
+        }
+      }
+
+      // Update sailor information
+      const sailorResult = db
         .prepare(
-          'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
+          'UPDATE Sailors SET name = ?, surname = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
         )
-        .run(name, surname, birthday, category_id, club_id, sailor_id);
-      console.log('Update result:', result); // Log the result
-      return { changes: result.changes };
+        .run(name, surname, category_id, club_id, sailor_id);
+      console.log('Sailor update result:', sailorResult);
+
+      // Update boat information
+      const boatResult = db
+        .prepare(
+          'UPDATE Boats SET sail_number = ?, country = ?, model = ? WHERE boat_id = ?',
+        )
+        .run(sail_number, country, model, boat_id);
+      console.log('Boat update result:', boatResult);
+
+      return { sailorChanges: sailorResult.changes, boatChanges: boatResult.changes };
     } catch (error) {
-      log(`Error updating sailor: ${error}`);
+      log(`Error updating sailor or boat: ${error}`);
       throw error;
     }
   },

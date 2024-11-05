@@ -1,9 +1,10 @@
-/* eslint-disable camelcase */
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import 'font-awesome/css/font-awesome.min.css';
 
-function SailorList({ sailors, onRemoveBoat }) {
+const categoryOptions = ['KADET', 'SENIOR', 'JUNIOR', 'MASTER', 'CADET'];
+
+function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [sortCriteria, setSortCriteria] = useState('name');
   const [editingSailorId, setEditingSailorId] = useState(null);
   const [editedSailor, setEditedSailor] = useState({});
@@ -16,22 +17,34 @@ function SailorList({ sailors, onRemoveBoat }) {
 
   const handleEditClick = (sailor) => {
     setEditingSailorId(sailor.boat_id);
-    setEditedSailor(sailor);
+    setEditedSailor({ ...sailor, originalName: sailor.name, originalSurname: sailor.surname, originalClubName: sailor.club });
   };
+
   const handleSave = async () => {
-    const { sailor_id, name, surname, birthday, category_id, club_id } = editedSailor;
-    console.log('Saving sailor:', editedSailor); // Log the data being sent
-    const result = await window.electron.sqlite.sailorDB.updateSailor(
-      sailor_id,
-      name,
-      surname,
-      birthday,
-      category_id,
-      club_id,
-    );
+    const sailorData = {
+      originalName: editedSailor.originalName,
+      originalSurname: editedSailor.originalSurname,
+      name: editedSailor.name,
+      surname: editedSailor.surname,
+      category_name: editedSailor.category,
+      club_name: editedSailor.club,
+      originalClubName: editedSailor.originalClubName,
+      boat_id: editedSailor.boat_id,
+      sail_number: editedSailor.sail_number,
+      country: editedSailor.country,
+      model: editedSailor.model,
+    };
+
+    console.log('Saving sailor and boat:', sailorData); // Log the data being sent
+
+    const result = await window.electron.sqlite.sailorDB.updateSailor(sailorData);
     if (result) {
       console.log('Save successful:', result); // Log the result
-      // Handle successful save, e.g., refresh the list or show a success message
+      // Reset editing state
+      setEditingSailorId(null);
+      setEditedSailor({});
+      // Refresh the list of sailors
+      onRefreshSailors();
     } else {
       console.error('Save failed');
       // Handle error
@@ -180,13 +193,18 @@ function SailorList({ sailors, onRemoveBoat }) {
               </td>
               <td>
                 {editingSailorId === sailor.boat_id ? (
-                  <input
-                    type="text"
+                  <select
                     name="category"
                     value={editedSailor.category}
                     onChange={handleInputChange}
                     className="editable-input"
-                  />
+                  >
+                    {categoryOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   sailor.category
                 )}
@@ -267,7 +285,7 @@ SailorList.propTypes = {
     }),
   ).isRequired,
   onRemoveBoat: PropTypes.func.isRequired,
-  onEditBoat: PropTypes.func.isRequired,
+  onRefreshSailors: PropTypes.func.isRequired,
 };
 
 export default SailorList;

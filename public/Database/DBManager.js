@@ -77,7 +77,7 @@ const initializeSchema = () => {
   );
   INSERT INTO Categories (category_id, category_name) VALUES (1, 'KADET')
   ON CONFLICT(category_id) DO NOTHING;
-  INSERT INTO Categories (category_id, category_name) VALUES (2, 'CADET')
+  INSERT INTO Categories (category_id, category_name) VALUES (2, 'JUNIOR')
   ON CONFLICT(category_id) DO NOTHING;
   INSERT INTO Categories (category_id, category_name) VALUES (3, 'SENIOR')
   ON CONFLICT(category_id) DO NOTHING;
@@ -95,37 +95,81 @@ const initializeSchema = () => {
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
       FOREIGN KEY (event_id) REFERENCES Events(event_id)
     );
-  `;
+    `;
 
-  try {
-    console.log('Creating Events table...');
-    db.exec(createEventsTable);
-    console.log('Events table created or already exists.');
+  const createHeatsTable = `
+  CREATE TABLE IF NOT EXISTS Heats (
+    heat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    heat_name TEXT NOT NULL,
+    heat_type TEXT NOT NULL, -- 'Qualifying' or 'Final'
+    FOREIGN KEY (event_id) REFERENCES Events(event_id)
+  );
+`;
 
-    console.log('Creating Sailors table...');
-    db.exec(createSailorsTable);
-    console.log('Sailors table created or already exists.');
+const createRacesTable = `
+  CREATE TABLE IF NOT EXISTS Races (
+    race_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    heat_id INTEGER NOT NULL,
+    race_number INTEGER NOT NULL,
+    FOREIGN KEY (heat_id) REFERENCES Heats(heat_id)
+  );
+`;
 
-    console.log('Creating Boats table...');
-    db.exec(createBoatsTable);
-    console.log('Boats table created or already exists.');
+const createScoresTable = `
+  CREATE TABLE IF NOT EXISTS Scores (
+    score_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    race_id INTEGER NOT NULL,
+    boat_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    status TEXT NOT NULL, -- 'DNF', 'RET', 'NSC', 'OCS', 'DNS', 'DNC', 'WTH', 'UFD', 'BFD', 'DSQ', 'DNE'
+    FOREIGN KEY (race_id) REFERENCES Races(race_id),
+    FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+  );
+`;
 
-    console.log('Creating Clubs table...');
-    db.exec(createClubsTable);
-    console.log('Clubs table created or already exists.');
+try {
+  console.log('Creating Events table...');
+  db.exec(createEventsTable);
+  console.log('Events table created or already exists.');
 
-    console.log('Creating Categories table...');
-    db.exec(createCategoriesTable);
-    console.log('Categories table created or already exists.');
+  console.log('Creating Sailors table...');
+  db.exec(createSailorsTable);
+  console.log('Sailors table created or already exists.');
 
-    console.log('Creating Boat_Event table...');
-    db.exec(createBoatEventTable);
-    console.log('Boat_Event table created or already exists.');
+  console.log('Creating Boats table...');
+  db.exec(createBoatsTable);
+  console.log('Boats table created or already exists.');
 
-    console.log('Database schema initialized successfully.');
-  } catch (error) {
-    console.error('Error initializing database schema:', error);
-  }
+  console.log('Creating Clubs table...');
+  db.exec(createClubsTable);
+  console.log('Clubs table created or already exists.');
+
+  console.log('Creating Categories table...');
+  db.exec(createCategoriesTable);
+  console.log('Categories table created or already exists.');
+
+  console.log('Creating Boat_Event table...');
+  db.exec(createBoatEventTable);
+  console.log('Boat_Event table created or already exists.');
+
+  console.log('Creating Heats table...');
+  db.exec(createHeatsTable);
+  console.log('Heats table created or already exists.');
+
+  console.log('Creating Races table...');
+  db.exec(createRacesTable);
+  console.log('Races table created or already exists.');
+
+  console.log('Creating Scores table...');
+  db.exec(createScoresTable);
+  console.log('Scores table created or already exists.');
+
+  console.log('Database schema initialized successfully.');
+} catch (error) {
+  console.error('Error initializing database schema:', error);
+}
 };
 
 // Function to check if the Events table exists

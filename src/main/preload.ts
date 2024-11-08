@@ -17,7 +17,15 @@ export type Channels =
   | 'insertEvent'
   | 'associateBoatWithEvent'
   | 'readBoatsByEvent'
-  | 'removeBoatFromEvent';
+  | 'removeBoatFromEvent'
+  | 'readAllHeats'
+  | 'insertHeat'
+  | 'readAllRaces'
+  | 'insertRace'
+  | 'readAllScores'
+  | 'insertScore'
+  | 'updateScore'
+  | 'deleteScore';
 
 const electronHandler = {
   ipcRenderer: {
@@ -208,6 +216,72 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking removeBoatFromEvent IPC:', error);
+          return false;
+        }
+      },
+    },
+    heatRaceDB: {
+      async readAllHeats(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('readAllHeats', event_id);
+        } catch (error) {
+          console.error('Error invoking readAllHeats IPC:', error);
+          return false;
+        }
+      },
+      async insertHeat(event_id: string, heat_name: string, heat_type: string) {
+        try {
+          return await ipcRenderer.invoke('insertHeat', event_id, heat_name, heat_type);
+        } catch (error) {
+          console.error('Error invoking insertHeat IPC:', error);
+          return false;
+        }
+      },
+      async readAllRaces(heat_id: string) {
+        try {
+          return await ipcRenderer.invoke('readAllRaces', heat_id);
+        } catch (error) {
+          console.error('Error invoking readAllRaces IPC:', error);
+          return false;
+        }
+      },
+      async insertRace(heat_id: string, race_number: number) {
+        try {
+          return await ipcRenderer.invoke('insertRace', heat_id, race_number);
+        } catch (error) {
+          console.error('Error invoking insertRace IPC:', error);
+          return false;
+        }
+      },
+      async readAllScores(race_id: string) {
+        try {
+          return await ipcRenderer.invoke('readAllScores', race_id);
+        } catch (error) {
+          console.error('Error invoking readAllScores IPC:', error);
+          return false;
+        }
+      },
+      async insertScore(race_id: string, boat_id: string, position: string, points: number, status: string) {
+        try {
+          return await ipcRenderer.invoke('insertScore', race_id, boat_id, position, points, status);
+        } catch (error) {
+          console.error('Error invoking insertScore IPC:', error);
+          return false;
+        }
+      },
+      async updateScore(score_id: string, position: string, points: number, status: string) {
+        try {
+          return await ipcRenderer.invoke('updateScore', score_id, position, points, status);
+        } catch (error) {
+          console.error('Error invoking updateScore IPC:', error);
+          return false;
+        }
+      },
+      async deleteScore(score_id: string) {
+        try {
+          return await ipcRenderer.invoke('deleteScore', score_id);
+        } catch (error) {
+          console.error('Error invoking deleteScore IPC:', error);
           return false;
         }
       },

@@ -17,7 +17,12 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
   const handleEditClick = (sailor) => {
     setEditingSailorId(sailor.boat_id);
-    setEditedSailor({ ...sailor, originalName: sailor.name, originalSurname: sailor.surname, originalClubName: sailor.club });
+    setEditedSailor({
+      ...sailor,
+      originalName: sailor.name,
+      originalSurname: sailor.surname,
+      originalClubName: sailor.club,
+    });
   };
 
   const handleSave = async () => {
@@ -37,7 +42,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
     console.log('Saving sailor and boat:', sailorData); // Log the data being sent
 
-    const result = await window.electron.sqlite.sailorDB.updateSailor(sailorData);
+    const result =
+      await window.electron.sqlite.sailorDB.updateSailor(sailorData);
     if (result) {
       console.log('Save successful:', result); // Log the result
       // Reset editing state

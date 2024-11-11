@@ -6,7 +6,6 @@ import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import './EventPage.css';
 
-
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,9 +54,10 @@ function EventPage() {
   const handleBackClick = () => {
     navigate('/');
   };
-  const handleNextClick = () => {
-    navigate(`/event/${event.event_name}/scoring`, { state: { event } });
+  const handleHeatRaceClick = () => {
+    navigate(`/event/${event.event_name}/heat-race`, { state: { event } });
   };
+
  const handleBoatSelection = async (e) => {
     e.preventDefault();
     try {
@@ -131,9 +131,9 @@ function EventPage() {
       <button type="button" onClick={handleBackClick}>
         Back to Landing Page
       </button>
-      <button type="button" onClick={handleNextClick} className="next-button">
-        Continue to scoring
-      </button>
+      <button type="button" onClick={handleHeatRaceClick} className="heat-race-button">
+          Manage Heats and Races
+        </button>
     </div>
 
       <h1>{event.event_name}</h1>

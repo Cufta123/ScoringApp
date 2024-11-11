@@ -5,6 +5,7 @@ import { resolveHtmlPath } from './util';
 import AppUpdater from './AppUpdater';
 import './ipcHandlers/SailorHandler';
 import './ipcHandlers/EventHandler';
+import './ipcHandlers/HeatRaceHandler';
 
 let mainWindow: BrowserWindow | null = null;
 

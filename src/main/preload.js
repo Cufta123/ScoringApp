@@ -35,16 +35,18 @@ const electronHandler = {
     readBoatsByEvent: eventDB.readBoatsByEvent,
     removeBoatFromEvent: eventDB.removeBoatFromEvent,
   },
-  heatRaceDB: {
-    readAllHeats: heatRaceDB.readAllHeats,
-    insertHeat: heatRaceDB.insertHeat,
-    readAllRaces: heatRaceDB.readAllRaces,
-    insertRace: heatRaceDB.insertRace,
-    readAllScores: heatRaceDB.readAllScores,
-    insertScore: heatRaceDB.insertScore,
-    updateScore: heatRaceDB.updateScore,
-    deleteScore: heatRaceDB.deleteScore,
-  },
+heatRaceDB: {
+  readAllHeats: heatRaceDB.readAllHeats,
+  insertHeat: heatRaceDB.insertHeat,
+  insertHeatBoat: heatRaceDB.insertHeatBoat,
+  readBoatsByHeat: heatRaceDB.readBoatsByHeat,
+  readAllRaces: heatRaceDB.readAllRaces,
+  insertRace: heatRaceDB.insertRace,
+  readAllScores: heatRaceDB.readAllScores,
+  insertScore: heatRaceDB.insertScore,
+  updateScore: heatRaceDB.updateScore,
+  deleteScore: heatRaceDB.deleteScore,
+},
 };
 
 contextBridge.exposeInMainWorld('electron', electronHandler);

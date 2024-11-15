@@ -28,7 +28,24 @@ const readAllHeats = (event_id) => {
     return [];
   }
 };
-
+const readBoatsByHeat = (heat_id) => {
+  try {
+    const query = `
+      SELECT b.boat_id, b.sail_number, b.country, b.model, s.name, s.surname
+      FROM HeatBoats hb
+      JOIN Boats b ON hb.boat_id = b.boat_id
+      JOIN Sailors s ON b.sailor_id = s.sailor_id
+      WHERE hb.heat_id = ?
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(heat_id);
+    console.log('Raw results from readBoatsByHeat:', results); // Log the raw results
+    return results;
+  } catch (err) {
+    console.error('Error reading boats by heat from the database:', err.message);
+    return [];
+  }
+};
 const insertHeat = (event_id, heat_name, heat_type) => {
   try {
     const insertQuery = db.prepare(
@@ -45,7 +62,19 @@ const insertHeat = (event_id, heat_name, heat_type) => {
     throw err;
   }
 };
-
+const insertHeatBoat = (heat_id, boat_id) => {
+  try {
+    const insertQuery = db.prepare(
+      `INSERT INTO HeatBoats (heat_id, boat_id)
+       VALUES (?, ?)`,
+    );
+    const info = insertQuery.run(heat_id, boat_id);
+    console.log(
+      `Inserted ${info.changes} row(s) with last ID ${info.lastInsertRowid} into HeatBoats.`,
+    );
+    return { lastInsertRowid: info.lastInsertRowid };
+  }
+};
 const readAllRaces = (heat_id) => {
   try {
     const query = `
@@ -160,4 +189,6 @@ module.exports = {
   insertScore,
   updateScore,
   deleteScore,
+  insertHeatBoat,
+  readBoatsByHeat,
 };

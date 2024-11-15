@@ -2,7 +2,6 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage/LandingPage';
 import EventPage from './pages/EventPage/EventPage';
-import ScoringPage from './pages/ScoringPage/ScoringPage';
 import HeatRacePage from './pages/HeatRacePage/HeatRacePage';
 
 function App() {

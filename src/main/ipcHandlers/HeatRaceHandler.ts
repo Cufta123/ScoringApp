@@ -30,6 +30,33 @@ ipcMain.handle('insertHeat', async (event, event_id, heat_name, heat_type) => {
   }
 });
 
+ipcMain.handle('insertHeatBoat', async(event, heat_id, boat_id) => {
+try {
+  const result = db
+    .prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)')
+    .run(heat_id, boat_id);
+  } catch (error) {
+    console.error('Error inserting heat boat:', error);
+    throw error;
+  }
+});
+ipcMain.handle('readBoatsByHeat', async (event, heat_id) => {
+  try {
+    const boats = db
+      .prepare(`
+        SELECT b.boat_id, b.sail_number, b.country, b.model, s.name, s.surname
+        FROM Heat_Boat hb
+        JOIN Boats b ON hb.boat_id = b.boat_id
+        JOIN Sailors s ON b.sailor_id = s.sailor_id
+        WHERE hb.heat_id = ?
+      `)
+      .all(heat_id);
+    return boats;
+  } catch (error) {
+    console.error('Error reading boats by heat:', error);
+    throw error;
+  }
+});
 ipcMain.handle('readAllRaces', async (event, heat_id) => {
   try {
     const races = db

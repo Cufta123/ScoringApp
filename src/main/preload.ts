@@ -3,6 +3,7 @@
 // Disable no-unused-vars, broken for spread args
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import { insertHeat } from '../../public/Database/HeatRaceManager';
 
 export type Channels =
   | 'ipc-example'
@@ -20,6 +21,7 @@ export type Channels =
   | 'removeBoatFromEvent'
   | 'readAllHeats'
   | 'insertHeat'
+  | 'insertHeatBoat'
   | 'readAllRaces'
   | 'insertRace'
   | 'readAllScores'
@@ -234,6 +236,22 @@ const electronHandler = {
           return await ipcRenderer.invoke('insertHeat', event_id, heat_name, heat_type);
         } catch (error) {
           console.error('Error invoking insertHeat IPC:', error);
+          return false;
+        }
+      },
+      async insertHeatBoat(heat_id: string, boat_id: string) {
+        try {
+          return await ipcRenderer.invoke('insertHeatBoat', heat_id, boat_id);
+        }catch (error) {
+          console.error('Error invoking insertHeatBoat IPC:', error);
+          return false;
+        }
+      },
+      async readBoatsByHeat(heat_id: string) {
+        try {
+          return await ipcRenderer.invoke('readBoatsByHeat', heat_id);
+        } catch (error) {
+          console.error('Error invoking readBoatsByHeat IPC:', error);
           return false;
         }
       },

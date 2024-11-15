@@ -128,6 +128,14 @@ const createScoresTable = `
     FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
   );
 `;
+const createHeatBoatTable = `
+  CREATE TABLE IF NOT EXISTS Heat_Boat (
+    heat_id INTEGER,
+    boat_id INTEGER,
+    FOREIGN KEY (heat_id) REFERENCES Heats(heat_id),
+    FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+  );
+`;
 
 try {
   console.log('Creating Events table...');
@@ -166,6 +174,9 @@ try {
   db.exec(createScoresTable);
   console.log('Scores table created or already exists.');
 
+  console.log('Creating Heat_Boat table...');
+  db.exec(createHeatBoatTable);
+  console.log('Heat_Boat table created or already exists.');
   console.log('Database schema initialized successfully.');
 } catch (error) {
   console.error('Error initializing database schema:', error);

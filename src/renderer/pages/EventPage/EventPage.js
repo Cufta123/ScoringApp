@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import './EventPage.css';
+import HeatComponent from '../../components/HeatComponent';
 
 function EventPage() {
   const location = useLocation();
@@ -114,78 +115,6 @@ function EventPage() {
       console.error('Error removing boat from event:', error);
     }
   };
-  const handleCreateHeats = async () => {
-    try {
-      // Fetch all boats for the event
-      const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(event.event_id);
-
-      // Sort boats by sail number (or any other criteria if needed)
-      eventBoats.sort((a, b) => a.sail_number - b.sail_number);
-
-      // Determine the number of heats
-      const numHeats = Math.ceil(eventBoats.length / 10); // Example: 10 boats per heat
-
-      // Create heats
-      const heatPromises = [];
-      for (let i = 0; i < numHeats; i += 1) {
-        const heatName = `Heat ${String.fromCharCode(65 + i)}`; // A, B, C, ...
-        const heatType = 'Qualifying';
-        heatPromises.push(window.electron.sqlite.heatRaceDB.insertHeat(event.event_id, heatName, heatType));
-      }
-      await Promise.all(heatPromises);
-
-      // Fetch the created heats
-      const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
-
-      // Assign boats to heats
-      const racePromises = [];
-      for (let i = 0; i < eventBoats.length; i += 1) {
-        const heatIndex = i % numHeats;
-        const heat = FetchedHeats[heatIndex];
-        racePromises.push(window.electron.sqlite.heatRaceDB.insertRace(heat.heat_id, i + 1));
-      }
-      await Promise.all(racePromises);
-
-      alert('Heats created successfully!');
-    } catch (error) {
-      console.error('Error creating heats:', error);
-      alert('Error creating heats. Please try again later.');
-    }
-  };
-  const handleDisplayHeats = async () => {
-    try {
-      // Fetch all heats for the event
-      const heatsToDisplay = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
-
-      // Fetch all boats for the event
-      const boatsToDisplay = await window.electron.sqlite.eventDB.readBoatsByEvent(event.event_id);
-
-      // Fetch all races for each heat and map boats to heats
-      const heatDetailsPromises = heatsToDisplay.map(async (heat) => {
-        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
-        const boatsInHeat = races.map((race) => {
-          const boat = boatsToDisplay.find((b) => b.boat_id === race.boat_id);
-          return {
-            ...boat,
-            race_number: race.race_number,
-          };
-        });
-        return {
-          ...heat,
-          boats: boatsInHeat,
-        };
-      });
-
-      const heatDetails = await Promise.all(heatDetailsPromises);
-
-      // Display the heats and sailors
-      console.log('Heats and Sailors:', heatDetails);
-      setHeats(heatDetails);
-    } catch (error) {
-      console.error('Error displaying heats and sailors:', error);
-      alert('Error displaying heats and sailors. Please try again later.');
-    }
-  };
 
   useEffect(() => {
     // Ensure that the allBoats state is updated when boats state changes
@@ -206,14 +135,10 @@ function EventPage() {
         <button type="button" onClick={handleBackClick}>
           Back to Landing Page
         </button>
-        <button type="button" onClick={handleHeatRaceClick} className="heat-race-button">
-          Manage Heats and Races
-        </button>
-        <button type="button" onClick={handleCreateHeats}>
-          Create Heats
-        </button>
+    <button type="button" onClick={handleHeatRaceClick}>
+          Go to scoring
+    </button>
       </div>
-
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>
@@ -225,9 +150,6 @@ function EventPage() {
       {isSailorFormVisible && (
         <SailorForm onAddSailor={handleAddSailor} eventId={event.event_id} />
       )}
-      <button type="button" onClick={handleDisplayHeats}>
-  Display Heats and Sailors
-</button>
       <h2>Add Existing Boat to Event</h2>
       <form onSubmit={handleBoatSelection}>
         <Select
@@ -245,20 +167,8 @@ function EventPage() {
         onRemoveBoat={handleRemoveBoat}
         onRefreshSailors={fetchBoatsWithSailors}
       />
-    <h3>Heats and Sailors</h3>
-    {heats.map((heat) => (
-      <div key={heat.heat_id}>
-        <h4>{heat.heat_name} ({heat.heat_type})</h4>
-        <ul>
-          {heat.boats.map((boat) => (
-            <li key={boat.boat_id}>
-              {boat.sail_number} - {boat.name} {boat.surname} (Race {boat.race_number})
-            </li>
-          ))}
-        </ul>
-      </div>
-    ))}
-  </div>
-);
+      <HeatComponent event={event} />
+    </div>
+  );
 }
 export default EventPage;

@@ -62,6 +62,32 @@ const insertHeat = (event_id, heat_name, heat_type) => {
     throw err;
   }
 };
+const deleteHeatsByEvent = (event_id) => {
+  try {
+    // Delete associated HeatBoats entries first
+    const deleteHeatBoatsQuery = db.prepare(
+      `DELETE FROM HeatBoats WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?)`
+    );
+    const heatBoatsInfo = deleteHeatBoatsQuery.run(event_id);
+    console.log(
+      `Deleted ${heatBoatsInfo.changes} row(s) from HeatBoats for event ID ${event_id}.`
+    );
+
+    // Delete Heats entries
+    const deleteHeatsQuery = db.prepare(
+      `DELETE FROM Heats WHERE event_id = ?`
+    );
+    const heatsInfo = deleteHeatsQuery.run(event_id);
+    console.log(
+      `Deleted ${heatsInfo.changes} row(s) from Heats for event ID ${event_id}.`
+    );
+
+    return { heatBoatsChanges: heatBoatsInfo.changes, heatsChanges: heatsInfo.changes };
+  } catch (err) {
+    console.error('Error deleting heats and heat boats from the database:', err.message);
+    throw err;
+  }
+};
 const insertHeatBoat = (heat_id, boat_id) => {
   try {
     const insertQuery = db.prepare(
@@ -191,4 +217,5 @@ module.exports = {
   deleteScore,
   insertHeatBoat,
   readBoatsByHeat,
+  deleteHeatsByEvent,
 };

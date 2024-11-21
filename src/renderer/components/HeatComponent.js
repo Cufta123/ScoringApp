@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-const HeatComponent = ({ event }) => {
+const HeatComponent = ({ event, onHeatSelect, clickable }) => {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
+  const [selectedHeatId, setSelectedHeatId] = useState(null);
+  const [heatsCreated, setHeatsCreated] = useState(false);
 
   const handleCreateHeats = async () => {
     try {
@@ -11,6 +13,7 @@ const HeatComponent = ({ event }) => {
 
       if (heats.length > 0) {
         alert('Heats already exist for this event.');
+        setHeatsCreated(true);
         return;
       }
 
@@ -41,10 +44,21 @@ const HeatComponent = ({ event }) => {
       await Promise.all(heatBoatPromises);
 
       alert('Heats created successfully!');
+      setHeatsCreated(true);
       handleDisplayHeats(); // Refresh the heats display
     } catch (error) {
       console.error('Error creating heats:', error);
       alert('Error creating heats. Please try again later.');
+    }
+  };
+
+  const handleRecreateHeats = async () => {
+    try {
+      await window.electron.sqlite.heatRaceDB.deleteHeatsByEvent(event.event_id);
+      await handleCreateHeats();
+    } catch (error) {
+      console.error('Error recreating heats:', error);
+      alert('Error recreating heats. Please try again later.');
     }
   };
 
@@ -61,6 +75,7 @@ const HeatComponent = ({ event }) => {
 
       const heatDetails = await Promise.all(heatDetailsPromises);
       setHeats(heatDetails);
+      setHeatsCreated(heatDetails.length > 0);
     } catch (error) {
       console.error('Error displaying heats and sailors:', error);
       alert('Error displaying heats and sailors. Please try again later.');
@@ -70,6 +85,45 @@ const HeatComponent = ({ event }) => {
   useEffect(() => {
     handleDisplayHeats();
   }, []);
+
+  const handleHeatClick = (heat) => {
+    if (clickable) {
+      setSelectedHeatId(heat.heat_id);
+      onHeatSelect(heat);
+    }
+  };
+
+  const heatsContainerStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    padding: '10px',
+  };
+
+  const heatColumnStyle = {
+    backgroundColor: '#f0f0f0',
+    border: '2px solid #ccc',
+    borderRadius: '5px',
+    padding: '10px',
+    maxWidth: '400px', // Set max width
+    flex: '1 1 30%', // Ensure only 4 columns per row with uniform spacing
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    cursor: clickable ? 'pointer' : 'default',
+  };
+  const selectedHeatColumnStyle = {
+    ...heatColumnStyle,
+    border: '2px solid #007bff', // Blue border to highlight the selected heat
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // Add shadow for more emphasis
+  };
+  const boatNumberColumnStyle = {
+    ...heatColumnStyle,
+    maxWidth: '100px', // Shorter width for boat number
+  };
+
+  const sailorNameColumnStyle = {
+    ...heatColumnStyle,
+    maxWidth: '400px', // Wider width for sailor name
+  };
 
   return (
     <div>
@@ -81,25 +135,33 @@ const HeatComponent = ({ event }) => {
           ))}
         </select>
       </div>
-      <button onClick={handleCreateHeats}>Create Heats</button>
-      <button onClick={handleDisplayHeats}>Display Heats</button>
+      <button onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}>
+        {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
+      </button>
       {heats.length > 0 && (
-        <div className="heats-container">
+        <div style={heatsContainerStyle} className="heats-container">
           {heats.map((heat) => (
-            <div key={heat.heat_id} className="heat-column">
+            <div
+              key={heat.heat_id}
+              style={heat.heat_id === selectedHeatId ? selectedHeatColumnStyle : heatColumnStyle}
+              className="heat-column"
+              onClick={() => handleHeatClick(heat)}
+            >
               <h4>{heat.heat_name}</h4>
               <table>
                 <thead>
                   <tr>
-                    <th>Sailor Name</th>
-                    <th>Boat Number</th>
+                    <th style={sailorNameColumnStyle}>Sailor Name</th>
+                    <th>Country</th>
+                    <th style={boatNumberColumnStyle}>Boat Number</th>
                   </tr>
                 </thead>
                 <tbody>
                   {heat.boats.map((boat) => (
                     <tr key={boat.boat_id}>
-                      <td>{boat.name} {boat.surname}</td>
-                      <td>{boat.sail_number}</td>
+                      <td style={sailorNameColumnStyle}>{boat.name} {boat.surname}</td>
+                      <td>{boat.country}</td>
+                      <td style={boatNumberColumnStyle}>{boat.sail_number}</td>
                     </tr>
                   ))}
                 </tbody>

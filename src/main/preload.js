@@ -46,6 +46,8 @@ heatRaceDB: {
   insertScore: heatRaceDB.insertScore,
   updateScore: heatRaceDB.updateScore,
   deleteScore: heatRaceDB.deleteScore,
+  deleteHeatsByEvent: heatRaceDB.deleteHeatsByEvent, // Add this line
+
 },
 };
 

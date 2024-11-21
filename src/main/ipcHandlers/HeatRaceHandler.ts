@@ -40,6 +40,24 @@ try {
     throw error;
   }
 });
+ipcMain.handle('deleteHeatsByEvent', async (event, event_id) => {
+  try {
+    const result = db
+      .prepare('DELETE FROM Heat_Boat WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?)')
+      .run(event_id);
+    console.log(`Deleted ${result.changes} row(s) from HeatBoats for event ID ${event_id}.`);
+
+    const resultHeats = db
+      .prepare('DELETE FROM Heats WHERE event_id = ?')
+      .run(event_id);
+    console.log(`Deleted ${resultHeats.changes} row(s) from Heats for event ID ${event_id}.`);
+
+    return { heatBoatsChanges: result.changes, heatsChanges: resultHeats.changes };
+  } catch (error) {
+    console.error('Error deleting heats by event:', error);
+    throw error;
+  }
+});
 ipcMain.handle('readBoatsByHeat', async (event, heat_id) => {
   try {
     const boats = db

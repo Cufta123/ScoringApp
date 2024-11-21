@@ -27,7 +27,8 @@ export type Channels =
   | 'readAllScores'
   | 'insertScore'
   | 'updateScore'
-  | 'deleteScore';
+  | 'deleteScore'
+  | 'deleteHeatsByEvent';
 
 const electronHandler = {
   ipcRenderer: {
@@ -236,6 +237,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('insertHeat', event_id, heat_name, heat_type);
         } catch (error) {
           console.error('Error invoking insertHeat IPC:', error);
+          return false;
+        }
+      },
+      async deleteHeatsByEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('deleteHeatsByEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking deleteHeatsByEvent IPC:', error);
           return false;
         }
       },

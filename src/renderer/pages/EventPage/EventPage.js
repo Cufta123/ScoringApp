@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import React, { useState, useEffect, useCallback } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -15,7 +14,6 @@ function EventPage() {
   const [allBoats, setAllBoats] = useState([]);
   const [selectedBoats, setSelectedBoats] = useState([]);
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
-  const [heats, setHeats] = useState([]);
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -56,13 +54,16 @@ function EventPage() {
   const handleBackClick = () => {
     navigate('/');
   };
+
   const handleHeatRaceClick = () => {
     navigate(`/event/${event.event_name}/heat-race`, { state: { event } });
   };
+
   const toggleSailorFormVisibility = () => {
     setIsSailorFormVisible(!isSailorFormVisible);
   };
- const handleBoatSelection = async (e) => {
+
+  const handleBoatSelection = async (e) => {
     e.preventDefault();
     try {
       const boatIds = selectedBoats.map(option => option.value);
@@ -78,6 +79,7 @@ function EventPage() {
       console.error('Error associating boats with event:', error);
     }
   };
+
   const handleBoatChange = (selectedOptions) => {
     setSelectedBoats(selectedOptions);
   };
@@ -127,17 +129,15 @@ function EventPage() {
     });
   }, [boats]);
 
-
-
   return (
     <div>
       <div className="button-container">
         <button type="button" onClick={handleBackClick}>
           Back to Landing Page
         </button>
-    <button type="button" onClick={handleHeatRaceClick}>
+        <button type="button" onClick={handleHeatRaceClick}>
           Go to scoring
-    </button>
+        </button>
       </div>
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
@@ -167,8 +167,9 @@ function EventPage() {
         onRemoveBoat={handleRemoveBoat}
         onRefreshSailors={fetchBoatsWithSailors}
       />
-      <HeatComponent event={event} />
+      <HeatComponent event={event} clickable={false} />
     </div>
   );
 }
+
 export default EventPage;

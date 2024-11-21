@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeatComponent from '../../components/HeatComponent';
+import ScoringInputComponent from '../../components/ScoringInputComponent';
 import './HeatRacePage.css';
 
 function HeatRacePage() {
@@ -8,6 +9,8 @@ function HeatRacePage() {
   const navigate = useNavigate();
   const { event } = location.state;
   const [eventData, setEventData] = useState(event || null);
+  const [selectedHeat, setSelectedHeat] = useState(null);
+  const [isScoring, setIsScoring] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -24,17 +27,36 @@ function HeatRacePage() {
     }
   }, [eventData, event]);
 
+  const handleHeatSelect = (heat) => {
+    setSelectedHeat(heat);
+  };
+
+  const handleStartScoring = () => {
+    setIsScoring(true);
+  };
+
+  const handleBackToHeats = () => {
+    setIsScoring(false);
+  };
+
   if (!event) {
     return <p>No event data available.</p>;
   }
 
   return (
     <div>
-      <button onClick={() => navigate(-1)}>Back</button>
-      {eventData ? (
-        <HeatComponent event={eventData} />
+      <button onClick={isScoring ? handleBackToHeats : () => navigate(-1)}>
+        {isScoring ? 'Back to Heats' : 'Back'}
+      </button>
+      {!isScoring ? (
+        <>
+          <HeatComponent event={event} onHeatSelect={handleHeatSelect} clickable={true} />
+          {selectedHeat && (
+            <button onClick={handleStartScoring}>Start Scoring</button>
+          )}
+        </>
       ) : (
-        <p>Loading event data...</p>
+        <ScoringInputComponent heat={selectedHeat} onBack={handleBackToHeats} />
       )}
     </div>
   );

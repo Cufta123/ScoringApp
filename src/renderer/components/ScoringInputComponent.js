@@ -7,6 +7,7 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
   const [validBoats, setValidBoats] = useState([]);
   const [invalidBoats, setInvalidBoats] = useState([]);
   const [placeNumbers, setPlaceNumbers] = useState({});
+  const [draggingIndex, setDraggingIndex] = useState(null);
 
   useEffect(() => {
     const fetchBoats = async () => {
@@ -60,6 +61,13 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     setTemporaryBoats([]); // Clear temporary state
     setInputValue(''); // Clear input field
   };
+  const updatePlaces = (boats) => {
+    const newPlaceNumbers = {};
+    boats.forEach((boat, index) => {
+      newPlaceNumbers[boat] = index + 1;
+    });
+    setPlaceNumbers(newPlaceNumbers);
+  };
 
   const handleRemoveBoat = (index) => {
     const updatedBoatNumbers = boatNumbers.filter((_, i) => i !== index);
@@ -73,7 +81,27 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     setBoatNumbers(updatedBoatNumbers);
     setPlaceNumbers(updatedPlaceNumbers);
   };
+  const handleReorderBoat = (fromIndex, toIndex) => {
+    const updatedBoatNumbers = [...boatNumbers];
+    const [movedBoat] = updatedBoatNumbers.splice(fromIndex, 1);
+    updatedBoatNumbers.splice(toIndex, 0, movedBoat);
+    setBoatNumbers(updatedBoatNumbers);
+    updatePlaces(updatedBoatNumbers);
+  };
+  const handleDragStart = (index) => {
+    setDraggingIndex(index);
+  };
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index) => {
+    if (draggingIndex !== null) {
+      handleReorderBoat(draggingIndex, index);
+      setDraggingIndex(null);
+    }
+  };
   const handleSubmit = () => {
     onSubmit(boatNumbers);
   };
@@ -144,8 +172,24 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
         </div>
         <ul>
           {boatNumbers.map((number, index) => (
-            <li key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-              <span>Boat {number} - Place {placeNumbers[number]}</span>
+            <li
+              key={index}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '10px',
+                cursor: 'move',
+                padding: '5px',
+                border: '1px solid #ccc',
+                borderRadius: '5px',
+                backgroundColor: '#f9f9f9',
+              }}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(index)}
+            >
+              <span style={{ marginRight: '10px' }}>Boat {number} - Place {placeNumbers[number]}</span>
               <button onClick={() => handleRemoveBoat(index)}>Remove</button>
             </li>
           ))}

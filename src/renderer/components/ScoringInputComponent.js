@@ -5,9 +5,9 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
   const [boatNumbers, setBoatNumbers] = useState([]);
   const [temporaryBoats, setTemporaryBoats] = useState([]);
   const [validBoats, setValidBoats] = useState([]);
-  const [invalidBoats, setInvalidBoats] = useState([]);
   const [placeNumbers, setPlaceNumbers] = useState({});
   const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dropIndex, setDropIndex] = useState(null);
 
   useEffect(() => {
     const fetchBoats = async () => {
@@ -61,6 +61,7 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     setTemporaryBoats([]); // Clear temporary state
     setInputValue(''); // Clear input field
   };
+
   const updatePlaces = (boats) => {
     const newPlaceNumbers = {};
     boats.forEach((boat, index) => {
@@ -81,6 +82,7 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     setBoatNumbers(updatedBoatNumbers);
     setPlaceNumbers(updatedPlaceNumbers);
   };
+
   const handleReorderBoat = (fromIndex, toIndex) => {
     const updatedBoatNumbers = [...boatNumbers];
     const [movedBoat] = updatedBoatNumbers.splice(fromIndex, 1);
@@ -88,22 +90,30 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     setBoatNumbers(updatedBoatNumbers);
     updatePlaces(updatedBoatNumbers);
   };
+
   const handleDragStart = (index) => {
     setDraggingIndex(index);
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (index) => (e) => {
     e.preventDefault();
+    setDropIndex(index);
   };
 
-  const handleDrop = (index) => {
-    if (draggingIndex !== null) {
-      handleReorderBoat(draggingIndex, index);
+  const handleDrop = () => {
+    if (draggingIndex !== null && dropIndex !== null) {
+      handleReorderBoat(draggingIndex, dropIndex);
       setDraggingIndex(null);
+      setDropIndex(null);
     }
   };
+
   const handleSubmit = () => {
-    onSubmit(boatNumbers);
+    const boatPlaces = boatNumbers.map((boatNumber) => ({
+      boatNumber,
+      place: placeNumbers[boatNumber],
+    }));
+    onSubmit(boatPlaces);
   };
 
   const getPlaceNumber = (sailNumber) => {
@@ -172,27 +182,52 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
         </div>
         <ul>
           {boatNumbers.map((number, index) => (
-            <li
-              key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '10px',
-                cursor: 'move',
-                padding: '5px',
-                border: '1px solid #ccc',
-                borderRadius: '5px',
-                backgroundColor: '#f9f9f9',
-              }}
-              draggable
-              onDragStart={() => handleDragStart(index)}
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(index)}
-            >
-              <span style={{ marginRight: '10px' }}>Boat {number} - Place {placeNumbers[number]}</span>
-              <button onClick={() => handleRemoveBoat(index)}>Remove</button>
-            </li>
+            <React.Fragment key={index}>
+            {dropIndex === index && (
+  <div
+    style={{
+      height: '2px', // Thinner line for a subtle look
+      backgroundColor: '#007bff', // Blue color for visibility
+      width: '30%', // Half the width of the list items
+      marginLeft: '5px', // Align the line to the left
+      borderRadius: '1px', // Rounded edges for better appearance
+      alignContent: 'center', // Center the line
+    }}
+  />
+)}
+  <li
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      marginBottom: '10px',
+      cursor: 'move',
+      padding: '5px',
+      border: '1px solid #ccc',
+      borderRadius: '5px',
+      backgroundColor: '#f9f9f9',
+       width: 'calc(100% - 10px)',
+    }}
+    draggable
+    onDragStart={() => handleDragStart(index)}
+    onDragOver={handleDragOver(index)}
+    onDrop={handleDrop}
+  >
+    <span style={{ marginRight: '10px' }}>Boat {number} - Place {placeNumbers[number]}</span>
+    <button onClick={() => handleRemoveBoat(index)}>Remove</button>
+  </li>
+</React.Fragment>
+
           ))}
+          {dropIndex === boatNumbers.length && (
+  <div
+    style={{
+      height: '5px',
+      backgroundColor: '#007bff',
+      marginLeft: '0', // Align the line to the left
+      width: '50%', // Half the width of the list items
+    }}
+  />
+)}
         </ul>
         <button onClick={handleSubmit}>Submit Scores</button>
       </div>

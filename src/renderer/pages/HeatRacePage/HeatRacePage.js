@@ -39,6 +39,20 @@ function HeatRacePage() {
     setIsScoring(false);
   };
 
+  const handleSubmitScores = async (placeNumbers) => {
+    console.log('Submitted place numbers:', placeNumbers);
+    const boatDetailsPromises = placeNumbers.map(async ({ boatNumber, place }) => {
+      const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(selectedHeat.heat_id);
+      const boatDetails = boats.find(boat => boat.sail_number === boatNumber);
+      return { ...boatDetails, place };
+    });
+
+    const boatDetails = await Promise.all(boatDetailsPromises);
+    boatDetails.forEach(({ boat_id, sail_number, country, model, name, surname, place }) => {
+      console.log(`Boat ID: ${boat_id}, Sail Number: ${sail_number}, Country: ${country}, Model: ${model}, Skipper: ${name} ${surname}, Place: ${place}`);
+    });
+  };
+
   if (!event) {
     return <p>No event data available.</p>;
   }
@@ -56,7 +70,7 @@ function HeatRacePage() {
           )}
         </>
       ) : (
-        <ScoringInputComponent heat={selectedHeat} onBack={handleBackToHeats} />
+        <ScoringInputComponent heat={selectedHeat} onSubmit={handleSubmitScores} onBack={handleBackToHeats} />
       )}
     </div>
   );

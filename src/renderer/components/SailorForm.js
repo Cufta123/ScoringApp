@@ -1,7 +1,9 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+
 import { toast } from 'react-toastify';
+
 import iocCountries from '../constants/iocCountries.json';
 
 function SailorForm({ onAddSailor, eventId }) {

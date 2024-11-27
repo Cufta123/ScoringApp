@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeatComponent from '../../components/HeatComponent';
@@ -102,7 +101,7 @@ function HeatRacePage() {
         <>
           <HeatComponent
             event={event}
-            onHeatSelect={handleHeatSelect}
+            onHeatSelect={handleHeatSelect} // Pass the onHeatSelect prop
             clickable
           />
           {selectedHeat && (

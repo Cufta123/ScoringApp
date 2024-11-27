@@ -6,6 +6,7 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
   const [selectedHeatId, setSelectedHeatId] = useState(null);
   const [heatsCreated, setHeatsCreated] = useState(false);
+  const [raceHappened, setRaceHappened] = useState(false);
 
   const handleDisplayHeats = useCallback(async () => {
     try {
@@ -27,6 +28,10 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
       const heatDetails = await Promise.all(heatDetailsPromises);
       setHeats(heatDetails);
       setHeatsCreated(heatDetails.length > 0);
+
+      // Check if any race has happened
+      const anyRaceHappened = heatDetails.some((heat) => heat.raceNumber > 0);
+      setRaceHappened(anyRaceHappened);
     } catch (error) {
       // Handle error appropriately
       setHeats([]);
@@ -35,6 +40,11 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
   }, [event.event_id]);
 
   const handleCreateHeats = async () => {
+    if (raceHappened) {
+      alert('Cannot create heats after a race has happened.');
+      return;
+    }
+
     try {
       const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(
         event.event_id,
@@ -103,6 +113,11 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
   };
 
   const handleRecreateHeats = async () => {
+    if (raceHappened) {
+      alert('Cannot recreate heats after a race has happened.');
+      return;
+    }
+
     try {
       await window.electron.sqlite.heatRaceDB.deleteHeatsByEvent(
         event.event_id,
@@ -115,8 +130,9 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
   };
 
   useEffect(() => {
+    setRaceHappened(false); // Reset raceHappened state when event changes
     handleDisplayHeats();
-  }, [handleDisplayHeats]);
+  }, [event, handleDisplayHeats]);
 
   const handleHeatClick = (heat) => {
     if (clickable) {
@@ -165,6 +181,7 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
           id="numHeats"
           value={numHeats}
           onChange={(e) => setNumHeats(Number(e.target.value))}
+          disabled={raceHappened} // Disable if a race has happened
         >
           {[...Array(10).keys()].map((i) => (
             <option key={i + 1} value={i + 1}>
@@ -176,6 +193,7 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
       <button
         type="button"
         onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
+        disabled={raceHappened} // Disable if a race has happened
       >
         {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
       </button>
@@ -229,13 +247,18 @@ function HeatComponent({ event, onHeatSelect, clickable }) {
     </div>
   );
 }
+
 HeatComponent.propTypes = {
   event: PropTypes.shape({
     event_id: PropTypes.number.isRequired,
     // Add other event properties here if needed
   }).isRequired,
-  onHeatSelect: PropTypes.func.isRequired,
+  onHeatSelect: PropTypes.func,
   clickable: PropTypes.bool.isRequired,
+};
+
+HeatComponent.defaultProps = {
+  onHeatSelect: () => {},
 };
 
 export default HeatComponent;

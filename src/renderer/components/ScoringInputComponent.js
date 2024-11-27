@@ -51,13 +51,26 @@ function ScoringInputComponent({ heat, onSubmit }) {
       (number) => !boatNumbers.includes(number) && validBoats.includes(number),
     );
 
-    const updatedBoatNumbers = [...boatNumbers, ...validNewBoats];
+    const boatsWithPenalties = validNewBoats.filter(
+      (number) => penalties[number],
+    );
+
+    const boatsWithoutPenalties = validNewBoats.filter(
+      (number) => !penalties[number],
+    );
+
+    const updatedBoatNumbers = [...boatNumbers, ...boatsWithoutPenalties];
     const updatedPlaceNumbers = { ...placeNumbers };
 
-    validNewBoats.forEach((boat) => {
+    boatsWithoutPenalties.forEach((boat) => {
       if (!updatedPlaceNumbers[boat]) {
         updatedPlaceNumbers[boat] = updatedBoatNumbers.indexOf(boat) + 1;
       }
+    });
+
+    boatsWithPenalties.forEach((boat) => {
+      updatedBoatNumbers.push(boat);
+      updatedPlaceNumbers[boat] = updatedBoatNumbers.length;
     });
 
     setBoatNumbers(updatedBoatNumbers);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-const ScoringInputComponent = ({ heat, onSubmit }) => {
+function ScoringInputComponent({ heat, onSubmit }) {
   const [inputValue, setInputValue] = useState('');
   const [boatNumbers, setBoatNumbers] = useState([]);
   const [temporaryBoats, setTemporaryBoats] = useState([]);
@@ -12,7 +13,9 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
   useEffect(() => {
     const fetchBoats = async () => {
       try {
-        const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(heat.heat_id);
+        const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
+          heat.heat_id,
+        );
         setValidBoats(boats.map((boat) => boat.sail_number));
       } catch (error) {
         console.error('Error fetching boats:', error);
@@ -27,7 +30,7 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
     const inputNumbers = input
       .split(' ')
       .map(Number)
-      .filter((n) => !isNaN(n));
+      .filter((n) => !Number.isNaN(n));
 
     const uniqueNumbers = [...new Set(inputNumbers)];
     setTemporaryBoats(uniqueNumbers); // Temporarily track boats
@@ -44,13 +47,13 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
 
   const handleAddBoats = () => {
     const validNewBoats = temporaryBoats.filter(
-      (number) => !boatNumbers.includes(number) && validBoats.includes(number)
+      (number) => !boatNumbers.includes(number) && validBoats.includes(number),
     );
 
     const updatedBoatNumbers = [...boatNumbers, ...validNewBoats];
     const updatedPlaceNumbers = { ...placeNumbers };
 
-    validNewBoats.forEach((boat, index) => {
+    validNewBoats.forEach((boat) => {
       if (!updatedPlaceNumbers[boat]) {
         updatedPlaceNumbers[boat] = updatedBoatNumbers.indexOf(boat) + 1;
       }
@@ -125,11 +128,25 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100vh' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        width: '100%',
+        height: '100vh',
+      }}
+    >
       <div style={{ flex: '1', padding: '10px', boxSizing: 'border-box' }}>
         <h2>Scoring for {heat.heat_name}</h2>
         <p>Heat ID: {heat.heat_id}</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '10px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            padding: '10px',
+          }}
+        >
           <div
             style={{
               backgroundColor: '#f0f0f0',
@@ -157,7 +174,9 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
                     key={boat.boat_id}
                     onClick={() => handleBoatClick(boat.sail_number)}
                   >
-                    <td>{boat.name} {boat.surname}</td>
+                    <td>
+                      {boat.name} {boat.surname}
+                    </td>
                     <td>{boat.country}</td>
                     <td>{boat.sail_number}</td>
                     <td>{getPlaceNumber(boat.sail_number)}</td>
@@ -176,63 +195,91 @@ const ScoringInputComponent = ({ heat, onSubmit }) => {
             value={inputValue}
             onChange={handleInputChange}
             placeholder="Enter boat number"
-            style={{ width: '100%', padding: '10px', marginBottom: '10px', boxSizing: 'border-box' }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              marginBottom: '10px',
+              boxSizing: 'border-box',
+            }}
           />
-          <button onClick={handleAddBoats}>Add Boat</button>
+          <button type="button" onClick={handleAddBoats}>
+            Add Boat
+          </button>
         </div>
         <ul>
           {boatNumbers.map((number, index) => (
-            <React.Fragment key={index}>
-            {dropIndex === index && (
-  <div
-    style={{
-      height: '2px', // Thinner line for a subtle look
-      backgroundColor: '#007bff', // Blue color for visibility
-      width: '30%', // Half the width of the list items
-      marginLeft: '5px', // Align the line to the left
-      borderRadius: '1px', // Rounded edges for better appearance
-      alignContent: 'center', // Center the line
-    }}
-  />
-)}
-  <li
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      marginBottom: '10px',
-      cursor: 'move',
-      padding: '5px',
-      border: '1px solid #ccc',
-      borderRadius: '5px',
-      backgroundColor: '#f9f9f9',
-       width: 'calc(100% - 10px)',
-    }}
-    draggable
-    onDragStart={() => handleDragStart(index)}
-    onDragOver={handleDragOver(index)}
-    onDrop={handleDrop}
-  >
-    <span style={{ marginRight: '10px' }}>Boat {number} - Place {placeNumbers[number]}</span>
-    <button onClick={() => handleRemoveBoat(index)}>Remove</button>
-  </li>
-</React.Fragment>
-
+            <React.Fragment key={number}>
+              {dropIndex === index && (
+                <div
+                  style={{
+                    height: '2px', // Thinner line for a subtle look
+                    backgroundColor: '#007bff', // Blue color for visibility
+                    width: '30%', // Half the width of the list items
+                    marginLeft: '5px', // Align the line to the left
+                    borderRadius: '1px', // Rounded edges for better appearance
+                    alignContent: 'center', // Center the line
+                  }}
+                />
+              )}
+              <li
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '10px',
+                  cursor: 'move',
+                  padding: '5px',
+                  border: '1px solid #ccc',
+                  borderRadius: '5px',
+                  backgroundColor: '#f9f9f9',
+                  width: 'calc(100% - 10px)',
+                }}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={handleDragOver(index)}
+                onDrop={handleDrop}
+              >
+                <span style={{ marginRight: '10px' }}>
+                  Boat {number} - Place {placeNumbers[number]}
+                </span>
+                <button type="button" onClick={() => handleRemoveBoat(index)}>
+                  Remove
+                </button>
+              </li>
+            </React.Fragment>
           ))}
           {dropIndex === boatNumbers.length && (
-  <div
-    style={{
-      height: '5px',
-      backgroundColor: '#007bff',
-      marginLeft: '0', // Align the line to the left
-      width: '50%', // Half the width of the list items
-    }}
-  />
-)}
+            <div
+              style={{
+                height: '5px',
+                backgroundColor: '#007bff',
+                marginLeft: '0', // Align the line to the left
+                width: '50%', // Half the width of the list items
+              }}
+            />
+          )}
         </ul>
-        <button onClick={handleSubmit}>Submit Scores</button>
+        <button type="button" onClick={handleSubmit}>
+          Submit Scores
+        </button>
       </div>
     </div>
   );
+}
+ScoringInputComponent.propTypes = {
+  heat: PropTypes.shape({
+    heat_id: PropTypes.number.isRequired,
+    heat_name: PropTypes.string.isRequired,
+    boats: PropTypes.arrayOf(
+      PropTypes.shape({
+        boat_id: PropTypes.number.isRequired,
+        name: PropTypes.string.isRequired,
+        surname: PropTypes.string.isRequired,
+        country: PropTypes.string.isRequired,
+        sail_number: PropTypes.number.isRequired,
+      }),
+    ).isRequired,
+  }).isRequired,
+  onSubmit: PropTypes.func.isRequired,
 };
 
 export default ScoringInputComponent;

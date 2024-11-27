@@ -73,6 +73,13 @@ function ScoringInputComponent({ heat, onSubmit }) {
       updatedPlaceNumbers[boat] = updatedBoatNumbers.length;
     });
 
+    // Update place numbers for all boats
+    updatedBoatNumbers.forEach((boat, index) => {
+      if (!penalties[boat]) {
+        updatedPlaceNumbers[boat] = index + 1;
+      }
+    });
+
     setBoatNumbers(updatedBoatNumbers);
     setPlaceNumbers(updatedPlaceNumbers);
     setTemporaryBoats([]); // Clear temporary state
@@ -88,12 +95,17 @@ function ScoringInputComponent({ heat, onSubmit }) {
   };
 
   const handleRemoveBoat = (index) => {
-    const updatedBoatNumbers = boatNumbers.filter((_, i) => i !== index);
-    const updatedPlaceNumbers = {};
+    const updatedBoatNumbers = [...boatNumbers];
+    const removedBoat = updatedBoatNumbers.splice(index, 1)[0];
 
-    // Recalculate place numbers for the remaining boats
-    updatedBoatNumbers.forEach((boat, newIndex) => {
-      updatedPlaceNumbers[boat] = newIndex + 1;
+    const updatedPlaceNumbers = { ...placeNumbers };
+    delete updatedPlaceNumbers[removedBoat];
+
+    // Update place numbers for remaining boats
+    updatedBoatNumbers.forEach((boat, idx) => {
+      if (!penalties[boat]) {
+        updatedPlaceNumbers[boat] = idx + 1;
+      }
     });
 
     setBoatNumbers(updatedBoatNumbers);
@@ -176,13 +188,15 @@ function ScoringInputComponent({ heat, onSubmit }) {
   };
 
   const getPlaceNumber = (sailNumber) => {
+    if (penalties[sailNumber]) {
+      return penalties[sailNumber]; // Display penalty if it exists
+    }
     if (temporaryBoats.includes(sailNumber)) {
       // Display temporary place
       return temporaryBoats.indexOf(sailNumber) + 1 + boatNumbers.length;
     }
     return placeNumbers[sailNumber] || ''; // Display final place
   };
-
   return (
     <div
       style={{
@@ -317,7 +331,10 @@ function ScoringInputComponent({ heat, onSubmit }) {
                 onDrop={handleDrop}
               >
                 <span style={{ marginRight: '10px' }}>
-                  Boat {number} - Place {placeNumbers[number]}
+                  Boat {number} -{' '}
+                  {penalties[number]
+                    ? `Penalty: ${penalties[number]}`
+                    : `Place: ${placeNumbers[number]}`}
                 </span>
                 <button type="button" onClick={() => handleRemoveBoat(index)}>
                   Remove

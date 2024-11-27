@@ -7,6 +7,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [temporaryBoats, setTemporaryBoats] = useState([]);
   const [validBoats, setValidBoats] = useState([]);
   const [placeNumbers, setPlaceNumbers] = useState({});
+  const [penalties, setPenalties] = useState({});
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
 
@@ -111,12 +112,54 @@ function ScoringInputComponent({ heat, onSubmit }) {
     }
   };
 
-  const handleSubmit = () => {
-    const boatPlaces = boatNumbers.map((boatNumber) => ({
-      boatNumber,
-      place: placeNumbers[boatNumber],
+  const handlePenaltyChange = (boatNumber, penalty) => {
+    setPenalties((prevPenalties) => ({
+      ...prevPenalties,
+      [boatNumber]: penalty,
     }));
-    onSubmit(boatPlaces);
+  };
+
+  const handleSubmit = () => {
+    const allBoats = [...new Set([...boatNumbers, ...validBoats])];
+    const boatsWithPenalties = allBoats.filter(
+      (boatNumber) => penalties[boatNumber],
+    );
+    const boatsWithoutPenalties = allBoats.filter(
+      (boatNumber) => !penalties[boatNumber],
+    );
+
+    // Assign place numbers to boats without penalties
+    const boatPlaces = boatsWithoutPenalties.map((boatNumber, index) => {
+      const place = index + 1;
+      return {
+        boatNumber,
+        place,
+        status: 'FINISHED',
+      };
+    });
+
+    // Assign place numbers to boats with penalties
+    boatsWithPenalties.forEach((boatNumber) => {
+      const penalty = penalties[boatNumber];
+      const place = allBoats.length + 1;
+      boatPlaces.push({
+        boatNumber,
+        place,
+        status: penalty,
+      });
+    });
+
+    const allBoatsAccountedFor = allBoats.every(
+      (boatNumber) => placeNumbers[boatNumber] || penalties[boatNumber],
+    );
+
+    if (allBoatsAccountedFor) {
+      onSubmit(boatPlaces);
+    } else {
+      alert(
+        'All boats must be assigned a place or a penalty before submitting.',
+      );
+    }
   };
 
   const getPlaceNumber = (sailNumber) => {
@@ -166,6 +209,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
                   <th>Country</th>
                   <th>Boat Number</th>
                   <th>Place</th>
+                  <th>Penalty</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,6 +224,27 @@ function ScoringInputComponent({ heat, onSubmit }) {
                     <td>{boat.country}</td>
                     <td>{boat.sail_number}</td>
                     <td>{getPlaceNumber(boat.sail_number)}</td>
+                    <td>
+                      <select
+                        value={penalties[boat.sail_number] || ''}
+                        onChange={(e) =>
+                          handlePenaltyChange(boat.sail_number, e.target.value)
+                        }
+                      >
+                        <option value="">None</option>
+                        <option value="DNS">DNS</option>
+                        <option value="DNF">DNF</option>
+                        <option value="RET">RET</option>
+                        <option value="NSC">NSC</option>
+                        <option value="OCS">OCS</option>
+                        <option value="DNC">DNC</option>
+                        <option value="WTH">WTH</option>
+                        <option value="UFD">UFD</option>
+                        <option value="BFD">BFD</option>
+                        <option value="DSQ">DSQ</option>
+                        <option value="DNE">DNE</option>
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -265,6 +330,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
     </div>
   );
 }
+
 ScoringInputComponent.propTypes = {
   heat: PropTypes.shape({
     heat_id: PropTypes.number.isRequired,

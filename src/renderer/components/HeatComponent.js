@@ -1,17 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 
-const HeatComponent = ({ event, onHeatSelect, clickable }) => {
+function HeatComponent({ event, onHeatSelect, clickable }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
   const [selectedHeatId, setSelectedHeatId] = useState(null);
   const [heatsCreated, setHeatsCreated] = useState(false);
 
+  const handleDisplayHeats = useCallback(async () => {
+    try {
+      const heatsToDisplay =
+        await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      const heatDetailsPromises = heatsToDisplay.map(async (heat) => {
+        const boatsInHeat =
+          await window.electron.sqlite.heatRaceDB.readBoatsByHeat(heat.heat_id);
+        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
+          heat.heat_id,
+        );
+        return {
+          ...heat,
+          boats: boatsInHeat,
+          raceNumber: races.length,
+        };
+      });
+
+      const heatDetails = await Promise.all(heatDetailsPromises);
+      setHeats(heatDetails);
+      setHeatsCreated(heatDetails.length > 0);
+    } catch (error) {
+      // Handle error appropriately
+      setHeats([]);
+      setHeatsCreated(false);
+    }
+  }, [event.event_id]);
+
   const handleCreateHeats = async () => {
     try {
-      const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(event.event_id);
-      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(
+        event.event_id,
+      );
+      const existingHeats =
+        await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
 
-      if (heats.length > 0) {
+      if (existingHeats.length > 0) {
         alert('Heats already exist for this event.');
         setHeatsCreated(true);
         return;
@@ -27,19 +58,38 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
       for (let i = 0; i < numHeats; i += 1) {
         const heatName = `Heat ${String.fromCharCode(65 + i)}`;
         const heatType = 'Qualifying';
-        heatPromises.push(window.electron.sqlite.heatRaceDB.insertHeat(event.event_id, heatName, heatType));
+        heatPromises.push(
+          window.electron.sqlite.heatRaceDB.insertHeat(
+            event.event_id,
+            heatName,
+            heatType,
+          ),
+        );
       }
       await Promise.all(heatPromises);
 
-      const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
-      const heatOrder = Array.from({ length: numHeats }, (_, i) => String.fromCharCode(65 + i)).concat(
-        Array.from({ length: numHeats }, (_, i) => String.fromCharCode(65 + numHeats - 1 - i))
+      const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+        event.event_id,
+      );
+      const heatOrder = Array.from({ length: numHeats }, (_, i) =>
+        String.fromCharCode(65 + i),
+      ).concat(
+        Array.from({ length: numHeats }, (_, i) =>
+          String.fromCharCode(65 + numHeats - 1 - i),
+        ),
       );
       const heatBoatPromises = [];
       for (let i = 0; i < eventBoats.length; i += 1) {
         const heatIndex = i % heatOrder.length;
-        const heat = FetchedHeats.find(h => h.heat_name === `Heat ${heatOrder[heatIndex]}`);
-        heatBoatPromises.push(window.electron.sqlite.heatRaceDB.insertHeatBoat(heat.heat_id, eventBoats[i].boat_id));
+        const heat = FetchedHeats.find(
+          (h) => h.heat_name === `Heat ${heatOrder[heatIndex]}`,
+        );
+        heatBoatPromises.push(
+          window.electron.sqlite.heatRaceDB.insertHeatBoat(
+            heat.heat_id,
+            eventBoats[i].boat_id,
+          ),
+        );
       }
       await Promise.all(heatBoatPromises);
 
@@ -54,7 +104,9 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
 
   const handleRecreateHeats = async () => {
     try {
-      await window.electron.sqlite.heatRaceDB.deleteHeatsByEvent(event.event_id);
+      await window.electron.sqlite.heatRaceDB.deleteHeatsByEvent(
+        event.event_id,
+      );
       await handleCreateHeats();
     } catch (error) {
       console.error('Error recreating heats:', error);
@@ -62,29 +114,9 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
     }
   };
 
-  const handleDisplayHeats = async () => {
-    try {
-      const heatsToDisplay = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
-      const heatDetailsPromises = heatsToDisplay.map(async (heat) => {
-        const boatsInHeat = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(heat.heat_id);
-        return {
-          ...heat,
-          boats: boatsInHeat,
-        };
-      });
-
-      const heatDetails = await Promise.all(heatDetailsPromises);
-      setHeats(heatDetails);
-      setHeatsCreated(heatDetails.length > 0);
-    } catch (error) {
-      console.error('Error displaying heats and sailors:', error);
-      alert('Error displaying heats and sailors. Please try again later.');
-    }
-  };
-
   useEffect(() => {
     handleDisplayHeats();
-  }, []);
+  }, [handleDisplayHeats]);
 
   const handleHeatClick = (heat) => {
     if (clickable) {
@@ -129,13 +161,22 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
     <div>
       <div>
         <label htmlFor="numHeats">Number of Heats:</label>
-        <select id="numHeats" value={numHeats} onChange={(e) => setNumHeats(Number(e.target.value))}>
-          {[...Array(10).keys()].map(i => (
-            <option key={i + 1} value={i + 1}>{i + 1}</option>
+        <select
+          id="numHeats"
+          value={numHeats}
+          onChange={(e) => setNumHeats(Number(e.target.value))}
+        >
+          {[...Array(10).keys()].map((i) => (
+            <option key={i + 1} value={i + 1}>
+              {i + 1}
+            </option>
           ))}
         </select>
       </div>
-      <button onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}>
+      <button
+        type="button"
+        onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
+      >
         {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
       </button>
       {heats.length > 0 && (
@@ -143,11 +184,24 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
           {heats.map((heat) => (
             <div
               key={heat.heat_id}
-              style={heat.heat_id === selectedHeatId ? selectedHeatColumnStyle : heatColumnStyle}
+              style={
+                heat.heat_id === selectedHeatId
+                  ? selectedHeatColumnStyle
+                  : heatColumnStyle
+              }
               className="heat-column"
               onClick={() => handleHeatClick(heat)}
+              role="button"
+              tabIndex={0}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleHeatClick(heat);
+                }
+              }}
             >
-              <h4>{heat.heat_name}</h4>
+              <h4>
+                {heat.heat_name} (Race {heat.raceNumber})
+              </h4>
               <table>
                 <thead>
                   <tr>
@@ -159,7 +213,9 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
                 <tbody>
                   {heat.boats.map((boat) => (
                     <tr key={boat.boat_id}>
-                      <td style={sailorNameColumnStyle}>{boat.name} {boat.surname}</td>
+                      <td style={sailorNameColumnStyle}>
+                        {boat.name} {boat.surname}
+                      </td>
                       <td>{boat.country}</td>
                       <td style={boatNumberColumnStyle}>{boat.sail_number}</td>
                     </tr>
@@ -172,6 +228,14 @@ const HeatComponent = ({ event, onHeatSelect, clickable }) => {
       )}
     </div>
   );
+}
+HeatComponent.propTypes = {
+  event: PropTypes.shape({
+    event_id: PropTypes.number.isRequired,
+    // Add other event properties here if needed
+  }).isRequired,
+  onHeatSelect: PropTypes.func.isRequired,
+  clickable: PropTypes.bool.isRequired,
 };
 
 export default HeatComponent;

@@ -44,31 +44,51 @@ function HeatRacePage() {
 
   const handleSubmitScores = async (placeNumbers) => {
     console.log('Submitted place numbers:', placeNumbers);
-    const boatDetailsPromises = placeNumbers.map(
-      async ({ boatNumber, place }) => {
+
+    // Fetch the current races for the selected heat
+    const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
+      selectedHeat.heat_id,
+    );
+    const nextRaceNumber = races.length + 1;
+
+    // Insert a new race for the selected heat
+    const { lastInsertRowid: raceId } =
+      await window.electron.sqlite.heatRaceDB.insertRace(
+        selectedHeat.heat_id,
+        nextRaceNumber,
+      );
+
+    // Insert scores for the new race
+    const scorePromises = placeNumbers.map(
+      async ({ boatNumber, place, status }) => {
         const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
           selectedHeat.heat_id,
         );
         const boatDetails = boats.find(
           (boat) => boat.sail_number === boatNumber,
         );
-        return { ...boatDetails, place };
+        if (boatDetails) {
+          await window.electron.sqlite.heatRaceDB.insertScore(
+            raceId,
+            boatDetails.boat_id,
+            place,
+            place,
+            status, // Pass the correct status
+          );
+        }
       },
     );
 
-    const boatDetails = await Promise.all(boatDetailsPromises);
-    boatDetails.forEach(
-      ({ boat_id, sail_number, country, model, name, surname, place }) => {
-        console.log(
-          `Boat ID: ${boat_id}, Sail Number: ${sail_number}, Country: ${country}, Model: ${model}, Skipper: ${name} ${surname}, Place: ${place}`,
-        );
-      },
+    await Promise.all(scorePromises);
+
+    console.log(
+      `Scores for race ${nextRaceNumber} in heat ${selectedHeat.heat_name} have been submitted.`,
     );
+    setIsScoring(false);
+
+    // Update the selected heat with the new race number
+    setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
   };
-
-  if (!event) {
-    return <p>No event data available.</p>;
-  }
 
   return (
     <div>

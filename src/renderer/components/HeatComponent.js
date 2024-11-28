@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
-function HeatComponent({ event, onHeatSelect, clickable }) {
+function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
   const [selectedHeatId, setSelectedHeatId] = useState(null);
@@ -255,10 +255,6 @@ HeatComponent.propTypes = {
   }).isRequired,
   onHeatSelect: PropTypes.func,
   clickable: PropTypes.bool.isRequired,
-};
-
-HeatComponent.defaultProps = {
-  onHeatSelect: () => {},
 };
 
 export default HeatComponent;

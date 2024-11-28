@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 import { toast } from 'react-toastify';
@@ -21,6 +21,7 @@ function SailorForm({ onAddSailor, eventId }) {
   const [sailNumber, setSailNumber] = useState('');
   const [model, setModel] = useState('');
   const [boats, setBoats] = useState([]);
+  const [raceHappened, setRaceHappened] = useState(false);
 
   const fetchSailors = async () => {
     try {
@@ -50,11 +51,27 @@ function SailorForm({ onAddSailor, eventId }) {
     }
   };
 
+  const checkIfRaceHappened = useCallback(async () => {
+    try {
+      const heats =
+        await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
+      const racePromises = heats.map((heat) =>
+        window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id),
+      );
+      const races = await Promise.all(racePromises);
+      const anyRaceHappened = races.some((raceArray) => raceArray.length > 0);
+      setRaceHappened(anyRaceHappened);
+    } catch (error) {
+      console.error('Error checking if race happened:', error);
+    }
+  }, [eventId]);
+
   useEffect(() => {
     fetchSailors();
     fetchClubs();
     fetchBoats();
-  }, []);
+    checkIfRaceHappened();
+  }, [checkIfRaceHappened]);
 
   const calculateCategory = () => {
     const birthYear = new Date(birthday).getFullYear();
@@ -70,6 +87,13 @@ function SailorForm({ onAddSailor, eventId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (raceHappened) {
+      toast.error(
+        'No more sailors can be added as a race has already happened.',
+      );
+      return;
+    }
     try {
       const category_id = calculateCategory(birthday);
       console.log(`Category ID calculated: ${category_id}`);
@@ -232,64 +256,70 @@ function SailorForm({ onAddSailor, eventId }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
-        placeholder="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <input
-        type="text"
-        placeholder="Surname"
-        value={surname}
-        onChange={(e) => setSurname(e.target.value)}
-        required
-      />
-      <input
-        type="date"
-        placeholder="Birthdate"
-        value={birthday}
-        onChange={(e) => setBirthday(e.target.value)}
-        required
-      />
-      <input
-        type="text"
-        value={club}
-        onChange={(e) => setClub(e.target.value)}
-        placeholder="Club name"
-        required
-      />
-      <input
-        type="text"
-        placeholder="Sail Number"
-        value={sailNumber}
-        onChange={(e) => setSailNumber(e.target.value)}
-        required
-      />
-      <select
-        value={selectedCountry}
-        onChange={(e) => setSelectedCountry(e.target.value)}
-        required
-      >
-        <option value="" disabled>
-          Select Country
-        </option>
-        {Object.entries(iocCountries).map(([code, countryName]) => (
-          <option key={code} value={code}>
-            {countryName} ({code})
-          </option>
-        ))}
-      </select>
-      <input
-        type="text"
-        placeholder="Model"
-        value={model}
-        onChange={(e) => setModel(e.target.value)}
-      />
-      <button type="submit">Add Sailor</button>
-    </form>
+    <div>
+      {raceHappened ? (
+        <p>No more sailors can be added as a race has already happened.</p>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <input
+            type="text"
+            placeholder="Surname"
+            value={surname}
+            onChange={(e) => setSurname(e.target.value)}
+            required
+          />
+          <input
+            type="date"
+            placeholder="Birthdate"
+            value={birthday}
+            onChange={(e) => setBirthday(e.target.value)}
+            required
+          />
+          <input
+            type="text"
+            value={club}
+            onChange={(e) => setClub(e.target.value)}
+            placeholder="Club name"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Sail Number"
+            value={sailNumber}
+            onChange={(e) => setSailNumber(e.target.value)}
+            required
+          />
+          <select
+            value={selectedCountry}
+            onChange={(e) => setSelectedCountry(e.target.value)}
+            required
+          >
+            <option value="" disabled>
+              Select Country
+            </option>
+            {Object.entries(iocCountries).map(([code, countryName]) => (
+              <option key={code} value={code}>
+                {countryName} ({code})
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Model"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <button type="submit">Add Sailor</button>
+        </form>
+      )}
+    </div>
   );
 }
 

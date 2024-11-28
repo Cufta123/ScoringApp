@@ -9,11 +9,19 @@ import HeatComponent from '../../components/HeatComponent';
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { event } = location.state;
+  const { event } = location.state || {};
+
+  useEffect(() => {
+    if (!event) {
+      navigate('/'); // Redirect to the landing page if event is not available
+    }
+  }, [event, navigate]);
+
   const [boats, setBoats] = useState([]);
   const [allBoats, setAllBoats] = useState([]);
   const [selectedBoats, setSelectedBoats] = useState([]);
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
+  const [raceHappened, setRaceHappened] = useState(false);
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -42,10 +50,29 @@ function EventPage() {
     }
   }, []);
 
+  const checkIfRaceHappened = useCallback(async () => {
+    try {
+      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+        event.event_id,
+      );
+      const racePromises = heats.map((heat) =>
+        window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id),
+      );
+      const races = await Promise.all(racePromises);
+      const anyRaceHappened = races.some((raceArray) => raceArray.length > 0);
+      setRaceHappened(anyRaceHappened);
+    } catch (error) {
+      console.error('Error checking if race happened:', error);
+    }
+  }, [event.event_id]);
+
   useEffect(() => {
-    fetchBoatsWithSailors();
-    fetchAllBoats();
-  }, [fetchBoatsWithSailors, fetchAllBoats]);
+    if (event) {
+      fetchBoatsWithSailors();
+      fetchAllBoats();
+      checkIfRaceHappened();
+    }
+  }, [event, fetchBoatsWithSailors, fetchAllBoats, checkIfRaceHappened]);
 
   const handleAddSailor = () => {
     fetchBoatsWithSailors();
@@ -60,16 +87,31 @@ function EventPage() {
   };
 
   const toggleSailorFormVisibility = () => {
+    if (raceHappened) {
+      alert('No more sailors can be added as a race has already happened.');
+      return;
+    }
     setIsSailorFormVisible(!isSailorFormVisible);
   };
 
   const handleBoatSelection = async (e) => {
     e.preventDefault();
+
+    if (raceHappened) {
+      alert('No more boats can be added as a race has already happened.');
+      return;
+    }
+
     try {
-      const boatIds = selectedBoats.map(option => option.value);
-      await Promise.all(boatIds.map(boatId =>
-        window.electron.sqlite.eventDB.associateBoatWithEvent(boatId, event.event_id)
-      ));
+      const boatIds = selectedBoats.map((option) => option.value);
+      await Promise.all(
+        boatIds.map((boatId) =>
+          window.electron.sqlite.eventDB.associateBoatWithEvent(
+            boatId,
+            event.event_id,
+          ),
+        ),
+      );
       fetchBoatsWithSailors();
       setAllBoats((prevBoats) =>
         prevBoats.filter((boat) => !boatIds.includes(boat.boat_id)),
@@ -91,7 +133,7 @@ function EventPage() {
 
   const boatOptions = availableBoats.map((boat) => ({
     value: boat.boat_id,
-    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`
+    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
   }));
 
   const handleRemoveBoat = async (boatId) => {
@@ -129,6 +171,10 @@ function EventPage() {
     });
   }, [boats]);
 
+  if (!event) {
+    return null; // Render nothing if event is not available
+  }
+
   return (
     <div>
       <div className="button-container">
@@ -143,29 +189,45 @@ function EventPage() {
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>
 
-      <h2>Add Sailors</h2>
-      <button type="button" onClick={toggleSailorFormVisibility}>
-        {isSailorFormVisible ? 'Hide Sailor Form' : 'Show Sailor Form'}
-      </button>
-      {isSailorFormVisible && (
-        <SailorForm onAddSailor={handleAddSailor} eventId={event.event_id} />
+      {raceHappened ? (
+        <div className="warning">
+          <p>
+            No more sailors or boats can be added as atleast one race has
+            happened.
+          </p>
+        </div>
+      ) : (
+        <>
+          <h2>Add Sailors</h2>
+          <button type="button" onClick={toggleSailorFormVisibility}>
+            {isSailorFormVisible ? 'Hide Sailor Form' : 'Show Sailor Form'}
+          </button>
+          {isSailorFormVisible && (
+            <SailorForm
+              onAddSailor={handleAddSailor}
+              eventId={event.event_id}
+            />
+          )}
+          <h2>Add Existing Boat to Event</h2>
+          <form onSubmit={handleBoatSelection}>
+            <Select
+              isMulti
+              value={selectedBoats}
+              onChange={handleBoatChange}
+              options={boatOptions}
+              closeMenuOnSelect={false}
+            />
+            <button type="submit">Add Boats</button>
+          </form>
+        </>
       )}
-      <h2>Add Existing Boat to Event</h2>
-      <form onSubmit={handleBoatSelection}>
-        <Select
-          isMulti
-          value={selectedBoats}
-          onChange={handleBoatChange}
-          options={boatOptions}
-          closeMenuOnSelect={false}
-        />
-        <button type="submit">Add Boats</button>
-      </form>
+
       <h3>Boats and Sailors</h3>
       <SailorList
         sailors={Array.isArray(boats) ? boats : []}
         onRemoveBoat={handleRemoveBoat}
         onRefreshSailors={fetchBoatsWithSailors}
+        raceHappened={raceHappened} // Pass raceHappened state to SailorList
       />
       <HeatComponent event={event} clickable={false} />
     </div>

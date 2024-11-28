@@ -10,7 +10,6 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [editedSailor, setEditedSailor] = useState({});
   const [isExpanded, setIsExpanded] = useState(true);
 
-
   useEffect(() => {
     const savedIsExpanded = localStorage.getItem('isExpanded');
     if (savedIsExpanded !== null) {
@@ -21,7 +20,6 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   useEffect(() => {
     localStorage.setItem('isExpanded', JSON.stringify(isExpanded));
   }, [isExpanded]);
-
 
   const sortedSailors = [...sailors].sort((a, b) => {
     if (a[sortCriteria] < b[sortCriteria]) return -1;
@@ -56,7 +54,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
     console.log('Saving sailor and boat:', sailorData); // Log the data being sent
 
-    const result = await window.electron.sqlite.sailorDB.updateSailor(sailorData);
+    const result =
+      await window.electron.sqlite.sailorDB.updateSailor(sailorData);
     if (result) {
       console.log('Save successful:', result); // Log the result
       // Reset editing state
@@ -113,7 +112,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
           }
         `}
       </style>
-      <button onClick={toggleExpand}>
+      <button type="button" onClick={toggleExpand}>
         {isExpanded ? 'Collapse Sailor List' : 'Expand Sailor List'}
       </button>
       {isExpanded && (
@@ -247,7 +246,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                           tabIndex="0"
                           onClick={handleSave}
                           onKeyPress={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') handleSave();
+                            if (e.key === 'Enter' || e.key === ' ')
+                              handleSave();
                           }}
                           style={{
                             color: 'green',

@@ -129,7 +129,27 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     }
   };
 
+  const doAllHeatsHaveSameNumberOfRaces = async (event_id) => {
+    try {
+      const results = await window.electron.sqlite.heatRaceDB.readAllHeats(event_id);
+      const raceCounts = await Promise.all(results.map(async (heat) => {
+        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
+        return races.length;
+      }));
+      return raceCounts.every(count => count === raceCounts[0]);
+    } catch (error) {
+      console.error('Error checking if all heats have the same number of races:', error.message);
+      return false;
+    }
+  };
+
   const handleRecreateHeatsBasedOnRanking = async () => {
+    const allHeatsEqual = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+    if (!allHeatsEqual) {
+      alert('Cannot recreate heats based on ranking because not all heats have the same number of races.');
+      return;
+    }
+
     try {
       await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(event.event_id);
       setHeatsCreated(true);

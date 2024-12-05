@@ -139,9 +139,12 @@ const createHeatBoatTable = `
 
 const createLiderboardTable = `
   CREATE TABLE IF NOT EXISTS Leaderboard (
-  boat_id INTEGER PRIMARY KEY,
+  boat_id INTEGER,
   total_points_event INTEGER NOT NULL,
-  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+  event_id INTEGER NOT NULL,
+  PRIMARY KEY (boat_id, event_id),
+  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
+  FOREIGN KEY (event_id) REFERENCES Events(event_id)
 );
 `;
 

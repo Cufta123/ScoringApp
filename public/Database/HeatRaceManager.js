@@ -78,13 +78,13 @@ const updateEventLeaderboard = (event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event)
-       VALUES (?, ?)
-       ON CONFLICT(boat_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
+       VALUES (?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`
     );
 
     results.forEach(result => {
-      updateQuery.run(result.boat_id, result.total_points_event);
+      updateQuery.run(result.boat_id, result.total_points_event, event_id);
     });
 
     console.log('Event leaderboard updated successfully.');
@@ -93,6 +93,7 @@ const updateEventLeaderboard = (event_id) => {
     throw err;
   }
 };
+
 
 const updateGlobalLeaderboard = (event_id) => {
   try {
@@ -265,14 +266,15 @@ const deleteScore = (score_id) => {
 };
 const createNewHeatsBasedOnLeaderboard = (event_id) => {
   try {
-    // Read the current leaderboard
+    // Read the current leaderboard for the specific event
     const leaderboardQuery = `
       SELECT boat_id
       FROM Leaderboard
+      WHERE event_id = ?
       ORDER BY total_points_event ASC
     `;
     const readLeaderboardQuery = db.prepare(leaderboardQuery);
-    const leaderboardResults = readLeaderboardQuery.all();
+    const leaderboardResults = readLeaderboardQuery.all(event_id);
 
     // Read the existing heats to determine the next heat name
     const existingHeatsQuery = db.prepare(
@@ -328,6 +330,7 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
     throw err;
   }
 };
+
 
 module.exports = {
   readAllHeats,

@@ -160,22 +160,23 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event)
-       VALUES (?, ?)
-       ON CONFLICT(boat_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
+       VALUES (?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`
     );
 
     results.forEach((result: { boat_id: any; total_points_event: any; }) => {
-      updateQuery.run(result.boat_id, result.total_points_event);
+      updateQuery.run(result.boat_id, result.total_points_event, event_id);
     });
 
     console.log('Event leaderboard updated successfully.');
     return { success: true };
   } catch (error) {
-    console.error('Error updating event leaderboard:', error);
+    console.error('Error updating event leaderboard:', (error as Error).message);
     throw error;
   }
 });
+
 
 ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
   try {
@@ -214,27 +215,51 @@ ipcMain.handle('deleteScore', async (event, score_id) => {
     console.error('Error deleting score:', error);
     throw error;
   }
-});ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
+});
+
+ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
   try {
-    // Read the current leaderboard
+    // Read the current leaderboard for the specific event
     const leaderboardQuery = `
       SELECT boat_id
       FROM Leaderboard
+      WHERE event_id = ?
       ORDER BY total_points_event ASC
     `;
     const readLeaderboardQuery = db.prepare(leaderboardQuery);
-    const leaderboardResults = readLeaderboardQuery.all();
+    const leaderboardResults = readLeaderboardQuery.all(event_id);
 
-    // Read the existing heats to determine the latest heats
+    // Read the existing heats for the event
     const existingHeatsQuery = db.prepare(
-      `SELECT heat_name FROM Heats WHERE event_id = ?`
+      `SELECT heat_name, heat_id FROM Heats WHERE event_id = ?`
     );
     const existingHeats = existingHeatsQuery.all(event_id);
+
+    // Check race count for each heat
+    const heatRaceCounts: { [key: string]: number } = {};
+    const raceCountQuery = db.prepare(
+      `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`
+    );
+
+    for (const heat of existingHeats) {
+      const raceCount = raceCountQuery.get(heat.heat_id).race_count;
+      heatRaceCounts[heat.heat_name] = raceCount;
+    }
+
+    // Validate that all heats have the same number of races
+    const raceCounts = Object.values(heatRaceCounts);
+    const uniqueRaceCounts = [...new Set(raceCounts)];
+
+    if (uniqueRaceCounts.length > 1) {
+      console.error('Heats do not have the same number of races.');
+      return { success: false, message: 'All heats must have the same number of races before creating new heats.' };
+    }
 
     // Group existing heats by base name (A, B, etc.) and track their maximum suffix
     const heatSuffixMap: { [key: string]: number } = {};
     existingHeats.forEach((heat: { heat_name: string }) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+      const { heat_name } = heat;
+      const match = heat_name.match(/Heat ([A-Z]+)(\d*)/);
       if (match) {
         const [_, base, suffix] = match;
         const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
@@ -244,7 +269,7 @@ ipcMain.handle('deleteScore', async (event, score_id) => {
       }
     });
 
-    // Determine the next round of heats based on the suffix map
+    // Determine the next round of heats
     const numBaseHeats = Object.keys(heatSuffixMap).length || 2; // Default to A, B if no heats exist
     const nextHeatNames = [];
     for (let i = 0; i < numBaseHeats; i++) {
@@ -278,3 +303,4 @@ ipcMain.handle('deleteScore', async (event, score_id) => {
     throw error;
   }
 });
+

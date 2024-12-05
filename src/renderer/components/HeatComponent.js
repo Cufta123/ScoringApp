@@ -129,6 +129,16 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     }
   };
 
+  const handleRecreateHeatsBasedOnRanking = async () => {
+    try {
+      await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(event.event_id);
+      setHeatsCreated(true);
+      handleDisplayHeats();
+    } catch (error) {
+      console.error('Error recreating heats based on ranking:', error.message);
+    }
+  };
+
   useEffect(() => {
     setRaceHappened(false); // Reset raceHappened state when event changes
     handleDisplayHeats();
@@ -196,6 +206,13 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
         disabled={raceHappened} // Disable if a race has happened
       >
         {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
+      </button>
+      <button
+        type="button"
+        onClick={handleRecreateHeatsBasedOnRanking}
+        disabled={!heatsCreated} // Enable only if heats are created
+      >
+        Recreate Heats Based on Ranking
       </button>
       {heats.length > 0 && (
         <div style={heatsContainerStyle} className="heats-container">

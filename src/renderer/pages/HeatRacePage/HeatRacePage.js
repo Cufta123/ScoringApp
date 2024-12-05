@@ -19,7 +19,6 @@ function HeatRacePage() {
           await window.electron.sqlite.eventDB.readEventById(event.event_id);
         setEventData(fetchedEventData);
       } catch (error) {
-        // Handle the error appropriately
         console.error(`Error fetching event: ${error.message}`);
       }
     };
@@ -39,6 +38,20 @@ function HeatRacePage() {
 
   const handleBackToHeats = () => {
     setIsScoring(false);
+  };
+
+  const doAllHeatsHaveSameNumberOfRaces = async (event_id) => {
+    try {
+      const results = await window.electron.sqlite.heatRaceDB.readAllHeats(event_id);
+      const raceCounts = await Promise.all(results.map(async (heat) => {
+        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
+        return races.length;
+      }));
+      return raceCounts.every(count => count === raceCounts[0]);
+    } catch (error) {
+      console.error('Error checking if all heats have the same number of races:', error.message);
+      return false;
+    }
   };
 
   const handleSubmitScores = async (placeNumbers) => {
@@ -72,7 +85,7 @@ function HeatRacePage() {
             boatDetails.boat_id,
             place,
             place,
-            status, // Pass the correct status
+            status,
           );
         }
       },
@@ -83,12 +96,30 @@ function HeatRacePage() {
     console.log(
       `Scores for race ${nextRaceNumber} in heat ${selectedHeat.heat_name} have been submitted.`,
     );
+
+    // Check if all heats have the same number of races before updating the local leaderboard
+    const allHeatsEqual = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+    if (allHeatsEqual) {
+      // Update the event leaderboard
+      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(event.event_id);
+    } else {
+      console.log('Not all heats have the same number of races. Local leaderboard will not be updated.');
+    }
+
     setIsScoring(false);
 
     // Update the selected heat with the new race number
     setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
   };
 
+  const handleCreateNewHeatsBasedOnLeaderboard = async () => {
+    try {
+      await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(event.event_id);
+      console.log('New heats created based on leaderboard.');
+    } catch (error) {
+      console.error('Error creating new heats based on leaderboard:', error.message);
+    }
+  };
   return (
     <div>
       <button
@@ -101,7 +132,7 @@ function HeatRacePage() {
         <>
           <HeatComponent
             event={event}
-            onHeatSelect={handleHeatSelect} // Pass the onHeatSelect prop
+            onHeatSelect={handleHeatSelect}
             clickable
           />
           {selectedHeat && (
@@ -109,6 +140,9 @@ function HeatRacePage() {
               Start Scoring
             </button>
           )}
+          <button type="button" onClick={handleCreateNewHeatsBasedOnLeaderboard}>
+            Create New Heats Based on Leaderboard
+          </button>
         </>
       ) : (
         <ScoringInputComponent

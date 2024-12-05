@@ -145,6 +145,65 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT boat_id, SUM(points) as total_points_event
+      FROM Scores
+      JOIN Races ON Scores.race_id = Races.race_id
+      JOIN Heats ON Races.heat_id = Heats.heat_id
+      WHERE Heats.event_id = ?
+      GROUP BY boat_id
+      ORDER BY total_points_event ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+
+    const updateQuery = db.prepare(
+      `INSERT INTO Leaderboard (boat_id, total_points_event)
+       VALUES (?, ?)
+       ON CONFLICT(boat_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+    );
+
+    results.forEach((result: { boat_id: any; total_points_event: any; }) => {
+      updateQuery.run(result.boat_id, result.total_points_event);
+    });
+
+    console.log('Event leaderboard updated successfully.');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating event leaderboard:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT boat_id, RANK() OVER (ORDER BY total_points_event ASC) as final_position
+      FROM Leaderboard
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all();
+
+    const updateQuery = db.prepare(
+      `INSERT INTO GlobalLeaderboard (boat_id, total_points_global)
+       VALUES (?, ?)
+       ON CONFLICT(boat_id) DO UPDATE SET total_points_global = total_points_global + excluded.total_points_global`
+    );
+
+    results.forEach((result: { boat_id: any; final_position: any; }) => {
+      updateQuery.run(result.boat_id, result.final_position);
+    });
+
+    console.log('Global leaderboard updated successfully.');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating global leaderboard:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('deleteScore', async (event, score_id) => {
   try {
     const result = db
@@ -153,6 +212,69 @@ ipcMain.handle('deleteScore', async (event, score_id) => {
     return { changes: result.changes };
   } catch (error) {
     console.error('Error deleting score:', error);
+    throw error;
+  }
+});ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
+  try {
+    // Read the current leaderboard
+    const leaderboardQuery = `
+      SELECT boat_id
+      FROM Leaderboard
+      ORDER BY total_points_event ASC
+    `;
+    const readLeaderboardQuery = db.prepare(leaderboardQuery);
+    const leaderboardResults = readLeaderboardQuery.all();
+
+    // Read the existing heats to determine the latest heats
+    const existingHeatsQuery = db.prepare(
+      `SELECT heat_name FROM Heats WHERE event_id = ?`
+    );
+    const existingHeats = existingHeatsQuery.all(event_id);
+
+    // Group existing heats by base name (A, B, etc.) and track their maximum suffix
+    const heatSuffixMap: { [key: string]: number } = {};
+    existingHeats.forEach((heat: { heat_name: string }) => {
+      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+      if (match) {
+        const [_, base, suffix] = match;
+        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+        if (!heatSuffixMap[base] || numericSuffix > heatSuffixMap[base]) {
+          heatSuffixMap[base] = numericSuffix;
+        }
+      }
+    });
+
+    // Determine the next round of heats based on the suffix map
+    const numBaseHeats = Object.keys(heatSuffixMap).length || 2; // Default to A, B if no heats exist
+    const nextHeatNames = [];
+    for (let i = 0; i < numBaseHeats; i++) {
+      const base = String.fromCharCode(65 + i); // A, B, C, ...
+      const nextSuffix = (heatSuffixMap[base] || 0) + 1;
+      nextHeatNames.push(`Heat ${base}${nextSuffix}`);
+    }
+
+    // Create new heats and assign boats to them
+    for (let i = 0; i < nextHeatNames.length; i++) {
+      const heatName = nextHeatNames[i];
+      const heatType = 'Qualifying';
+
+      // Insert the new heat into the database
+      const { lastInsertRowid: newHeatId } = db
+        .prepare('INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)')
+        .run(event_id, heatName, heatType);
+
+      // Assign boats to the new heat
+      for (let j = i; j < leaderboardResults.length; j += nextHeatNames.length) {
+        const boatId = leaderboardResults[j].boat_id;
+        db.prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)')
+          .run(newHeatId, boatId);
+      }
+    }
+
+    console.log('New heats created based on leaderboard.');
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating new heats based on leaderboard:', (error as Error).message);
     throw error;
   }
 });

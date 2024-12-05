@@ -28,7 +28,11 @@ export type Channels =
   | 'insertScore'
   | 'updateScore'
   | 'deleteScore'
-  | 'deleteHeatsByEvent';
+  | 'deleteHeatsByEvent'
+  | 'recreateHeats'
+  | 'updateEventLeaderboard'
+  | 'updateGlobalLeaderboard'
+  | 'createNewHeatsBasedOnLeaderboard';
 
 const electronHandler = {
   ipcRenderer: {
@@ -312,9 +316,42 @@ const electronHandler = {
           return false;
         }
       },
+      async recreateHeats(event_id: string, numHeats: number) {
+        try {
+          return await ipcRenderer.invoke('recreateHeats', event_id, numHeats);
+        } catch (error) {
+          console.error('Error invoking recreateHeats IPC:', error);
+          return false;
+        }
+      },
+      async updateEventLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('updateEventLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking updateEventLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async updateGlobalLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('updateGlobalLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking updateGlobalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      createNewHeatsBasedOnLeaderboard: async (event_id: string) => {
+        try {
+          return await ipcRenderer.invoke('createNewHeatsBasedOnLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking createNewHeatsBasedOnLeaderboard IPC:', error);
+          return false;
+        }
+      },
     },
   },
 };
+
 
 contextBridge.exposeInMainWorld('electron', electronHandler);
 

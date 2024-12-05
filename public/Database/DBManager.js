@@ -137,6 +137,22 @@ const createHeatBoatTable = `
   );
 `;
 
+const createLiderboardTable = `
+  CREATE TABLE IF NOT EXISTS Leaderboard (
+  boat_id INTEGER PRIMARY KEY,
+  total_points_event INTEGER NOT NULL,
+  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+);
+`;
+
+const createGlobalLeaderboardTable = `
+  CREATE TABLE IF NOT EXISTS GlobalLeaderboard (
+  boat_id INTEGER PRIMARY KEY,
+  total_points_global INTEGER NOT NULL,
+  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+);
+`;
+
 try {
   console.log('Creating Events table...');
   db.exec(createEventsTable);
@@ -177,6 +193,15 @@ try {
   console.log('Creating Heat_Boat table...');
   db.exec(createHeatBoatTable);
   console.log('Heat_Boat table created or already exists.');
+
+  console.log('Creating Leaderboard table...');
+  db.exec(createLiderboardTable);
+  console.log('Leaderboard table created or already exists.');
+
+  console.log('Creating GlobalLeaderboard table...');
+  db.exec(createGlobalLeaderboardTable);
+  console.log('GlobalLeaderboard table created or already exists.');
+
   console.log('Database schema initialized successfully.');
 } catch (error) {
   console.error('Error initializing database schema:', error);

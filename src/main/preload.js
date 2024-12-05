@@ -47,6 +47,8 @@ heatRaceDB: {
   updateScore: heatRaceDB.updateScore,
   deleteScore: heatRaceDB.deleteScore,
   deleteHeatsByEvent: heatRaceDB.deleteHeatsByEvent, // Add this line
+  updateEventLeaderboard: heatRaceDB.updateEventLeaderboard,
+  updateGlobalLeaderboard: heatRaceDB.updateGlobalLeaderboard,
 
 },
 };

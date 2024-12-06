@@ -235,48 +235,51 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     );
     const existingHeats = existingHeatsQuery.all(event_id);
 
-    // Check race count for each heat
-    const heatRaceCounts: { [key: string]: number } = {};
+    // Find the latest heats by suffix
+    const latestHeats = existingHeats.reduce((acc: Record<string, { suffix: number; heat: { heat_name: string; heat_id: number } }>, heat: { heat_name: string; heat_id: number }) => {
+      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+      if (match) {
+        const [_, base, suffix] = match;
+        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+        acc[base] = acc[base] || { suffix: 0, heat: null };
+        if (numericSuffix > acc[base].suffix) {
+          acc[base] = { suffix: numericSuffix, heat };
+        }
+      }
+      return acc;
+    }, {});
+
+    // Extract only the latest heats
+    const lastHeats = Object.values(latestHeats).map((entry) => (entry as { suffix: number; heat: { heat_name: string; heat_id: number } }).heat);
+
+    // Check race count for the latest heats
     const raceCountQuery = db.prepare(
       `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`
     );
 
-    for (const heat of existingHeats) {
+    const heatRaceCounts = lastHeats.map((heat) => {
       const raceCount = raceCountQuery.get(heat.heat_id).race_count;
-      heatRaceCounts[heat.heat_name] = raceCount;
-    }
-
-    // Validate that all heats have the same number of races
-    const raceCounts = Object.values(heatRaceCounts);
-    const uniqueRaceCounts = [...new Set(raceCounts)];
-
-    if (uniqueRaceCounts.length > 1) {
-      console.error('Heats do not have the same number of races.');
-      return { success: false, message: 'All heats must have the same number of races before creating new heats.' };
-    }
-
-    // Group existing heats by base name (A, B, etc.) and track their maximum suffix
-    const heatSuffixMap: { [key: string]: number } = {};
-    existingHeats.forEach((heat: { heat_name: string }) => {
-      const { heat_name } = heat;
-      const match = heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [_, base, suffix] = match;
-        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-        if (!heatSuffixMap[base] || numericSuffix > heatSuffixMap[base]) {
-          heatSuffixMap[base] = numericSuffix;
-        }
-      }
+      return { heat_name: heat.heat_name, raceCount };
     });
 
-    // Determine the next round of heats
-    const numBaseHeats = Object.keys(heatSuffixMap).length || 2; // Default to A, B if no heats exist
-    const nextHeatNames = [];
-    for (let i = 0; i < numBaseHeats; i++) {
-      const base = String.fromCharCode(65 + i); // A, B, C, ...
-      const nextSuffix = (heatSuffixMap[base] || 0) + 1;
-      nextHeatNames.push(`Heat ${base}${nextSuffix}`);
+    // Ensure all latest heats have the same number of races
+    const uniqueRaceCounts = [
+      ...new Set(heatRaceCounts.map((item) => item.raceCount)),
+    ];
+
+    if (uniqueRaceCounts.length > 1) {
+      console.error('Latest heats do not have the same number of races.');
+      return {
+        success: false,
+        message:
+          'The latest heats must have the same number of races before creating new heats.',
+      };
     }
+
+    // Generate names for the next round of heats
+    const nextHeatNames = Object.keys(latestHeats).map(
+      (base) => `Heat ${base}${latestHeats[base].suffix + 1}`
+    );
 
     // Create new heats and assign boats to them
     for (let i = 0; i < nextHeatNames.length; i++) {
@@ -303,4 +306,3 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
-

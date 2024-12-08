@@ -7,6 +7,7 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [selectedHeatId, setSelectedHeatId] = useState(null);
   const [heatsCreated, setHeatsCreated] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
+  const [displayLastHeats, setDisplayLastHeats] = useState(false);
 
   const handleDisplayHeats = useCallback(async () => {
     try {
@@ -171,6 +172,38 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     }
   };
 
+
+  const toggleDisplayMode = () => {
+    setDisplayLastHeats((prevMode) => !prevMode);
+  };
+
+  const getLastHeats = (heats) => {
+    const heatGroups = heats.reduce((acc, heat) => {
+      const match = heat.heat_name.match(/([A-Z]+)(\d*)$/);
+      if (match) {
+        const [_, group, suffix] = match;
+        const suffixNumber = suffix ? parseInt(suffix, 10) : 0;
+        if (!acc[group] || acc[group] < suffixNumber) {
+          acc[group] = suffixNumber;
+        }
+      }
+      return acc;
+    }, {});
+
+    return heats.filter((heat) => {
+      const match = heat.heat_name.match(/([A-Z]+)(\d*)$/);
+      if (match) {
+        const [_, group, suffix] = match;
+        const suffixNumber = suffix ? parseInt(suffix, 10) : 0;
+        return suffixNumber === heatGroups[group];
+      }
+      return false;
+    });
+  };
+
+
+  const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
+
   const heatsContainerStyle = {
     display: 'flex',
     flexWrap: 'wrap',
@@ -203,7 +236,8 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     maxWidth: '400px', // Wider width for sailor name
   };
 
-  return (
+
+   return (
     <div>
       <div>
         <label htmlFor="numHeats">Number of Heats:</label>
@@ -227,16 +261,12 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
       >
         {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
       </button>
-      <button
-        type="button"
-        onClick={handleRecreateHeatsBasedOnRanking}
-        disabled={!heatsCreated} // Enable only if heats are created
-      >
-        Recreate Heats Based on Ranking
+      <button type="button" onClick={toggleDisplayMode}>
+        {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
       </button>
-      {heats.length > 0 && (
+      {heatsToDisplay.length > 0 && (
         <div style={heatsContainerStyle} className="heats-container">
-          {heats.map((heat) => (
+          {heatsToDisplay.map((heat) => (
             <div
               key={heat.heat_id}
               style={

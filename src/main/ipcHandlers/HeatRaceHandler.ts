@@ -306,3 +306,30 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
+
+ipcMain.handle('readLeaderboard', async (event, event_id) => {
+  try {
+    const query = `
+    SELECT
+      lb.boat_id,
+      lb.total_points_event,
+      b.sail_number AS boat_number,
+      b.model AS boat_type,
+      s.name,
+      s.surname,
+      b.country
+    FROM Leaderboard lb
+    LEFT JOIN Boats b ON lb.boat_id = b.boat_id
+    LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+    WHERE lb.event_id = ?
+    ORDER BY lb.total_points_event ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+    console.log('Raw results from readLeaderboard:', results); // Log the raw results
+    return results;
+  } catch (error) {
+    console.error('Error reading leaderboard:', error);
+    throw error;
+  }
+});

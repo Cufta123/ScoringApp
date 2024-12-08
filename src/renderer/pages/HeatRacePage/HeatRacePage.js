@@ -120,6 +120,7 @@ function HeatRacePage() {
       console.error('Error creating new heats based on leaderboard:', error.message);
     }
   };
+
   return (
     <div>
       <button

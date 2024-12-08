@@ -5,7 +5,7 @@ import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
-
+import LeaderboardComponent from '../../components/Leaderboard';
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -22,6 +22,7 @@ function EventPage() {
   const [selectedBoats, setSelectedBoats] = useState([]);
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -126,15 +127,13 @@ function EventPage() {
     setSelectedBoats(selectedOptions);
   };
 
-  // Filter out boats that are already added to the event
-  const availableBoats = allBoats.filter(
-    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
-  );
+  const handleOpenLeaderboard = () => {
+    setShowLeaderboard(true);
+  };
 
-  const boatOptions = availableBoats.map((boat) => ({
-    value: boat.boat_id,
-    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
-  }));
+  const handleCloseLeaderboard = () => {
+    setShowLeaderboard(false);
+  };
 
   const handleRemoveBoat = async (boatId) => {
     try {
@@ -175,6 +174,27 @@ function EventPage() {
     return null; // Render nothing if event is not available
   }
 
+  if (showLeaderboard) {
+    return (
+      <div>
+        <button type="button" onClick={handleCloseLeaderboard}>
+          Back
+        </button>
+        <LeaderboardComponent eventId={event.event_id} />
+      </div>
+    );
+  }
+
+  const availableBoats = allBoats.filter(
+    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+  );
+
+  const boatOptions = availableBoats.map((boat) => ({
+    value: boat.boat_id,
+    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
+  }));
+
+
   return (
     <div>
       <div className="button-container">
@@ -188,7 +208,9 @@ function EventPage() {
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>
-
+      <button type="button" onClick={handleOpenLeaderboard}>
+        Open Leaderboard
+      </button>
       {raceHappened ? (
         <div className="warning">
           <p>

@@ -283,7 +283,7 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
     const existingHeats = existingHeatsQuery.all(event_id);
 
     // Determine the number of new heats to create based on the existing heats
-    const numHeats = existingHeats.length || 2; // Default to 2 if no existing heats
+    const numHeats = existingHeats.length || 1; // Default to 2 if no existing heats
 
     // Filter the existing heats to only include the most recent heats
     const recentHeats = existingHeats.filter((heat) => {
@@ -308,6 +308,9 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
       heatNames.push(newHeatName);
     }
 
+// Sort leaderboardResults by total_points_event in ascending order
+leaderboardResults.sort((a, b) => a.total_points_event - b.total_points_event);
+
     // Create new heats based on the leaderboard
     for (let i = 0; i < numHeats; i++) {
       const heatName = heatNames[i];
@@ -331,6 +334,34 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
   }
 };
 
+const readLeaderboard = (event_id) => {
+  try {
+    const query = `
+    SELECT
+      lb.boat_id,
+      lb.total_points_event,
+      b.sail_number AS boat_number,
+      b.model AS boat_type,
+      s.name,
+      s.surname,
+      b.country
+    FROM Leaderboard lb
+    LEFT JOIN Boats b ON lb.boat_id = b.boat_id
+    LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+    WHERE lb.event_id = ?
+    ORDER BY lb.total_points_event ASC
+    `;
+
+
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+    console.log('Raw results from readLeaderboard:', results); // Log the raw results
+    return results;
+  } catch (err) {
+    console.error('Error reading leaderboard from the database:', err.message);
+    return [];
+  }
+};
 
 module.exports = {
   readAllHeats,
@@ -347,4 +378,5 @@ module.exports = {
   updateEventLeaderboard,
   updateGlobalLeaderboard,
   createNewHeatsBasedOnLeaderboard,
+  readLeaderboard,
 };

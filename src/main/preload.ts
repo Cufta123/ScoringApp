@@ -32,7 +32,8 @@ export type Channels =
   | 'recreateHeats'
   | 'updateEventLeaderboard'
   | 'updateGlobalLeaderboard'
-  | 'createNewHeatsBasedOnLeaderboard';
+  | 'createNewHeatsBasedOnLeaderboard'
+  | 'readLeaderboard';
 
 const electronHandler = {
   ipcRenderer: {
@@ -348,10 +349,17 @@ const electronHandler = {
           return false;
         }
       },
+      async readLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('readLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking readLeaderboard IPC:', error);
+          return false;
+        }
+      },
     },
   },
 };
-
 
 contextBridge.exposeInMainWorld('electron', electronHandler);
 

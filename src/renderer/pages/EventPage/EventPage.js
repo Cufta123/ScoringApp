@@ -6,6 +6,7 @@ import SailorList from '../../components/SailorList';
 import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
 import LeaderboardComponent from '../../components/Leaderboard';
+
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -193,7 +194,6 @@ function EventPage() {
     value: boat.boat_id,
     label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
   }));
-
 
   return (
     <div>

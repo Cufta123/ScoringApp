@@ -306,7 +306,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     );
 
     // Create new heats and assign boats to them
-    for (let i = 0; i < nextHeatNames.length; i++) {
+    for (let i = 0; i < nextHeatNames.length; i += 1) {
       const heatName = nextHeatNames[i];
       const heatType = 'Qualifying';
 

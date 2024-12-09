@@ -3,7 +3,6 @@
 // Disable no-unused-vars, broken for spread args
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { insertHeat } from '../../public/Database/HeatRaceManager';
 
 export type Channels =
   | 'ipc-example'
@@ -33,7 +32,8 @@ export type Channels =
   | 'updateEventLeaderboard'
   | 'updateGlobalLeaderboard'
   | 'createNewHeatsBasedOnLeaderboard'
-  | 'readLeaderboard';
+  | 'readLeaderboard'
+  | 'readGlobalLeaderboard';
 
 const electronHandler = {
   ipcRenderer: {
@@ -239,7 +239,12 @@ const electronHandler = {
       },
       async insertHeat(event_id: string, heat_name: string, heat_type: string) {
         try {
-          return await ipcRenderer.invoke('insertHeat', event_id, heat_name, heat_type);
+          return await ipcRenderer.invoke(
+            'insertHeat',
+            event_id,
+            heat_name,
+            heat_type,
+          );
         } catch (error) {
           console.error('Error invoking insertHeat IPC:', error);
           return false;
@@ -256,7 +261,7 @@ const electronHandler = {
       async insertHeatBoat(heat_id: string, boat_id: string) {
         try {
           return await ipcRenderer.invoke('insertHeatBoat', heat_id, boat_id);
-        }catch (error) {
+        } catch (error) {
           console.error('Error invoking insertHeatBoat IPC:', error);
           return false;
         }
@@ -293,17 +298,41 @@ const electronHandler = {
           return false;
         }
       },
-      async insertScore(race_id: string, boat_id: string, position: string, points: number, status: string) {
+      async insertScore(
+        race_id: string,
+        boat_id: string,
+        position: string,
+        points: number,
+        status: string,
+      ) {
         try {
-          return await ipcRenderer.invoke('insertScore', race_id, boat_id, position, points, status);
+          return await ipcRenderer.invoke(
+            'insertScore',
+            race_id,
+            boat_id,
+            position,
+            points,
+            status,
+          );
         } catch (error) {
           console.error('Error invoking insertScore IPC:', error);
           return false;
         }
       },
-      async updateScore(score_id: string, position: string, points: number, status: string) {
+      async updateScore(
+        score_id: string,
+        position: string,
+        points: number,
+        status: string,
+      ) {
         try {
-          return await ipcRenderer.invoke('updateScore', score_id, position, points, status);
+          return await ipcRenderer.invoke(
+            'updateScore',
+            score_id,
+            position,
+            points,
+            status,
+          );
         } catch (error) {
           console.error('Error invoking updateScore IPC:', error);
           return false;
@@ -343,9 +372,15 @@ const electronHandler = {
       },
       createNewHeatsBasedOnLeaderboard: async (event_id: string) => {
         try {
-          return await ipcRenderer.invoke('createNewHeatsBasedOnLeaderboard', event_id);
+          return await ipcRenderer.invoke(
+            'createNewHeatsBasedOnLeaderboard',
+            event_id,
+          );
         } catch (error) {
-          console.error('Error invoking createNewHeatsBasedOnLeaderboard IPC:', error);
+          console.error(
+            'Error invoking createNewHeatsBasedOnLeaderboard IPC:',
+            error,
+          );
           return false;
         }
       },
@@ -354,6 +389,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('readLeaderboard', event_id);
         } catch (error) {
           console.error('Error invoking readLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async readGlobalLeaderboard() {
+        try {
+          return await ipcRenderer.invoke('readGlobalLeaderboard');
+        } catch (error) {
+          console.error('Error invoking readGlobalLeaderboard IPC:', error);
           return false;
         }
       },

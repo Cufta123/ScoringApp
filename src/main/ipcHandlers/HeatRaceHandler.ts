@@ -367,3 +367,30 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
+
+ipcMain.handle('readGlobalLeaderboard', async () => {
+  try {
+    const results = db
+      .prepare(
+        `
+        SELECT
+          gl.boat_id,
+          gl.total_points_global,
+          b.sail_number AS boat_number,
+          b.model AS boat_type,
+          s.name,
+          s.surname,
+          b.country
+        FROM GlobalLeaderboard gl
+        LEFT JOIN Boats b ON gl.boat_id = b.boat_id
+        LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+        ORDER BY gl.total_points_global ASC
+      `,
+      )
+      .all();
+    return results;
+  } catch (error) {
+    console.error('Error reading global leaderboard:', error);
+    throw error;
+  }
+});

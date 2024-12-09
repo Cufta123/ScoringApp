@@ -107,7 +107,7 @@ const initializeSchema = () => {
   );
 `;
 
-const createRacesTable = `
+  const createRacesTable = `
   CREATE TABLE IF NOT EXISTS Races (
     race_id INTEGER PRIMARY KEY AUTOINCREMENT,
     heat_id INTEGER NOT NULL,
@@ -116,7 +116,7 @@ const createRacesTable = `
   );
 `;
 
-const createScoresTable = `
+  const createScoresTable = `
   CREATE TABLE IF NOT EXISTS Scores (
     score_id INTEGER PRIMARY KEY AUTOINCREMENT,
     race_id INTEGER NOT NULL,
@@ -128,7 +128,7 @@ const createScoresTable = `
     FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
   );
 `;
-const createHeatBoatTable = `
+  const createHeatBoatTable = `
   CREATE TABLE IF NOT EXISTS Heat_Boat (
     heat_id INTEGER,
     boat_id INTEGER,
@@ -137,7 +137,7 @@ const createHeatBoatTable = `
   );
 `;
 
-const createLiderboardTable = `
+  const createLiderboardTable = `
   CREATE TABLE IF NOT EXISTS Leaderboard (
   boat_id INTEGER,
   total_points_event INTEGER NOT NULL,
@@ -148,7 +148,7 @@ const createLiderboardTable = `
 );
 `;
 
-const createGlobalLeaderboardTable = `
+  const createGlobalLeaderboardTable = `
   CREATE TABLE IF NOT EXISTS GlobalLeaderboard (
   boat_id INTEGER PRIMARY KEY,
   total_points_global INTEGER NOT NULL,
@@ -156,59 +156,59 @@ const createGlobalLeaderboardTable = `
 );
 `;
 
-try {
-  console.log('Creating Events table...');
-  db.exec(createEventsTable);
-  console.log('Events table created or already exists.');
+  try {
+    console.log('Creating Events table...');
+    db.exec(createEventsTable);
+    console.log('Events table created or already exists.');
 
-  console.log('Creating Sailors table...');
-  db.exec(createSailorsTable);
-  console.log('Sailors table created or already exists.');
+    console.log('Creating Sailors table...');
+    db.exec(createSailorsTable);
+    console.log('Sailors table created or already exists.');
 
-  console.log('Creating Boats table...');
-  db.exec(createBoatsTable);
-  console.log('Boats table created or already exists.');
+    console.log('Creating Boats table...');
+    db.exec(createBoatsTable);
+    console.log('Boats table created or already exists.');
 
-  console.log('Creating Clubs table...');
-  db.exec(createClubsTable);
-  console.log('Clubs table created or already exists.');
+    console.log('Creating Clubs table...');
+    db.exec(createClubsTable);
+    console.log('Clubs table created or already exists.');
 
-  console.log('Creating Categories table...');
-  db.exec(createCategoriesTable);
-  console.log('Categories table created or already exists.');
+    console.log('Creating Categories table...');
+    db.exec(createCategoriesTable);
+    console.log('Categories table created or already exists.');
 
-  console.log('Creating Boat_Event table...');
-  db.exec(createBoatEventTable);
-  console.log('Boat_Event table created or already exists.');
+    console.log('Creating Boat_Event table...');
+    db.exec(createBoatEventTable);
+    console.log('Boat_Event table created or already exists.');
 
-  console.log('Creating Heats table...');
-  db.exec(createHeatsTable);
-  console.log('Heats table created or already exists.');
+    console.log('Creating Heats table...');
+    db.exec(createHeatsTable);
+    console.log('Heats table created or already exists.');
 
-  console.log('Creating Races table...');
-  db.exec(createRacesTable);
-  console.log('Races table created or already exists.');
+    console.log('Creating Races table...');
+    db.exec(createRacesTable);
+    console.log('Races table created or already exists.');
 
-  console.log('Creating Scores table...');
-  db.exec(createScoresTable);
-  console.log('Scores table created or already exists.');
+    console.log('Creating Scores table...');
+    db.exec(createScoresTable);
+    console.log('Scores table created or already exists.');
 
-  console.log('Creating Heat_Boat table...');
-  db.exec(createHeatBoatTable);
-  console.log('Heat_Boat table created or already exists.');
+    console.log('Creating Heat_Boat table...');
+    db.exec(createHeatBoatTable);
+    console.log('Heat_Boat table created or already exists.');
 
-  console.log('Creating Leaderboard table...');
-  db.exec(createLiderboardTable);
-  console.log('Leaderboard table created or already exists.');
+    console.log('Creating Leaderboard table...');
+    db.exec(createLiderboardTable);
+    console.log('Leaderboard table created or already exists.');
 
-  console.log('Creating GlobalLeaderboard table...');
-  db.exec(createGlobalLeaderboardTable);
-  console.log('GlobalLeaderboard table created or already exists.');
+    console.log('Creating GlobalLeaderboard table...');
+    db.exec(createGlobalLeaderboardTable);
+    console.log('GlobalLeaderboard table created or already exists.');
 
-  console.log('Database schema initialized successfully.');
-} catch (error) {
-  console.error('Error initializing database schema:', error);
-}
+    console.log('Database schema initialized successfully.');
+  } catch (error) {
+    console.error('Error initializing database schema:', error);
+  }
 };
 
 // Function to check if the Events table exists

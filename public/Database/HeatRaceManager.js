@@ -409,6 +409,32 @@ const readLeaderboard = (event_id) => {
   }
 };
 
+const readGlobalLeaderboard = () => {
+  try {
+    const query = `
+      SELECT
+        gl.boat_id,
+        gl.total_points_global,
+        b.sail_number AS boat_number,
+        b.model AS boat_type,
+        s.name,
+        s.surname,
+        b.country
+      FROM GlobalLeaderboard gl
+      LEFT JOIN Boats b ON gl.boat_id = b.boat_id
+      LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      ORDER BY gl.total_points_global ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all();
+    console.log('Raw results from readGlobalLeaderboard:', results); // Log the raw results
+    return results;
+  } catch (err) {
+    console.error('Error reading global leaderboard from the database:', err.message);
+    return [];
+  }
+};
+
 module.exports = {
   readAllHeats,
   insertHeat,
@@ -425,4 +451,5 @@ module.exports = {
   updateGlobalLeaderboard,
   createNewHeatsBasedOnLeaderboard,
   readLeaderboard,
+  readGlobalLeaderboard,
 };

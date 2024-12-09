@@ -30,11 +30,11 @@ ipcMain.handle('insertHeat', async (event, event_id, heat_name, heat_type) => {
   }
 });
 
-ipcMain.handle('insertHeatBoat', async(event, heat_id, boat_id) => {
-try {
-  const result = db
-    .prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)')
-    .run(heat_id, boat_id);
+ipcMain.handle('insertHeatBoat', async (event, heat_id, boat_id) => {
+  try {
+    const result = db
+      .prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)')
+      .run(heat_id, boat_id);
   } catch (error) {
     console.error('Error inserting heat boat:', error);
     throw error;
@@ -43,16 +43,25 @@ try {
 ipcMain.handle('deleteHeatsByEvent', async (event, event_id) => {
   try {
     const result = db
-      .prepare('DELETE FROM Heat_Boat WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?)')
+      .prepare(
+        'DELETE FROM Heat_Boat WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?)',
+      )
       .run(event_id);
-    console.log(`Deleted ${result.changes} row(s) from HeatBoats for event ID ${event_id}.`);
+    console.log(
+      `Deleted ${result.changes} row(s) from HeatBoats for event ID ${event_id}.`,
+    );
 
     const resultHeats = db
       .prepare('DELETE FROM Heats WHERE event_id = ?')
       .run(event_id);
-    console.log(`Deleted ${resultHeats.changes} row(s) from Heats for event ID ${event_id}.`);
+    console.log(
+      `Deleted ${resultHeats.changes} row(s) from Heats for event ID ${event_id}.`,
+    );
 
-    return { heatBoatsChanges: result.changes, heatsChanges: resultHeats.changes };
+    return {
+      heatBoatsChanges: result.changes,
+      heatsChanges: resultHeats.changes,
+    };
   } catch (error) {
     console.error('Error deleting heats by event:', error);
     throw error;
@@ -61,13 +70,15 @@ ipcMain.handle('deleteHeatsByEvent', async (event, event_id) => {
 ipcMain.handle('readBoatsByHeat', async (event, heat_id) => {
   try {
     const boats = db
-      .prepare(`
+      .prepare(
+        `
         SELECT b.boat_id, b.sail_number, b.country, b.model, s.name, s.surname
         FROM Heat_Boat hb
         JOIN Boats b ON hb.boat_id = b.boat_id
         JOIN Sailors s ON b.sailor_id = s.sailor_id
         WHERE hb.heat_id = ?
-      `)
+      `,
+      )
       .all(heat_id);
     return boats;
   } catch (error) {
@@ -162,21 +173,23 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
     const updateQuery = db.prepare(
       `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
        VALUES (?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
     );
 
-    results.forEach((result: { boat_id: any; total_points_event: any; }) => {
+    results.forEach((result: { boat_id: any; total_points_event: any }) => {
       updateQuery.run(result.boat_id, result.total_points_event, event_id);
     });
 
     console.log('Event leaderboard updated successfully.');
     return { success: true };
   } catch (error) {
-    console.error('Error updating event leaderboard:', (error as Error).message);
+    console.error(
+      'Error updating event leaderboard:',
+      (error as Error).message,
+    );
     throw error;
   }
 });
-
 
 ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
   try {
@@ -190,10 +203,10 @@ ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
     const updateQuery = db.prepare(
       `INSERT INTO GlobalLeaderboard (boat_id, total_points_global)
        VALUES (?, ?)
-       ON CONFLICT(boat_id) DO UPDATE SET total_points_global = total_points_global + excluded.total_points_global`
+       ON CONFLICT(boat_id) DO UPDATE SET total_points_global = total_points_global + excluded.total_points_global`,
     );
 
-    results.forEach((result: { boat_id: any; final_position: any; }) => {
+    results.forEach((result: { boat_id: any; final_position: any }) => {
       updateQuery.run(result.boat_id, result.final_position);
     });
 
@@ -231,30 +244,41 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Read the existing heats for the event
     const existingHeatsQuery = db.prepare(
-      `SELECT heat_name, heat_id FROM Heats WHERE event_id = ?`
+      `SELECT heat_name, heat_id FROM Heats WHERE event_id = ?`,
     );
     const existingHeats = existingHeatsQuery.all(event_id);
 
     // Find the latest heats by suffix
-    const latestHeats = existingHeats.reduce((acc: Record<string, { suffix: number; heat: { heat_name: string; heat_id: number } }>, heat: { heat_name: string; heat_id: number }) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [_, base, suffix] = match;
-        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-        acc[base] = acc[base] || { suffix: 0, heat: null };
-        if (numericSuffix > acc[base].suffix) {
-          acc[base] = { suffix: numericSuffix, heat };
+    const latestHeats = existingHeats.reduce(
+      (
+        acc: Record<
+          string,
+          { suffix: number; heat: { heat_name: string; heat_id: number } }
+        >,
+        heat: { heat_name: string; heat_id: number },
+      ) => {
+        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+        if (match) {
+          const [_, base, suffix] = match;
+          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+          acc[base] = acc[base] || { suffix: 0, heat: null };
+          if (numericSuffix > acc[base].suffix) {
+            acc[base] = { suffix: numericSuffix, heat };
+          }
         }
-      }
-      return acc;
-    }, {});
+        return acc;
+      },
+      {},
+    );
 
     // Extract only the latest heats
-    const lastHeats = Object.values(latestHeats).map((entry) => (entry as { suffix: number; heat: { heat_name: string; heat_id: number } }).heat);
+    const lastHeats = Object.values(latestHeats)
+      .map((entry) => entry.heat)
+      .filter((heat) => heat !== null); // Filter out null values
 
     // Check race count for the latest heats
     const raceCountQuery = db.prepare(
-      `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`
+      `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`,
     );
 
     const heatRaceCounts = lastHeats.map((heat) => {
@@ -278,7 +302,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Generate names for the next round of heats
     const nextHeatNames = Object.keys(latestHeats).map(
-      (base) => `Heat ${base}${latestHeats[base].suffix + 1}`
+      (base) => `Heat ${base}${latestHeats[base].suffix + 1}`,
     );
 
     // Create new heats and assign boats to them
@@ -288,21 +312,31 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
       // Insert the new heat into the database
       const { lastInsertRowid: newHeatId } = db
-        .prepare('INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)')
+        .prepare(
+          'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
+        )
         .run(event_id, heatName, heatType);
 
       // Assign boats to the new heat
-      for (let j = i; j < leaderboardResults.length; j += nextHeatNames.length) {
+      for (
+        let j = i;
+        j < leaderboardResults.length;
+        j += nextHeatNames.length
+      ) {
         const boatId = leaderboardResults[j].boat_id;
-        db.prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)')
-          .run(newHeatId, boatId);
+        db.prepare(
+          'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)',
+        ).run(newHeatId, boatId);
       }
     }
 
     console.log('New heats created based on leaderboard.');
     return { success: true };
   } catch (error) {
-    console.error('Error creating new heats based on leaderboard:', (error as Error).message);
+    console.error(
+      'Error creating new heats based on leaderboard:',
+      (error as Error).message,
+    );
     throw error;
   }
 });

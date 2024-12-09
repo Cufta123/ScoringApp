@@ -275,59 +275,105 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
     `;
     const readLeaderboardQuery = db.prepare(leaderboardQuery);
     const leaderboardResults = readLeaderboardQuery.all(event_id);
+    console.log('Leaderboard results:', leaderboardResults); // Log the leaderboard results
 
-    // Read the existing heats to determine the next heat name
+    // Read the existing heats for the event
     const existingHeatsQuery = db.prepare(
-      `SELECT heat_name FROM Heats WHERE event_id = ?`
+      `db WHERE event_id = ?`,
     );
     const existingHeats = existingHeatsQuery.all(event_id);
+    console.log('Existing heats:', existingHeats); // Log the existing heats
 
-    // Determine the number of new heats to create based on the existing heats
-    const numHeats = existingHeats.length || 1; // Default to 2 if no existing heats
+    // Find the latest heats by suffix
+    const latestHeats = existingHeats.reduce(
+      (
+        acc,
+        heat,
+      ) => {
+        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+        if (match) {
+          const [_, base, suffix] = match;
+          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+          acc[base] = acc[base] || { suffix: 0, heat: null };
+          if (numericSuffix > acc[base].suffix) {
+            acc[base] = { suffix: numericSuffix, heat };
+          }
+        }
+        return acc;
+      },
+      {},
+    );
+    console.log('Latest heats:', latestHeats); // Log the latest heats
 
-    // Filter the existing heats to only include the most recent heats
-    const recentHeats = existingHeats.filter((heat) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [, base, suffix] = match;
-        return suffix === '' || suffix === '1';
-      }
-      return false;
+    // Extract only the latest heats
+    const lastHeats = Object.values(latestHeats).map(
+      (entry) =>
+        (
+          entry
+        ).heat,
+    );
+    console.log('Last heats:', lastHeats); // Log the last heats
+
+    // Check race count for the latest heats
+    const raceCountQuery = db.prepare(
+      `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`,
+    );
+
+    const heatRaceCounts = lastHeats.map((heat) => {
+      const raceCount = raceCountQuery.get(heat.heat_id).race_count;
+      return { heat_name: heat.heat_name, raceCount };
     });
+    console.log('Heat race counts:', heatRaceCounts); // Log the heat race counts
 
-    // Determine the next heat names
-    const heatNames = [];
-    for (let i = 0; i < numHeats; i++) {
-      const baseHeatName = `Heat ${String.fromCharCode(65 + i)}`; // A, B, C, ...
-      let suffix = 1;
-      let newHeatName = `${baseHeatName}${suffix}`;
-      while (recentHeats.some((heat) => heat.heat_name === newHeatName)) {
-        suffix++;
-        newHeatName = `${baseHeatName}${suffix}`;
-      }
-      heatNames.push(newHeatName);
+    // Ensure all latest heats have the same number of races
+    const uniqueRaceCounts = [
+      ...new Set(heatRaceCounts.map((item) => item.raceCount)),
+    ];
+
+    if (uniqueRaceCounts.length > 1) {
+      console.error('Latest heats do not have the same number of races.');
+      return {
+        success: false,
+        message:
+          'The latest heats must have the same number of races before creating new heats.',
+      };
     }
 
-// Sort leaderboardResults by total_points_event in ascending order
-leaderboardResults.sort((a, b) => a.total_points_event - b.total_points_event);
+    // Generate names for the next round of heats
+    const nextHeatNames = Object.keys(latestHeats).map(
+      (base) => `Heat ${base}${latestHeats[base].suffix + 1}`,
+    );
+    console.log('Next heat names:', nextHeatNames); // Log the next heat names
 
-    // Create new heats based on the leaderboard
-    for (let i = 0; i < numHeats; i++) {
-      const heatName = heatNames[i];
+    // Create new heats and assign boats to them
+    for (let i = 0; i < nextHeatNames.length; i++) {
+      const heatName = nextHeatNames[i];
       const heatType = 'Qualifying';
-      const { lastInsertRowid: newHeatId } = db
-        .prepare('INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)')
-        .run(event_id, heatName, heatType);
 
-      // Assign boats to the new heats
-      for (let j = i; j < leaderboardResults.length; j += numHeats) {
+      // Insert the new heat into the database
+      const { lastInsertRowid: newHeatId } = db
+        .prepare(
+          'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
+        )
+        .run(event_id, heatName, heatType);
+      console.log(`Inserted new heat: ${heatName} with ID: ${newHeatId}`); // Log the new heat insertion
+
+      // Assign boats to the new heat
+      for (
+        let j = i;
+        j < leaderboardResults.length;
+        j += nextHeatNames.length
+      ) {
         const boatId = leaderboardResults[j].boat_id;
-        db.prepare('INSERT INTO HeatBoats (heat_id, boat_id) VALUES (?, ?)')
-          .run(newHeatId, boatId);
+        db.prepare(
+          'INSERT INTO HeatBoats (heat_id, boat_id) VALUES (?, ?)',
+        ).run(newHeatId, boatId);
+        console.log(`Assigned boat ID: ${boatId} to heat ID: ${newHeatId}`); // Log the boat assignment
       }
     }
 
     console.log('New heats created based on leaderboard.');
+    return { success: true };
   } catch (err) {
     console.error('Error creating new heats based on leaderboard:', err.message);
     throw err;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeatComponent from '../../components/HeatComponent';
 import ScoringInputComponent from '../../components/ScoringInputComponent';
@@ -11,6 +11,7 @@ function HeatRacePage() {
   const [eventData, setEventData] = useState(event || null);
   const [selectedHeat, setSelectedHeat] = useState(null);
   const [isScoring, setIsScoring] = useState(false);
+  const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -43,10 +44,31 @@ function HeatRacePage() {
   const doAllHeatsHaveSameNumberOfRaces = async (event_id) => {
     try {
       const results = await window.electron.sqlite.heatRaceDB.readAllHeats(event_id);
-      const raceCounts = await Promise.all(results.map(async (heat) => {
+
+      // Find the latest heats by suffix
+      const latestHeats = results.reduce((acc, heat) => {
+        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+        if (match) {
+          const [_, base, suffix] = match;
+          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+          acc[base] = acc[base] || { suffix: 0, heat: null };
+          if (numericSuffix > acc[base].suffix) {
+            acc[base] = { suffix: numericSuffix, heat };
+          }
+        }
+        return acc;
+      }, {});
+
+      // Extract only the latest heats
+      const lastHeats = Object.values(latestHeats).map(entry => entry.heat);
+
+      // Check race count for the latest heats
+      const raceCounts = await Promise.all(lastHeats.map(async (heat) => {
         const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
         return races.length;
       }));
+
+      // Ensure all latest heats have the same number of races
       return raceCounts.every(count => count === raceCounts[0]);
     } catch (error) {
       console.error('Error checking if all heats have the same number of races:', error.message);
@@ -88,6 +110,7 @@ function HeatRacePage() {
             status,
           );
         }
+
       },
     );
 
@@ -97,13 +120,18 @@ function HeatRacePage() {
       `Scores for race ${nextRaceNumber} in heat ${selectedHeat.heat_name} have been submitted.`,
     );
 
-    // Check if all heats have the same number of races before updating the local leaderboard
-    const allHeatsEqual = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
-    if (allHeatsEqual) {
-      // Update the event leaderboard
-      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(event.event_id);
+    if (!finalSeriesStarted) {
+      // Check if all heats have the same number of races before updating the local leaderboard
+      const allHeatsEqual = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+      if (allHeatsEqual) {
+        // Update the event leaderboard
+        await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(event.event_id);
+      } else {
+        console.log('Not all heats have the same number of races. Local leaderboard will not be updated.');
+      }
     } else {
-      console.log('Not all heats have the same number of races. Local leaderboard will not be updated.');
+      console.log('Final series has started. Leaderboard will not be updated.');
+      await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(event.event_id);
     }
 
     setIsScoring(false);
@@ -113,6 +141,11 @@ function HeatRacePage() {
   };
 
   const handleCreateNewHeatsBasedOnLeaderboard = async () => {
+    if (finalSeriesStarted) {
+      alert('Cannot create new heats based on leaderboard after the final series has started.');
+      return;
+    }
+
     try {
       await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(event.event_id);
       console.log('New heats created based on leaderboard.');
@@ -120,6 +153,23 @@ function HeatRacePage() {
       console.error('Error creating new heats based on leaderboard:', error.message);
     }
   };
+  const checkFinalSeriesStarted = useCallback(async () => {
+    try {
+      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      const finalHeats = heats.filter(heat => heat.heat_type === 'Final');
+      if (finalHeats.length > 0) {
+        setFinalSeriesStarted(true);
+
+      }
+    } catch (error) {
+      console.error('Error checking final series:', error);
+    }
+  }, [event.event_id]);
+
+  useEffect(() => {
+    checkFinalSeriesStarted();
+  }, [checkFinalSeriesStarted]);
+
 
   return (
     <div>
@@ -141,9 +191,15 @@ function HeatRacePage() {
               Start Scoring
             </button>
           )}
-          <button type="button" onClick={handleCreateNewHeatsBasedOnLeaderboard}>
+          {!finalSeriesStarted&&(
+                      <button
+            type="button"
+            onClick={handleCreateNewHeatsBasedOnLeaderboard}
+            disabled={finalSeriesStarted}
+          >
             Create New Heats Based on Leaderboard
           </button>
+          )}
         </>
       ) : (
         <ScoringInputComponent

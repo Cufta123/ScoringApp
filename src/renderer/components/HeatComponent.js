@@ -8,7 +8,8 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heatsCreated, setHeatsCreated] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
   const [displayLastHeats, setDisplayLastHeats] = useState(true);
-  const [isFinalSeries, setIsFinalSeries] = useState(false);
+  const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
+
 
   const handleDisplayHeats = useCallback(async () => {
     try {
@@ -41,57 +42,78 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     }
   }, [event.event_id]);
 
-  const handleStartFinalSeries = async () => {
+  const checkFinalSeriesStarted = useCallback(async () => {
     try {
-        const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
-        const numHeats = heats.filter(heat => heat.heat_type === 'Qualifying').length;
-
-        // Fetch leaderboard to rank boats
-        const leaderboard = await window.electron.sqlite.heatRaceDB.readLeaderboard(event.event_id);
-
-        // Determine fleet sizes
-        const boatsPerFleet = Math.floor(leaderboard.length / numHeats);
-        const extraBoats = leaderboard.length % numHeats;
-
-        const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
-        const fleetPromises = [];
-
-        let boatIndex = 0;
-        for (let i = 0; i < numHeats; i++) {
-            const fleetName = fleetNames[i] || `Fleet ${i + 1}`;
-            const heatName = `Heat ${fleetName}`;
-            const heatType = 'Final';
-
-            // Insert new heat for the final series
-            const { lastInsertRowid: newHeatId } = await window.electron.sqlite.heatRaceDB.insertHeat(
-                event.event_id,
-                heatName,
-                heatType
-            );
-
-            const boatsInThisFleet = boatsPerFleet + (i < extraBoats ? 1 : 0);
-            for (let j = 0; j < boatsInThisFleet; j++) {
-                fleetPromises.push(
-                    window.electron.sqlite.heatRaceDB.insertHeatBoat(newHeatId, leaderboard[boatIndex].boat_id)
-                );
-                boatIndex++;
-            }
-        }
-
-        await Promise.all(fleetPromises);
-        setIsFinalSeries(true);
-        alert('Final Series started successfully!');
-        handleDisplayHeats(); // Refresh the heats display
+      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      const finalHeats = heats.filter(heat => heat.heat_type === 'Final');
+      if (finalHeats.length > 0) {
+        setFinalSeriesStarted(true);
+      }
     } catch (error) {
-        console.error('Error starting final series:', error);
-        alert('Error starting final series. Please try again later.');
+      console.error('Error checking final series:', error);
     }
-};
+  }, [event.event_id]);
 
+  useEffect(() => {
+    checkFinalSeriesStarted();
+  }, [checkFinalSeriesStarted]);
+
+
+  const handleStartFinalSeries = async () => {
+    if (finalSeriesStarted) {
+      return;
+    }
+    try {
+      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      const qualifyingHeats = heats.filter(heat => heat.heat_type === 'Qualifying');
+      const numHeats = new Set(qualifyingHeats.map(heat => heat.heat_name.match(/Heat ([A-Z])/)[1])).size;
+
+      // Fetch leaderboard to rank boats
+      const leaderboard = await window.electron.sqlite.heatRaceDB.readLeaderboard(event.event_id);
+
+      // Determine fleet sizes
+      const boatsPerFleet = Math.floor(leaderboard.length / numHeats);
+      const extraBoats = leaderboard.length % numHeats;
+
+      const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
+      const fleetPromises = [];
+
+      let boatIndex = 0;
+      for (let i = 0; i < numHeats; i++) {
+        const fleetName = fleetNames[i] || `Fleet ${i + 1}`;
+        const heatName = `Heat ${fleetName}`;
+        const heatType = 'Final';
+
+        // Insert new heat for the final series
+        const { lastInsertRowid: newHeatId } = await window.electron.sqlite.heatRaceDB.insertHeat(
+          event.event_id,
+          heatName,
+          heatType
+        );
+
+        const boatsInThisFleet = boatsPerFleet + (i < extraBoats ? 1 : 0);
+        for (let j = 0; j < boatsInThisFleet; j++) {
+          fleetPromises.push(
+            window.electron.sqlite.heatRaceDB.insertHeatBoat(newHeatId, leaderboard[boatIndex].boat_id)
+          );
+          boatIndex++;
+        }
+      }
+
+      await Promise.all(fleetPromises);
+      setIsFinalSeries(true);
+      setFinalSeriesStarted(true); // Set final series started to true
+      alert('Final Series started successfully!');
+      handleDisplayHeats(); // Refresh the heats display
+    } catch (error) {
+      console.error('Error starting final series:', error);
+      alert('Error starting final series. Please try again later.');
+    }
+  };
 
 
 const handleCreateHeats = async () => {
-  if (raceHappened) {
+  if (raceHappened || finalSeriesStarted) {
     alert('Cannot create heats after a race has happened.');
     return;
   }
@@ -169,7 +191,7 @@ const handleCreateHeats = async () => {
 };
 
   const handleRecreateHeats = async () => {
-    if (raceHappened) {
+    if (raceHappened || finalSeriesStarted) {
       alert('Cannot recreate heats after a race has happened.');
       return;
     }
@@ -202,6 +224,11 @@ const handleCreateHeats = async () => {
   };
 
   const getLastHeats = (heats) => {
+    const finalHeats = heats.filter((heat) => heat.heat_type.toLowerCase() === 'final');
+    if (finalHeats.length > 0) {
+      return finalHeats;
+    }
+
     const heatGroups = heats.reduce((acc, heat) => {
       const match = heat.heat_name.match(/([A-Z]+)(\d*)$/);
       if (match) {
@@ -224,6 +251,7 @@ const handleCreateHeats = async () => {
       return false;
     });
   };
+
 
   const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
 
@@ -261,41 +289,41 @@ const handleCreateHeats = async () => {
 
   return (
     <div>
-    <div>
-      {!raceHappened && (
-        <>
-          <label htmlFor="numHeats">Number of Heats:</label>
-          <select
-            id="numHeats"
-            value={numHeats}
-            onChange={(e) => setNumHeats(Number(e.target.value))}
-            disabled={raceHappened} // Disable if a race has happened
-          >
-            {[...Array(10).keys()].map((i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
-            disabled={raceHappened} // Disable if a race has happened
-          >
-            {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
-          </button>
-        </>
-      )}
-    </div>
+      <div>
+        {!raceHappened && !finalSeriesStarted && (
+          <>
+            <label htmlFor="numHeats">Number of Heats:</label>
+            <select
+              id="numHeats"
+              value={numHeats}
+              onChange={(e) => setNumHeats(Number(e.target.value))}
+              disabled={raceHappened || finalSeriesStarted}
+            >
+              {[...Array(10).keys()].map((i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
+              disabled={raceHappened || finalSeriesStarted}
+            >
+              {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
+            </button>
+          </>
+        )}
+      </div>
 
       <button type="button" onClick={toggleDisplayMode}>
         {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
       </button>
-      {!isFinalSeries && (
-  <button type="button" onClick={handleStartFinalSeries}>
-    Start Final Series
-  </button>
-)}
+      { !finalSeriesStarted && (
+        <button type="button" onClick={handleStartFinalSeries}>
+          Start Final Series
+        </button>
+      )}
       {heatsToDisplay.length > 0 && (
         <div style={heatsContainerStyle} className="heats-container">
           {heatsToDisplay.map((heat) => (

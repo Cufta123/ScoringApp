@@ -17,6 +17,13 @@ ipcMain.on('ipc-example', async (event, arg) => {
   event.reply('ipc-example', msgTemplate('pongSailor'));
 });
 
+const checkEventLocked = (event_id: any) => {
+  const query = `SELECT is_locked FROM Events WHERE event_id = ?`;
+  const checkQuery = db.prepare(query);
+  const result = checkQuery.get(event_id);
+  return result.is_locked === 1;
+};
+
 ipcMain.handle('readAllEvents', async () => {
   try {
     const events = await db.prepare('SELECT * FROM Events').all();
@@ -61,6 +68,9 @@ ipcMain.handle(
 );
 
 ipcMain.handle('associateBoatWithEvent', async (event, boat_id, event_id) => {
+  if (checkEventLocked(event_id)) {
+    throw new Error('Event is locked.');
+  }
   try {
     const result = db
       .prepare('INSERT INTO Boat_Event (boat_id, event_id) VALUES (?, ?)')
@@ -106,6 +116,19 @@ ipcMain.handle('removeBoatFromEvent', async (event, boat_id, event_id) => {
     );
   } catch (error) {
     log(`Error removing boat from event: ${error}`);
+    throw error;
+  }
+});
+
+ipcMain.handle('lockEvent', async (event, event_id) => {
+  try {
+    const query = `UPDATE Events SET is_locked = 1 WHERE event_id = ?`;
+    const updateQuery = db.prepare(query);
+    updateQuery.run(event_id);
+    console.log(`Event ${event_id} locked.`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error locking event:', error);
     throw error;
   }
 });

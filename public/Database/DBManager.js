@@ -34,7 +34,8 @@ const initializeSchema = () => {
       event_name TEXT NOT NULL,
       event_location TEXT NOT NULL,
       start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL
+      end_date TEXT NOT NULL,
+      is_locked INTEGER DEFAULT 0
     );
   `;
 
@@ -156,6 +157,18 @@ const initializeSchema = () => {
 );
 `;
 
+  const createFinalLeaderboardTable = `
+  CREATE TABLE IF NOT EXISTS FinalLeaderboard (
+  boat_id INTEGER,
+  total_points_final INTEGER NOT NULL,
+  event_id INTEGER NOT NULL,
+  placement_group TEXT NOT NULL,
+  PRIMARY KEY (boat_id, event_id),
+  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
+  FOREIGN KEY (event_id) REFERENCES Events(event_id)
+);
+`;
+
   try {
     console.log('Creating Events table...');
     db.exec(createEventsTable);
@@ -204,6 +217,10 @@ const initializeSchema = () => {
     console.log('Creating GlobalLeaderboard table...');
     db.exec(createGlobalLeaderboardTable);
     console.log('GlobalLeaderboard table created or already exists.');
+
+    console.log('Creating FinalLeaderboard table...');
+    db.exec(createFinalLeaderboardTable);
+    console.log('FinalLeaderboard table created or already exists.');
 
     console.log('Database schema initialized successfully.');
   } catch (error) {

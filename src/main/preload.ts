@@ -33,7 +33,9 @@ export type Channels =
   | 'updateGlobalLeaderboard'
   | 'createNewHeatsBasedOnLeaderboard'
   | 'readLeaderboard'
-  | 'readGlobalLeaderboard';
+  | 'readGlobalLeaderboard'
+  | 'updateFinalLeaderboard'
+  | 'readFinalLeaderboard';
 
 const electronHandler = {
   ipcRenderer: {
@@ -400,9 +402,26 @@ const electronHandler = {
           return false;
         }
       },
+      async updateFinalLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('updateFinalLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking updateFinalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async readFinalLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('readFinalLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking readFinalLeaderboard IPC:', error);
+          return false;
+        }
+      },
     },
   },
 };
+
 
 contextBridge.exposeInMainWorld('electron', electronHandler);
 

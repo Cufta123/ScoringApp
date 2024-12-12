@@ -2,6 +2,7 @@
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';
 
+
 console.log('HeatRaceHandler.ts loaded');
 
 ipcMain.handle('readAllHeats', async (event, event_id) => {
@@ -344,29 +345,36 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 ipcMain.handle('readLeaderboard', async (event, event_id) => {
   try {
     const query = `
-    SELECT
-      lb.boat_id,
-      lb.total_points_event,
-      b.sail_number AS boat_number,
-      b.model AS boat_type,
-      s.name,
-      s.surname,
-      b.country
-    FROM Leaderboard lb
-    LEFT JOIN Boats b ON lb.boat_id = b.boat_id
-    LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
-    WHERE lb.event_id = ?
-    ORDER BY lb.total_points_event ASC
+      SELECT
+        lb.boat_id,
+        lb.total_points_event,
+        b.sail_number AS boat_number,
+        b.model AS boat_type,
+        s.name,
+        s.surname,
+        b.country,
+        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions
+      FROM Leaderboard lb
+      LEFT JOIN Boats b ON lb.boat_id = b.boat_id
+      LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      LEFT JOIN Heat_Boat hb ON b.boat_id = hb.boat_id
+      LEFT JOIN Heats h ON hb.heat_id = h.heat_id
+      LEFT JOIN Races r ON hb.heat_id = r.heat_id
+      LEFT JOIN Scores sc ON r.race_id = sc.race_id AND sc.boat_id = b.boat_id
+      WHERE lb.event_id = ? AND h.event_id = ? AND h.heat_type = 'Qualifying'
+      GROUP BY lb.boat_id
+      ORDER BY lb.total_points_event ASC
     `;
     const readQuery = db.prepare(query);
-    const results = readQuery.all(event_id);
-    console.log('Raw results from readLeaderboard:', results); // Log the raw results
+    const results = readQuery.all(event_id, event_id);
+    console.log('Raw results from readLeaderboard:', results);
     return results;
   } catch (error) {
     console.error('Error reading leaderboard:', error);
     throw error;
   }
 });
+
 
 ipcMain.handle('readGlobalLeaderboard', async () => {
   try {
@@ -391,6 +399,74 @@ ipcMain.handle('readGlobalLeaderboard', async () => {
     return results;
   } catch (error) {
     console.error('Error reading global leaderboard:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT boat_id, heat_name, SUM(points) as total_points_final
+      FROM Scores
+      JOIN Races ON Scores.race_id = Races.race_id
+      JOIN Heats ON Races.heat_id = Heats.heat_id
+      WHERE Heats.event_id = ? AND Heats.heat_type = 'Final'
+      GROUP BY boat_id, heat_name
+      ORDER BY heat_name, total_points_final ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+
+    const updateQuery = db.prepare(
+      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
+    );
+
+    results.forEach((result: { boat_id: any; total_points_final: any; heat_name: string }) => {
+      const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
+      updateQuery.run(result.boat_id, result.total_points_final, event_id, placementGroup);
+    });
+
+    console.log('Final leaderboard updated successfully.');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating final leaderboard:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT
+        fl.boat_id,
+        fl.total_points_final,
+        fl.event_id,
+        fl.placement_group,
+        b.sail_number AS boat_number,
+        b.model AS boat_type,
+        s.name,
+        s.surname,
+        b.country,
+        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions
+      FROM FinalLeaderboard fl
+      LEFT JOIN Boats b ON fl.boat_id = b.boat_id
+      LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      LEFT JOIN Heat_Boat hb ON b.boat_id = hb.boat_id
+      LEFT JOIN Heats h ON hb.heat_id = h.heat_id
+      LEFT JOIN Races r ON hb.heat_id = r.heat_id
+      LEFT JOIN Scores sc ON r.race_id = sc.race_id AND sc.boat_id = b.boat_id
+      WHERE fl.event_id = ? AND h.event_id = ? AND h.heat_type = 'Final'
+      GROUP BY fl.boat_id
+      ORDER BY fl.placement_group, fl.total_points_final ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id, event_id);
+    console.log('Final leaderboard results:', results);
+    return results;
+  } catch (error) {
+    console.error('Error reading final leaderboard:', error);
     throw error;
   }
 });

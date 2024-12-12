@@ -8,6 +8,7 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heatsCreated, setHeatsCreated] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
   const [displayLastHeats, setDisplayLastHeats] = useState(true);
+  const [isFinalSeries, setIsFinalSeries] = useState(false);
 
   const handleDisplayHeats = useCallback(async () => {
     try {
@@ -40,78 +41,132 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     }
   }, [event.event_id]);
 
-  const handleCreateHeats = async () => {
-    if (raceHappened) {
-      alert('Cannot create heats after a race has happened.');
+  const handleStartFinalSeries = async () => {
+    try {
+        const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+        const numHeats = heats.filter(heat => heat.heat_type === 'Qualifying').length;
+
+        // Fetch leaderboard to rank boats
+        const leaderboard = await window.electron.sqlite.heatRaceDB.readLeaderboard(event.event_id);
+
+        // Determine fleet sizes
+        const boatsPerFleet = Math.floor(leaderboard.length / numHeats);
+        const extraBoats = leaderboard.length % numHeats;
+
+        const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
+        const fleetPromises = [];
+
+        let boatIndex = 0;
+        for (let i = 0; i < numHeats; i++) {
+            const fleetName = fleetNames[i] || `Fleet ${i + 1}`;
+            const heatName = `Heat ${fleetName}`;
+            const heatType = 'Final';
+
+            // Insert new heat for the final series
+            const { lastInsertRowid: newHeatId } = await window.electron.sqlite.heatRaceDB.insertHeat(
+                event.event_id,
+                heatName,
+                heatType
+            );
+
+            const boatsInThisFleet = boatsPerFleet + (i < extraBoats ? 1 : 0);
+            for (let j = 0; j < boatsInThisFleet; j++) {
+                fleetPromises.push(
+                    window.electron.sqlite.heatRaceDB.insertHeatBoat(newHeatId, leaderboard[boatIndex].boat_id)
+                );
+                boatIndex++;
+            }
+        }
+
+        await Promise.all(fleetPromises);
+        setIsFinalSeries(true);
+        alert('Final Series started successfully!');
+        handleDisplayHeats(); // Refresh the heats display
+    } catch (error) {
+        console.error('Error starting final series:', error);
+        alert('Error starting final series. Please try again later.');
+    }
+};
+
+
+
+const handleCreateHeats = async () => {
+  if (raceHappened) {
+    alert('Cannot create heats after a race has happened.');
+    return;
+  }
+
+  try {
+    const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(
+      event.event_id,
+    );
+    const existingHeats =
+      await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+
+    if (existingHeats.length > 0) {
+      alert('Heats already exist for this event.');
+      setHeatsCreated(true);
       return;
     }
 
-    try {
-      const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(
-        event.event_id,
-      );
-      const existingHeats =
-        await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+    eventBoats.sort((a, b) => {
+      if (a.country < b.country) return -1;
+      if (a.country > b.country) return 1;
+      return a.sail_number - b.sail_number;
+    });
 
-      if (existingHeats.length > 0) {
-        alert('Heats already exist for this event.');
-        setHeatsCreated(true);
-        return;
-      }
-
-      eventBoats.sort((a, b) => {
-        if (a.country < b.country) return -1;
-        if (a.country > b.country) return 1;
-        return a.sail_number - b.sail_number;
-      });
-
-      const heatPromises = [];
-      for (let i = 0; i < numHeats; i += 1) {
-        const heatName = `Heat ${String.fromCharCode(65 + i)}`;
-        const heatType = 'Qualifying';
-        heatPromises.push(
-          window.electron.sqlite.heatRaceDB.insertHeat(
-            event.event_id,
-            heatName,
-            heatType,
-          ),
-        );
-      }
-      await Promise.all(heatPromises);
-
-      const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
-        event.event_id,
-      );
-      const heatOrder = Array.from({ length: numHeats }, (_, i) =>
-        String.fromCharCode(65 + i),
-      ).concat(
-        Array.from({ length: numHeats }, (_, i) =>
-          String.fromCharCode(65 + numHeats - 1 - i),
+    const heatPromises = [];
+    for (let i = 0; i < numHeats; i += 1) {
+      const heatName = `Heat ${String.fromCharCode(65 + i)}`;
+      const heatType = 'Qualifying';
+      heatPromises.push(
+        window.electron.sqlite.heatRaceDB.insertHeat(
+          event.event_id,
+          heatName,
+          heatType,
         ),
       );
-      const heatBoatPromises = [];
-      for (let i = 0; i < eventBoats.length; i += 1) {
-        const heatIndex = i % heatOrder.length;
-        const heat = FetchedHeats.find(
-          (h) => h.heat_name === `Heat ${heatOrder[heatIndex]}`,
-        );
+    }
+    await Promise.all(heatPromises);
+
+    const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+      event.event_id,
+    );
+
+    // Calculate the number of boats per heat
+    const boatsPerHeat = Math.floor(eventBoats.length / numHeats);
+    const extraBoats = eventBoats.length % numHeats;
+
+    const heatBoatPromises = [];
+    let boatIndex = 0;
+
+    for (let i = 0; i < numHeats; i += 1) {
+      const heat = FetchedHeats.find(
+        (h) => h.heat_name === `Heat ${String.fromCharCode(65 + i)}`,
+      );
+      const boatsInThisHeat = boatsPerHeat + (i < extraBoats ? 1 : 0);
+
+      for (let j = 0; j < boatsInThisHeat; j += 1) {
         heatBoatPromises.push(
           window.electron.sqlite.heatRaceDB.insertHeatBoat(
             heat.heat_id,
-            eventBoats[i].boat_id,
+            eventBoats[boatIndex].boat_id,
           ),
         );
+        boatIndex += 1;
       }
-      await Promise.all(heatBoatPromises);
-
-      alert('Heats created successfully!');
-      setHeatsCreated(true);
-      handleDisplayHeats(); // Refresh the heats display
-    } catch (error) {
-      console.error('Error creating heats:', error);
-      alert('Error creating heats. Please try again later.');
     }
-  };
+
+    await Promise.all(heatBoatPromises);
+
+    alert('Heats created successfully!');
+    setHeatsCreated(true);
+    handleDisplayHeats(); // Refresh the heats display
+  } catch (error) {
+    console.error('Error creating heats:', error);
+    alert('Error creating heats. Please try again later.');
+  }
+};
 
   const handleRecreateHeats = async () => {
     if (raceHappened) {
@@ -206,31 +261,41 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
 
   return (
     <div>
-      <div>
-        <label htmlFor="numHeats">Number of Heats:</label>
-        <select
-          id="numHeats"
-          value={numHeats}
-          onChange={(e) => setNumHeats(Number(e.target.value))}
-          disabled={raceHappened} // Disable if a race has happened
-        >
-          {[...Array(10).keys()].map((i) => (
-            <option key={i + 1} value={i + 1}>
-              {i + 1}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button
-        type="button"
-        onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
-        disabled={raceHappened} // Disable if a race has happened
-      >
-        {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
-      </button>
+    <div>
+      {!raceHappened && (
+        <>
+          <label htmlFor="numHeats">Number of Heats:</label>
+          <select
+            id="numHeats"
+            value={numHeats}
+            onChange={(e) => setNumHeats(Number(e.target.value))}
+            disabled={raceHappened} // Disable if a race has happened
+          >
+            {[...Array(10).keys()].map((i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
+            disabled={raceHappened} // Disable if a race has happened
+          >
+            {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
+          </button>
+        </>
+      )}
+    </div>
+
       <button type="button" onClick={toggleDisplayMode}>
         {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
       </button>
+      {!isFinalSeries && (
+  <button type="button" onClick={handleStartFinalSeries}>
+    Start Final Series
+  </button>
+)}
       {heatsToDisplay.length > 0 && (
         <div style={heatsContainerStyle} className="heats-container">
           {heatsToDisplay.map((heat) => (

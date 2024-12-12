@@ -273,7 +273,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Extract only the latest heats
     const lastHeats = Object.values(latestHeats)
-      .map((entry) => entry.heat)
+      .map((entry) => (entry as { suffix: number; heat: { heat_name: string; heat_id: number } }).heat)
       .filter((heat) => heat !== null); // Filter out null values
 
     // Check race count for the latest heats

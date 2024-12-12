@@ -345,6 +345,7 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
     );
     console.log('Next heat names:', nextHeatNames); // Log the next heat names
 
+
     // Create new heats and assign boats to them
     for (let i = 0; i < nextHeatNames.length; i++) {
       const heatName = nextHeatNames[i];

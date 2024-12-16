@@ -43,38 +43,38 @@ function HeatRacePage() {
 
   const doAllHeatsHaveSameNumberOfRaces = async (event_id) => {
     try {
-      const results = await window.electron.sqlite.heatRaceDB.readAllHeats(event_id);
+        const results = await window.electron.sqlite.heatRaceDB.readAllHeats(event_id);
 
-      // Find the latest heats by suffix
-      const latestHeats = results.reduce((acc, heat) => {
-        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-        if (match) {
-          const [_, base, suffix] = match;
-          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-          acc[base] = acc[base] || { suffix: 0, heat: null };
-          if (numericSuffix > acc[base].suffix) {
-            acc[base] = { suffix: numericSuffix, heat };
-          }
-        }
-        return acc;
-      }, {});
+        // Find the latest heats by suffix
+        const latestHeats = results.reduce((acc, heat) => {
+            const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+            if (match) {
+                const [_, base, suffix] = match;
+                const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+                acc[base] = acc[base] || { suffix: -1, heat: null }; // Initialize suffix to -1 for heats without a number
+                if (numericSuffix > acc[base].suffix) {
+                    acc[base] = { suffix: numericSuffix, heat };
+                }
+            }
+            return acc;
+        }, {});
 
-      // Extract only the latest heats
-      const lastHeats = Object.values(latestHeats).map(entry => entry.heat);
+        // Extract only the latest heats
+        const lastHeats = Object.values(latestHeats).map(entry => entry.heat);
 
-      // Check race count for the latest heats
-      const raceCounts = await Promise.all(lastHeats.map(async (heat) => {
-        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
-        return races.length;
-      }));
+        // Check race count for the latest heats
+        const raceCounts = await Promise.all(lastHeats.map(async (heat) => {
+            const races = await window.electron.sqlite.heatRaceDB.readAllRaces(heat.heat_id);
+            return races.length;
+        }));
 
-      // Ensure all latest heats have the same number of races
-      return raceCounts.every(count => count === raceCounts[0]);
+        // Ensure all latest heats have the same number of races
+        return raceCounts.every(count => count === raceCounts[0]);
     } catch (error) {
-      console.error('Error checking if all heats have the same number of races:', error.message);
-      return false;
+        console.error('Error checking if all heats have the same number of races:', error.message);
+        return false;
     }
-  };
+};
 
   const handleSubmitScores = async (placeNumbers) => {
     console.log('Submitted place numbers:', placeNumbers);

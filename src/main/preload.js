@@ -35,6 +35,7 @@ const electronHandler = {
     associateBoatWithEvent: eventDB.associateBoatWithEvent,
     readBoatsByEvent: eventDB.readBoatsByEvent,
     removeBoatFromEvent: eventDB.removeBoatFromEvent,
+    lockEvent: eventDB.lockEvent,
   },
   heatRaceDB: {
     readAllHeats: heatRaceDB.readAllHeats,

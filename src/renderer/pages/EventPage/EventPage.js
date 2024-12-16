@@ -24,6 +24,7 @@ function EventPage() {
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isEventLocked, setIsEventLocked] = useState(event.is_locked === 1);
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -160,6 +161,23 @@ function EventPage() {
     }
   };
 
+  const handleLockEvent = async () => {
+    try {
+      if (isEventLocked) {
+        await window.electron.sqlite.eventDB.unlockEvent(event.event_id);
+        setIsEventLocked(false);
+        alert('Event unlocked successfully!');
+      } else {
+        await window.electron.sqlite.eventDB.lockEvent(event.event_id);
+        setIsEventLocked(true);
+        alert('Event locked successfully!');
+      }
+    } catch (error) {
+      console.error('Error locking/unlocking event:', error);
+      alert('Error locking/unlocking event. Please try again later.');
+    }
+  };
+
   useEffect(() => {
     // Ensure that the allBoats state is updated when boats state changes
     setAllBoats((prevBoats) => {
@@ -201,8 +219,13 @@ function EventPage() {
         <button type="button" onClick={handleBackClick}>
           Back to Landing Page
         </button>
-        <button type="button" onClick={handleHeatRaceClick}>
-          Go to scoring
+        {!isEventLocked && (
+          <button type="button" onClick={handleHeatRaceClick}>
+            Go to scoring
+          </button>
+        )}
+        <button type="button" onClick={handleLockEvent}>
+          {isEventLocked ? 'Unlock Event' : 'Lock Event'}
         </button>
       </div>
       <h1>{event.event_name}</h1>
@@ -211,11 +234,11 @@ function EventPage() {
       <button type="button" onClick={handleOpenLeaderboard}>
         Open Leaderboard
       </button>
-      {raceHappened ? (
+      {raceHappened || isEventLocked ? (
         <div className="warning">
           <p>
-            No more sailors or boats can be added as atleast one race has
-            happened.
+            No more sailors or boats can be added as at least one race has
+            happened or the event is locked.
           </p>
         </div>
       ) : (

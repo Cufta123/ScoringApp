@@ -11,6 +11,8 @@ const dbPath =
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
+
+
 const readAllEvents = () => {
   try {
     const query = `
@@ -45,8 +47,34 @@ const insertEvent = (event_name, event_location, start_date, end_date) => {
   }
 };
 
+const lockEvent = (event_id) => {
+  try {
+    const query = `UPDATE Events SET is_locked = 1 WHERE event_id = ?`;
+    const updateQuery = db.prepare(query);
+    updateQuery.run(event_id);
+    console.log(`Event ${event_id} locked.`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error locking event:', error);
+    throw error;
+  }
+};
+
+const unlockEvent = (event_id) => {
+  try {
+    const query = `UPDATE Events SET is_locked = 0 WHERE event_id = ?`;
+    const updateQuery = db.prepare(query);
+    updateQuery.run(event_id);
+    console.log(`Event ${event_id} unlocked.`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error unlocking event:', error);
+    throw error;
+  }
+};
 
 module.exports = {
   readAllEvents,
   insertEvent,
+  lockEvent,
 };

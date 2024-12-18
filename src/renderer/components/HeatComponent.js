@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
-
+import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
@@ -255,6 +255,11 @@ const handleCreateHeats = async () => {
 
   const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
 
+  const getFlagCode = (iocCode) => {
+    return iocToFlagCodeMap[iocCode] || iocCode;
+  };
+
+
   const heatsContainerStyle = {
     display: 'flex',
     flexWrap: 'wrap',
@@ -362,8 +367,8 @@ const handleCreateHeats = async () => {
                         {boat.name} {boat.surname}
                       </td>
                       <td>
-                        <Flag code={boat.country} style={{ width: '30px', marginRight: '5px' }} />
-                        {boat.country}
+                      <Flag code={getFlagCode(boat.country)} style={{ width: '30px', marginRight: '5px' }} />
+                      {boat.country}
                       </td>
                       <td style={boatNumberColumnStyle}>{boat.sail_number}</td>
                     </tr>

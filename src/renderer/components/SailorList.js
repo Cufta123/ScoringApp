@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import 'font-awesome/css/font-awesome.min.css';
+import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
+import Flag from 'react-world-flags';
 
 const categoryOptions = ['KADET', 'SENIOR', 'JUNIOR', 'MASTER', 'CADET'];
 
@@ -76,6 +78,10 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
+  };
+
+  const getFlagCode = (iocCode) => {
+    return iocToFlagCodeMap[iocCode] || iocCode;
   };
 
   return (
@@ -157,6 +163,10 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                       sailor.country
                     )}
                   </td>
+                  <td>
+                <Flag code={getFlagCode(sailor.country)} style={{ width: '30px', marginRight: '5px' }} />
+                {sailor.country}
+              </td>
                   <td>
                     {editingSailorId === sailor.boat_id ? (
                       <input

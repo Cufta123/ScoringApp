@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import Flag from 'react-world-flags';
 
 function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heats, setHeats] = useState([]);
@@ -101,7 +102,6 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
       }
 
       await Promise.all(fleetPromises);
-      setIsFinalSeries(true);
       setFinalSeriesStarted(true); // Set final series started to true
       alert('Final Series started successfully!');
       handleDisplayHeats(); // Refresh the heats display
@@ -361,7 +361,10 @@ const handleCreateHeats = async () => {
                       <td style={sailorNameColumnStyle}>
                         {boat.name} {boat.surname}
                       </td>
-                      <td>{boat.country}</td>
+                      <td>
+                        <Flag code={boat.country} style={{ width: '30px', marginRight: '5px' }} />
+                        {boat.country}
+                      </td>
                       <td style={boatNumberColumnStyle}>{boat.sail_number}</td>
                     </tr>
                   ))}
@@ -374,7 +377,6 @@ const handleCreateHeats = async () => {
     </div>
   );
 }
-
 HeatComponent.propTypes = {
   event: PropTypes.shape({
     event_id: PropTypes.number.isRequired,

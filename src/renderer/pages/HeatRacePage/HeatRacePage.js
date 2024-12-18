@@ -12,6 +12,8 @@ function HeatRacePage() {
   const [selectedHeat, setSelectedHeat] = useState(null);
   const [isScoring, setIsScoring] = useState(false);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
+  const [heats, setHeats] = useState([]);
+  const [renderTrigger, setRenderTrigger] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -28,6 +30,8 @@ function HeatRacePage() {
       fetchEvent();
     }
   }, [eventData, event]);
+
+
 
   const handleHeatSelect = (heat) => {
     setSelectedHeat(heat);
@@ -139,7 +143,6 @@ function HeatRacePage() {
     // Update the selected heat with the new race number
     setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
   };
-
   const handleCreateNewHeatsBasedOnLeaderboard = async () => {
     if (finalSeriesStarted) {
       alert('Cannot create new heats based on leaderboard after the final series has started.');
@@ -147,12 +150,24 @@ function HeatRacePage() {
     }
 
     try {
+      // Create new heats
       await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(event.event_id);
       console.log('New heats created based on leaderboard.');
+
+      // Fetch and update heats
+      const updatedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
+      setHeats(updatedHeats); // Directly update the state with new heats
     } catch (error) {
       console.error('Error creating new heats based on leaderboard:', error.message);
     }
   };
+
+  useEffect(() => {
+    console.log('HeatComponent Props:', heats);
+  }, [heats]);
+
+
+
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
       const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
@@ -181,11 +196,13 @@ function HeatRacePage() {
       </button>
       {!isScoring ? (
         <>
-          <HeatComponent
-            event={event}
-            onHeatSelect={handleHeatSelect}
-            clickable
-          />
+        <HeatComponent
+  key={JSON.stringify(heats)} // Forces re-render when heats changes
+  event={event}
+  heats={heats}
+  onHeatSelect={handleHeatSelect}
+  clickable
+/>
           {selectedHeat && (
             <button type="button" onClick={handleStartScoring}>
               Start Scoring

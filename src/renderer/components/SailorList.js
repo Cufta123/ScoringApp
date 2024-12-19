@@ -160,13 +160,15 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                         className="editable-input"
                       />
                     ) : (
-                      sailor.country
+                      <div>
+                        <Flag
+                          code={getFlagCode(sailor.country)}
+                          style={{ width: '30px', marginRight: '5px' }}
+                        />
+                        <span>{sailor.country}</span>
+                      </div>
                     )}
                   </td>
-                  <td>
-                <Flag code={getFlagCode(sailor.country)} style={{ width: '30px', marginRight: '5px' }} />
-                {sailor.country}
-              </td>
                   <td>
                     {editingSailorId === sailor.boat_id ? (
                       <input

@@ -69,13 +69,30 @@ function EventPage() {
     }
   }, [event.event_id]);
 
+  const fetchEventLockStatus = useCallback(async () => {
+    try {
+      const events = await window.electron.sqlite.eventDB.readAllEvents();
+      const currentEvent = events.find((e) => e.event_id === event.event_id);
+      setIsEventLocked(currentEvent.is_locked === 1);
+    } catch (error) {
+      console.error('Error fetching event lock status:', error);
+    }
+  }, [event.event_id]);
+
   useEffect(() => {
     if (event) {
       fetchBoatsWithSailors();
       fetchAllBoats();
       checkIfRaceHappened();
+      fetchEventLockStatus();
     }
-  }, [event, fetchBoatsWithSailors, fetchAllBoats, checkIfRaceHappened]);
+  }, [
+    event,
+    fetchBoatsWithSailors,
+    fetchAllBoats,
+    checkIfRaceHappened,
+    fetchEventLockStatus,
+  ]);
 
   const handleAddSailor = () => {
     fetchBoatsWithSailors();

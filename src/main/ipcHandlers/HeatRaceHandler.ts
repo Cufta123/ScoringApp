@@ -2,8 +2,14 @@
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';
 
-
 console.log('HeatRaceHandler.ts loaded');
+
+const isEventLocked = (event_id: any) => {
+  const query = `SELECT is_locked FROM Events WHERE event_id = ?`;
+  const checkQuery = db.prepare(query);
+  const result = checkQuery.get(event_id);
+  return result.is_locked === 1;
+};
 
 ipcMain.handle('readAllHeats', async (event, event_id) => {
   try {
@@ -18,6 +24,9 @@ ipcMain.handle('readAllHeats', async (event, event_id) => {
 });
 
 ipcMain.handle('insertHeat', async (event, event_id, heat_name, heat_type) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     const result = db
       .prepare(
@@ -42,6 +51,9 @@ ipcMain.handle('insertHeatBoat', async (event, heat_id, boat_id) => {
   }
 });
 ipcMain.handle('deleteHeatsByEvent', async (event, event_id) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     const result = db
       .prepare(
@@ -158,6 +170,9 @@ ipcMain.handle(
 );
 
 ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     const query = `
       SELECT boat_id, SUM(points) as total_points_event
@@ -193,6 +208,9 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
 });
 
 ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     const query = `
       SELECT boat_id, RANK() OVER (ORDER BY total_points_event ASC) as final_position
@@ -232,6 +250,9 @@ ipcMain.handle('deleteScore', async (event, score_id) => {
 });
 
 ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     // Read the current leaderboard for the specific event
     const leaderboardQuery = `
@@ -274,7 +295,15 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Extract only the latest heats
     const lastHeats = Object.values(latestHeats)
-      .map((entry) => (entry as { suffix: number; heat: { heat_name: string; heat_id: number } }).heat)
+      .map(
+        (entry) =>
+          (
+            entry as {
+              suffix: number;
+              heat: { heat_name: string; heat_id: number };
+            }
+          ).heat,
+      )
       .filter((heat) => heat !== null); // Filter out null values
 
     // Check race count for the latest heats
@@ -375,7 +404,6 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
   }
 });
 
-
 ipcMain.handle('readGlobalLeaderboard', async () => {
   try {
     const results = db
@@ -404,6 +432,9 @@ ipcMain.handle('readGlobalLeaderboard', async () => {
 });
 
 ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
+  if (isEventLocked(event_id)) {
+    throw new Error('Cannot insert heat for locked event.');
+  }
   try {
     const query = `
       SELECT boat_id, heat_name, SUM(points) as total_points_final
@@ -423,10 +454,21 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
     );
 
-    results.forEach((result: { boat_id: any; total_points_final: any; heat_name: string }) => {
-      const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
-      updateQuery.run(result.boat_id, result.total_points_final, event_id, placementGroup);
-    });
+    results.forEach(
+      (result: {
+        boat_id: any;
+        total_points_final: any;
+        heat_name: string;
+      }) => {
+        const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
+        updateQuery.run(
+          result.boat_id,
+          result.total_points_final,
+          event_id,
+          placementGroup,
+        );
+      },
+    );
 
     console.log('Final leaderboard updated successfully.');
     return { success: true };

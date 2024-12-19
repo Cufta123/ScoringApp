@@ -35,7 +35,9 @@ export type Channels =
   | 'readLeaderboard'
   | 'readGlobalLeaderboard'
   | 'updateFinalLeaderboard'
-  | 'readFinalLeaderboard';
+  | 'readFinalLeaderboard'
+  | 'lockEvent'
+  | 'unlockEvent';
 
 const electronHandler = {
   ipcRenderer: {
@@ -226,6 +228,22 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking removeBoatFromEvent IPC:', error);
+          return false;
+        }
+      },
+      async lockEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('lockEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking lockEvent IPC:', error);
+          return false;
+        }
+      },
+      async unlockEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('unlockEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking unlockEvent IPC:', error);
           return false;
         }
       },
@@ -421,7 +439,6 @@ const electronHandler = {
     },
   },
 };
-
 
 contextBridge.exposeInMainWorld('electron', electronHandler);
 

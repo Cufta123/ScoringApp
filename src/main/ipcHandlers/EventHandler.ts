@@ -132,3 +132,16 @@ ipcMain.handle('lockEvent', async (event, event_id) => {
     throw error;
   }
 });
+
+ipcMain.handle('unlockEvent', async (event, event_id) => {
+  try {
+    const query = `UPDATE Events SET is_locked = 0 WHERE event_id = ?`;
+    const updateQuery = db.prepare(query);
+    updateQuery.run(event_id);
+    console.log(`Event ${event_id} unlocked.`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error unlocking event:', error);
+    throw error;
+  }
+});

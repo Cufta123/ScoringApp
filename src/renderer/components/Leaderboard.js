@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import Flag from 'react-world-flags';
+import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -8,8 +10,9 @@ function LeaderboardComponent({ eventId }) {
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
-      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
-      const finalHeats = heats.filter(heat => heat.heat_type === 'Final');
+      const heats =
+        await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
+      const finalHeats = heats.filter((heat) => heat.heat_type === 'Final');
       if (finalHeats.length > 0) {
         setFinalSeriesStarted(true);
       }
@@ -22,22 +25,30 @@ function LeaderboardComponent({ eventId }) {
     checkFinalSeriesStarted();
   }, [checkFinalSeriesStarted]);
 
+  const getFlagCode = (iocCode) => {
+    return iocToFlagCodeMap[iocCode] || iocCode;
+  };
+
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
         const results = finalSeriesStarted
-          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
+          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(
+              eventId,
+            )
           : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
         console.log('Fetched leaderboard:', results);
 
-        const leaderboardWithRaces = results.map(entry => ({
+        const leaderboardWithRaces = results.map((entry) => ({
           ...entry,
           races: entry.race_positions ? entry.race_positions.split(',') : [],
         }));
 
         // Sort the leaderboard by total_points_event or total_points_final in ascending order
-        leaderboardWithRaces.sort(
-          (a, b) => (finalSeriesStarted ? a.total_points_final - b.total_points_final : a.total_points_event - b.total_points_event),
+        leaderboardWithRaces.sort((a, b) =>
+          finalSeriesStarted
+            ? a.total_points_final - b.total_points_final
+            : a.total_points_event - b.total_points_event,
         );
 
         setLeaderboard(leaderboardWithRaces);
@@ -76,35 +87,51 @@ function LeaderboardComponent({ eventId }) {
   return (
     <div className="leaderboard">
       <h2>{finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h2>
-      {sortedGroups.map(group => (
-        <div key={group}>
+      {sortedGroups.map((group) => (
+        <div key={`group-${group}`}>
           <h3>{group} Group</h3>
           <table>
             <thead>
               <tr>
                 <th>Rank</th>
                 <th>Name</th>
+                <th>Country</th>
                 <th>Boat Number</th>
                 <th>Boat Type</th>
-                <th>Country</th>
-                {leaderboard[0].races.map((_, index) => (
-                  <th key={index}>Race {index + 1}</th>
+                {leaderboard[0].races.map((race, index) => (
+                  <th key={`header-race-${index}`}>Race {index + 1}</th>
                 ))}
+
                 <th>Total Points</th>
               </tr>
             </thead>
             <tbody>
               {groupedLeaderboard[group].map((entry, index) => (
-                <tr key={entry.boat_id}>
+                <tr key={`boat-${entry.boat_id}-${index}`}>
                   <td>{index + 1}</td>
-                  <td>{entry.name} {entry.surname}</td>
+                  <td>
+                    {entry.name} {entry.surname}
+                  </td>
+                  <td>
+                    <Flag
+                      code={getFlagCode(entry.country)}
+                      style={{ width: '30px', marginRight: '5px' }}
+                    />
+                    {entry.country}
+                  </td>
                   <td>{entry.boat_number}</td>
                   <td>{entry.boat_type}</td>
-                  <td>{entry.country}</td>
+
                   {entry.races.map((race, raceIndex) => (
-                    <td key={raceIndex}>{race}</td>
+                    <td key={`entry-race-${entry.boat_id}-${raceIndex}`}>
+                      {race}
+                    </td>
                   ))}
-                  <td>{finalSeriesStarted ? entry.total_points_final : entry.total_points_event}</td>
+                  <td>
+                    {finalSeriesStarted
+                      ? entry.total_points_final
+                      : entry.total_points_event}
+                  </td>
                 </tr>
               ))}
             </tbody>

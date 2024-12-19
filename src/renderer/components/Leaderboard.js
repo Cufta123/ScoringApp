@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 
 function LeaderboardComponent({ eventId }) {
@@ -84,9 +86,70 @@ function LeaderboardComponent({ eventId }) {
     return groupOrder.indexOf(a) - groupOrder.indexOf(b);
   });
 
+  const exportToExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Leaderboard');
+
+    // Add header row
+    const header = [
+      'Rank',
+      'Name',
+      'Country',
+      'Boat Number',
+      'Boat Type',
+      ...leaderboard[0].races.map((_, index) => `Race ${index + 1}`),
+      'Total Points',
+    ];
+    worksheet.addRow(header);
+
+    // Add data rows
+    if (finalSeriesStarted) {
+      sortedGroups.forEach((group) => {
+        const groupHeader = [`${group} Group`];
+        worksheet.addRow(groupHeader);
+
+        groupedLeaderboard[group].forEach((entry, index) => {
+          const row = [
+            index + 1,
+            `${entry.name} ${entry.surname}`,
+            entry.country,
+            entry.boat_number,
+            entry.boat_type,
+            ...entry.races,
+            entry.total_points_final,
+          ];
+          worksheet.addRow(row);
+        });
+      });
+    } else {
+      leaderboard.forEach((entry, index) => {
+        const row = [
+          index + 1,
+          `${entry.name} ${entry.surname}`,
+          entry.country,
+          entry.boat_number,
+          entry.boat_type,
+          ...entry.races,
+          entry.total_points_event,
+        ];
+        worksheet.addRow(row);
+      });
+    }
+
+    // Generate Excel file and trigger download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    saveAs(blob, 'leaderboard.xlsx');
+  };
+
   return (
     <div className="leaderboard">
       <h2>{finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h2>
+      <button type="button" onClick={exportToExcel}>
+        Export to Excel
+      </button>
       {sortedGroups.map((group) => (
         <div key={`group-${group}`}>
           <h3>{group} Group</h3>

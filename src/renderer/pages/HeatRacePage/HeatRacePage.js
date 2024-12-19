@@ -145,7 +145,7 @@ function HeatRacePage() {
         );
       }
     } else {
-      console.log('Final series has started. Leaderboard will not be updated.');
+      console.log('Final series has started. Leaderboard will be updated.');
       await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
         event.event_id,
       );
@@ -156,6 +156,7 @@ function HeatRacePage() {
     // Update the selected heat with the new race number
     setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
   };
+
   const handleCreateNewHeatsBasedOnLeaderboard = async () => {
     if (finalSeriesStarted) {
       alert(

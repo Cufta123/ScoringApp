@@ -50,6 +50,7 @@ const electronHandler = {
     updateScore: heatRaceDB.updateScore,
     deleteScore: heatRaceDB.deleteScore,
     deleteHeatsByEvent: heatRaceDB.deleteHeatsByEvent,
+    transferBoatBetweenHeats: heatRaceDB.transferBoatBetweenHeats,
     updateEventLeaderboard: heatRaceDB.updateEventLeaderboard,
     updateGlobalLeaderboard: heatRaceDB.updateGlobalLeaderboard,
     readLeaderboard: heatRaceDB.readLeaderboard,

@@ -32,6 +32,7 @@ export type Channels =
   | 'updateEventLeaderboard'
   | 'updateGlobalLeaderboard'
   | 'createNewHeatsBasedOnLeaderboard'
+  | 'transferBoatBetweenHeats'
   | 'readLeaderboard'
   | 'readGlobalLeaderboard'
   | 'updateFinalLeaderboard'
@@ -401,6 +402,23 @@ const electronHandler = {
             'Error invoking createNewHeatsBasedOnLeaderboard IPC:',
             error,
           );
+          return false;
+        }
+      },
+      async transferBoatBetweenHeats(
+        from_heat_id: string,
+        to_heat_id: string,
+        boat_id: string,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'transferBoatBetweenHeats',
+            from_heat_id,
+            to_heat_id,
+            boat_id,
+          );
+        } catch (error) {
+          console.error('Error invoking transferBoatBetweenHeats IPC:', error);
           return false;
         }
       },

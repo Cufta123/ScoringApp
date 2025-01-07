@@ -271,6 +271,44 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     return iocToFlagCodeMap[iocCode] || iocCode;
   };
 
+  const handleBoatTransfer = async (boat, fromHeatId, toHeatId) => {
+    if (raceHappened || finalSeriesStarted) {
+      alert('Cannot transfer boats after a race has happened.');
+      return;
+    }
+
+    try {
+      await window.electron.sqlite.heatRaceDB.transferBoatBetweenHeats(
+        fromHeatId,
+        toHeatId,
+        boat.boat_id,
+      );
+      alert('Boat transferred successfully!');
+      handleDisplayHeats(); // Refresh the heats display
+    } catch (error) {
+      console.error('Error transferring boat:', error);
+      alert('Error transferring boat. Please try again later.');
+    }
+  };
+
+  const handleDragStart = (e, boat, fromHeatId) => {
+    const { nativeEvent } = e;
+    nativeEvent.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({ boat, fromHeatId }),
+    );
+  };
+  const handleDrop = async (e, toHeatId) => {
+    e.preventDefault();
+    const data = JSON.parse(e.dataTransfer.getData('application/json'));
+    const { boat, fromHeatId } = data;
+    await handleBoatTransfer(boat, fromHeatId, toHeatId);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
   const heatsContainerStyle = {
     display: 'flex',
     flexWrap: 'wrap',
@@ -359,6 +397,8 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
                   handleHeatClick(heat);
                 }
               }}
+              onDrop={(e) => handleDrop(e, heat.heat_id)}
+              onDragOver={handleDragOver}
             >
               <h4>
                 {heat.heat_name} (Race {heat.raceNumber})
@@ -373,7 +413,13 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
                 </thead>
                 <tbody>
                   {heat.boats.map((boat) => (
-                    <tr key={boat.boat_id}>
+                    <tr
+                      key={boat.boat_id}
+                      draggable={!raceHappened && !finalSeriesStarted}
+                      onDragStart={(e) =>
+                        handleDragStart(e, boat, heat.heat_id)
+                      }
+                    >
                       <td style={sailorNameColumnStyle}>
                         {boat.name} {boat.surname}
                       </td>

@@ -371,6 +371,34 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
   }
 });
 
+ipcMain.handle(
+  'transferBoatBetweenHeats',
+  async (event, from_heat_id, to_heat_id, boat_id) => {
+    try {
+      const deleteQuery = db.prepare(
+        'DELETE FROM Heat_Boat WHERE heat_id = ? AND boat_id = ?',
+      );
+      const deleteInfo = deleteQuery.run(from_heat_id, boat_id);
+      console.log(
+        `Deleted ${deleteInfo.changes} row(s) from HeatBoats for heat ID ${from_heat_id} and boat ID ${boat_id}.`,
+      );
+
+      const insertQuery = db.prepare(
+        'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)',
+      );
+      const insertInfo = insertQuery.run(to_heat_id, boat_id);
+      console.log(
+        `Inserted ${insertInfo.changes} row(s) with last ID ${insertInfo.lastInsertRowid} into HeatBoats for heat ID ${to_heat_id}.`,
+      );
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error transferring boat between heats:', error);
+      throw error;
+    }
+  },
+);
+
 ipcMain.handle('readLeaderboard', async (event, event_id) => {
   try {
     const query = `

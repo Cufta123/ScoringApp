@@ -90,7 +90,6 @@ function LeaderboardComponent({ eventId }) {
       setEditableLeaderboard(updatedLeaderboard);
     }
   };
-
   const handleSave = async () => {
     console.log('Updated leaderboard:', editableLeaderboard);
     try {
@@ -98,8 +97,21 @@ function LeaderboardComponent({ eventId }) {
         throw new Error('Leaderboard data is not initialized');
       }
 
+      // Recalculate total points before saving
+      const updatedLeaderboard = editableLeaderboard.map((entry) => {
+        // Calculate total points based on updated races
+        const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+        const totalPointsFinal = totalPointsEvent; // Use the same logic for final points if needed
+
+        return {
+          ...entry,
+          total_points_event: totalPointsEvent,
+          total_points_final: totalPointsFinal,
+        };
+      });
+
       // Update changes to the database
-      for (const entry of editableLeaderboard) {
+      for (const entry of updatedLeaderboard) {
         const originalEntry = leaderboard.find((e) => e.boat_id === entry.boat_id);
         if (!originalEntry) continue;
 
@@ -111,11 +123,13 @@ function LeaderboardComponent({ eventId }) {
               console.error('Race ID is missing for entry:', entry);
               continue;
             }
-            console.log(`Updating race result for race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${entry.races[i]}`);
+            const newPosition = parseInt(entry.races[i], 10); // Ensure new_position is a number
+            console.log(`Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}`);
             await window.electron.sqlite.heatRaceDB.updateRaceResult(
+              eventId, // Pass event_id
               race_id,
               entry.boat_id,
-              entry.races[i],
+              newPosition, // Pass new_position as a number
               false, // Disable shift positions for inline edit
             );
           }
@@ -142,10 +156,11 @@ function LeaderboardComponent({ eventId }) {
       setLeaderboard(leaderboardWithRaces);
       setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
       setEditMode(false); // Exit edit mode after saving
-    } catch (error) {
-      console.error('Error saving leaderboard:', error.message);
-    }
+      } catch (error) {
+        console.error('Error saving leaderboard:', error.message);
+      }
   };
+
 
 
   if (loading) {

@@ -399,10 +399,14 @@ ipcMain.handle(
   },
 );
 
+
 ipcMain.handle(
   'updateRaceResult',
-  async (event, race_id, boat_id, new_position, shift_positions) => {
+  async (event, event_id, race_id, boat_id, new_position, shift_positions) => {
     try {
+      console.log(`Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}`);
+
+      // Step 1: Get the current race result
       const currentResult = db
         .prepare(
           `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`,
@@ -410,26 +414,50 @@ ipcMain.handle(
         .get(race_id, boat_id);
 
       if (!currentResult) {
+        console.error(`Current result not found for race_id: ${race_id}, boat_id: ${boat_id}`);
         throw new Error('Current result not found.');
       }
 
       const currentPosition = currentResult.position;
 
+      // Step 2: Update the race result in the Scores table
       const updateQuery = db.prepare(
         `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`,
       );
       updateQuery.run(new_position, race_id, boat_id);
 
+      // Step 3: Optionally shift positions if needed
       if (shift_positions) {
         const shiftQuery = db.prepare(
-          `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position > ?`,
+          `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND boat_id != ?`
         );
-        shiftQuery.run(race_id, currentPosition);
+        shiftQuery.run(race_id, new_position, boat_id);
       }
 
-      console.log(
-        `Updated race result for boat ID ${boat_id} in race ID ${race_id}.`,
+      console.log(`Updated race result for boat ID ${boat_id} in race ID ${race_id}.`);
+
+      // Step 4: Recalculate the total points for the affected boat
+      // Get all races for this boat in the event
+      const races = db
+        .prepare(
+          `SELECT position FROM Scores WHERE boat_id = ? AND race_id IN (SELECT race_id FROM Races WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?))`,
+        )
+        .all(boat_id, event_id);
+
+      const totalPointsEvent = races.reduce((acc: any, race: { position: any; }) => acc + race.position, 0);
+
+      // Step 5: Update the total points in the Leaderboard (or FinalLeaderboard) table
+      const leaderboardUpdateQuery = db.prepare(
+        `UPDATE Leaderboard SET total_points_event = ? WHERE boat_id = ? AND event_id = ?`,
       );
+      leaderboardUpdateQuery.run(totalPointsEvent, boat_id, event_id);
+
+      // If final series is started, update the FinalLeaderboard table
+      const finalLeaderboardUpdateQuery = db.prepare(
+        `UPDATE FinalLeaderboard SET total_points_final = ? WHERE boat_id = ? AND event_id = ?`,
+      );
+      finalLeaderboardUpdateQuery.run(totalPointsEvent, boat_id, event_id);
+
       return { success: true };
     } catch (err) {
       console.error('Error updating race result:', (err as Error).message);

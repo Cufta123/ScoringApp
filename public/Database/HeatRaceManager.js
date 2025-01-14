@@ -383,6 +383,31 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
   }
 };
 
+const transferBoatBetweenHeats = (from_heat_id, to_heat_id, boat_id) => {
+  try {
+    const deleteQuery = db.prepare(
+      `DELETE FROM HeatBoats WHERE heat_id = ? AND boat_id = ?`
+    );
+    const deleteInfo = deleteQuery.run(from_heat_id, boat_id);
+    console.log(
+      `Deleted ${deleteInfo.changes} row(s) from HeatBoats for heat ID ${from_heat_id} and boat ID ${boat_id}.`
+    );
+
+    const insertQuery = db.prepare(
+      `INSERT INTO HeatBoats (heat_id, boat_id) VALUES (?, ?)`
+    );
+    const insertInfo = insertQuery.run(to_heat_id, boat_id);
+    console.log(
+      `Inserted ${insertInfo.changes} row(s) with last ID ${insertInfo.lastInsertRowid} into HeatBoats for heat ID ${to_heat_id}.`
+    );
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error transferring boat between heats:', err.message);
+    throw err;
+  }
+};
+
 const readLeaderboard = (event_id) => {
   try {
     const query = `
@@ -409,6 +434,37 @@ const readLeaderboard = (event_id) => {
   } catch (err) {
     console.error('Error reading leaderboard from the database:', err.message);
     return [];
+  }
+};
+const updateRaceResult = (race_id, boat_id, new_position, shift_positions) => {
+  try {
+    const currentResult = db.prepare(
+      `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`
+    ).get(race_id, boat_id);
+
+    if (!currentResult) {
+      throw new Error('Race result not found.');
+    }
+
+    const currentPosition = currentResult.position;
+
+    const updateQuery = db.prepare(
+      `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`
+    );
+    updateQuery.run(new_position, race_id, boat_id);
+
+    if (shift_positions) {
+      const shiftQuery = db.prepare(
+        `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND boat_id != ?`
+      );
+      shiftQuery.run(race_id, new_position, boat_id);
+    }
+
+    console.log(`Updated race result for boat ID ${boat_id} in race ID ${race_id}.`);
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating race result:', err.message);
+    throw err;
   }
 };
 
@@ -513,8 +569,10 @@ module.exports = {
   updateEventLeaderboard,
   updateGlobalLeaderboard,
   createNewHeatsBasedOnLeaderboard,
+  transferBoatBetweenHeats,
   readLeaderboard,
   readGlobalLeaderboard,
   updateFinalLeaderboard,
   readFinalLeaderboard,
+  updateRaceResult,
 };

@@ -57,6 +57,7 @@ const electronHandler = {
     readGlobalLeaderboard: heatRaceDB.readGlobalLeaderboard,
     updateFinalLeaderboard: heatRaceDB.updateFinalLeaderboard,
     readFinalLeaderboard: heatRaceDB.readFinalLeaderboard,
+    updateRaceResult: heatRaceDB.updateRaceResult,
   },
 };
 

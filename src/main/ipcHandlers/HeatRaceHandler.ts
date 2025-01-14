@@ -399,6 +399,45 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle(
+  'updateRaceResult',
+  async (event, race_id, boat_id, new_position, shift_positions) => {
+    try {
+      const currentResult = db
+        .prepare(
+          `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`,
+        )
+        .get(race_id, boat_id);
+
+      if (!currentResult) {
+        throw new Error('Current result not found.');
+      }
+
+      const currentPosition = currentResult.position;
+
+      const updateQuery = db.prepare(
+        `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`,
+      );
+      updateQuery.run(new_position, race_id, boat_id);
+
+      if (shift_positions) {
+        const shiftQuery = db.prepare(
+          `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position > ?`,
+        );
+        shiftQuery.run(race_id, currentPosition);
+      }
+
+      console.log(
+        `Updated race result for boat ID ${boat_id} in race ID ${race_id}.`,
+      );
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating race result:', (err as Error).message);
+      throw err;
+    }
+  },
+);
+
 ipcMain.handle('readLeaderboard', async (event, event_id) => {
   try {
     const query = `

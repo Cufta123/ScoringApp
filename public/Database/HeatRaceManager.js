@@ -436,6 +436,37 @@ const readLeaderboard = (event_id) => {
     return [];
   }
 };
+const updateRaceResult = (race_id, boat_id, new_position, shift_positions) => {
+  try {
+    const currentResult = db.prepare(
+      `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`
+    ).get(race_id, boat_id);
+
+    if (!currentResult) {
+      throw new Error('Race result not found.');
+    }
+
+    const currentPosition = currentResult.position;
+
+    const updateQuery = db.prepare(
+      `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`
+    );
+    updateQuery.run(new_position, race_id, boat_id);
+
+    if (shift_positions) {
+      const shiftQuery = db.prepare(
+        `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND boat_id != ?`
+      );
+      shiftQuery.run(race_id, new_position, boat_id);
+    }
+
+    console.log(`Updated race result for boat ID ${boat_id} in race ID ${race_id}.`);
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating race result:', err.message);
+    throw err;
+  }
+};
 
 const readGlobalLeaderboard = () => {
   try {
@@ -543,4 +574,5 @@ module.exports = {
   readGlobalLeaderboard,
   updateFinalLeaderboard,
   readFinalLeaderboard,
+  updateRaceResult,
 };

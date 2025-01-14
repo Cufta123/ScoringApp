@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
@@ -9,6 +10,9 @@ function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [newPosition, setNewPosition] = useState('');
+  const [shiftPositions, setShiftPositions] = useState(false);
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -63,6 +67,53 @@ function LeaderboardComponent({ eventId }) {
 
     fetchLeaderboard();
   }, [eventId, finalSeriesStarted]);
+
+  const updateRaceResult = async (
+    race_id,
+    boat_id,
+    new_position,
+    shift_positions,
+  ) => {
+    try {
+      const result = await window.electron.sqlite.heatRaceDB.updateRaceResult(
+        race_id,
+        boat_id,
+        new_position,
+        shift_positions,
+      );
+      if (result.success) {
+        // Refresh the leaderboard after updating the race result
+        const results = finalSeriesStarted
+          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(
+              eventId,
+            )
+          : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
+        setLeaderboard(results);
+      }
+    } catch (error) {
+      console.error('Error updating race result:', error);
+    }
+  };
+
+  const handleEditResult = (entry) => {
+    setEditingEntry(entry);
+    setNewPosition(entry.position);
+    setShiftPositions(false);
+  };
+
+  const handleSaveResult = () => {
+    if (editingEntry) {
+      updateRaceResult(
+        editingEntry.race_id,
+        editingEntry.boat_id,
+        newPosition,
+        shiftPositions,
+      );
+      setEditingEntry(null);
+      setNewPosition('');
+      setShiftPositions(false);
+    }
+  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -194,6 +245,42 @@ function LeaderboardComponent({ eventId }) {
                     {finalSeriesStarted
                       ? entry.total_points_final
                       : entry.total_points_event}
+                  </td>
+                  <td>
+                    {editingEntry && editingEntry.boat_id === entry.boat_id ? (
+                      <>
+                        <input
+                          type="number"
+                          value={newPosition}
+                          onChange={(e) => setNewPosition(e.target.value)}
+                        />
+                        <label htmlFor="shift-positions-checkbox">
+                          Shift positions?
+                        </label>
+                        <input
+                          id="shift-positions-checkbox"
+                          type="checkbox"
+                          checked={shiftPositions}
+                          onChange={(e) => setShiftPositions(e.target.checked)}
+                        />
+                        <button type="button" onClick={handleSaveResult}>
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingEntry(null)}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleEditResult(entry)}
+                      >
+                        Edit Result
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

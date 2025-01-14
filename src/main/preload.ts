@@ -38,7 +38,8 @@ export type Channels =
   | 'updateFinalLeaderboard'
   | 'readFinalLeaderboard'
   | 'lockEvent'
-  | 'unlockEvent';
+  | 'unlockEvent'
+  | 'updateRaceResult';
 
 const electronHandler = {
   ipcRenderer: {
@@ -443,6 +444,25 @@ const electronHandler = {
           return await ipcRenderer.invoke('updateFinalLeaderboard', event_id);
         } catch (error) {
           console.error('Error invoking updateFinalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async updateRaceResult(
+        race_id: string,
+        boat_id: string,
+        new_position: string,
+        shift_positions: boolean,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'updateRaceResult',
+            race_id,
+            boat_id,
+            new_position,
+            shift_positions,
+          );
+        } catch (error) {
+          console.error('Error invoking updateRaceResult IPC:', error);
           return false;
         }
       },

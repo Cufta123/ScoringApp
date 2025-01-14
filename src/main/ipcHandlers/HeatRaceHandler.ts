@@ -449,7 +449,8 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
         s.name,
         s.surname,
         b.country,
-        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions
+        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions,
+        GROUP_CONCAT(r.race_id ORDER BY r.race_number) AS race_ids
       FROM Leaderboard lb
       LEFT JOIN Boats b ON lb.boat_id = b.boat_id
       LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
@@ -558,7 +559,8 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
         s.name,
         s.surname,
         b.country,
-        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions
+        GROUP_CONCAT(sc.position ORDER BY r.race_number) AS race_positions,
+        GROUP_CONCAT(r.race_id ORDER BY r.race_number) AS race_ids
       FROM FinalLeaderboard fl
       LEFT JOIN Boats b ON fl.boat_id = b.boat_id
       LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id

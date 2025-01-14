@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
@@ -10,14 +9,14 @@ function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
-  const [editingEntry, setEditingEntry] = useState(null);
-  const [newPosition, setNewPosition] = useState('');
-  const [shiftPositions, setShiftPositions] = useState(false);
+  const [editingCell, setEditingCell] = useState(null); // Tracks the row and cell being edited
+  const [newValue, setNewValue] = useState(''); // Stores the new value for the cell being edited
+  const [editMode, setEditMode] = useState(false); // Toggle for edit mode
+  const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
-      const heats =
-        await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
+      const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
       const finalHeats = heats.filter((heat) => heat.heat_type === 'Final');
       if (finalHeats.length > 0) {
         setFinalSeriesStarted(true);
@@ -39,18 +38,15 @@ function LeaderboardComponent({ eventId }) {
     const fetchLeaderboard = async () => {
       try {
         const results = finalSeriesStarted
-          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(
-              eventId,
-            )
+          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
           : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
-        console.log('Fetched leaderboard:', results);
 
         const leaderboardWithRaces = results.map((entry) => ({
           ...entry,
           races: entry.race_positions ? entry.race_positions.split(',') : [],
+          race_ids: entry.race_ids ? entry.race_ids.split(',') : [], // Ensure race_ids are included
         }));
 
-        // Sort the leaderboard by total_points_event or total_points_final in ascending order
         leaderboardWithRaces.sort((a, b) =>
           finalSeriesStarted
             ? a.total_points_final - b.total_points_final
@@ -58,6 +54,7 @@ function LeaderboardComponent({ eventId }) {
         );
 
         setLeaderboard(leaderboardWithRaces);
+        setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
       } catch (error) {
         console.error('Error fetching leaderboard:', error.message);
       } finally {
@@ -68,52 +65,88 @@ function LeaderboardComponent({ eventId }) {
     fetchLeaderboard();
   }, [eventId, finalSeriesStarted]);
 
-  const updateRaceResult = async (
-    race_id,
-    boat_id,
-    new_position,
-    shift_positions,
-  ) => {
+  const toggleEditMode = () => {
+    if (editMode) {
+      // Discard changes if exiting edit mode
+      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboard)));
+    }
+    setEditMode(!editMode);
+  };
+
+  const handleRaceChange = (boatId, raceIndex, value) => {
+    if (!isNaN(value) && value >= 0) {
+      const updatedLeaderboard = editableLeaderboard.map((entry) =>
+        entry.boat_id === boatId
+          ? {
+              ...entry,
+              races: entry.races.map((race, index) =>
+                index === raceIndex ? value : race
+              ),
+              total_points_event: entry.races.reduce((acc, race, index) => acc + (index === raceIndex ? parseInt(value, 10) : parseInt(race, 10)), 0),
+              total_points_final: entry.races.reduce((acc, race, index) => acc + (index === raceIndex ? parseInt(value, 10) : parseInt(race, 10)), 0),
+            }
+          : entry
+      );
+      setEditableLeaderboard(updatedLeaderboard);
+    }
+  };
+
+  const handleSave = async () => {
+    console.log('Updated leaderboard:', editableLeaderboard);
     try {
-      const result = await window.electron.sqlite.heatRaceDB.updateRaceResult(
-        race_id,
-        boat_id,
-        new_position,
-        shift_positions,
-      );
-      if (result.success) {
-        // Refresh the leaderboard after updating the race result
-        const results = finalSeriesStarted
-          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(
-              eventId,
-            )
-          : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
-        setLeaderboard(results);
+      if (!editableLeaderboard || !leaderboard) {
+        throw new Error('Leaderboard data is not initialized');
       }
-    } catch (error) {
-      console.error('Error updating race result:', error);
-    }
-  };
 
-  const handleEditResult = (entry) => {
-    setEditingEntry(entry);
-    setNewPosition(entry.position);
-    setShiftPositions(false);
-  };
+      // Update changes to the database
+      for (const entry of editableLeaderboard) {
+        const originalEntry = leaderboard.find((e) => e.boat_id === entry.boat_id);
+        if (!originalEntry) continue;
 
-  const handleSaveResult = () => {
-    if (editingEntry) {
-      updateRaceResult(
-        editingEntry.race_id,
-        editingEntry.boat_id,
-        newPosition,
-        shiftPositions,
+        // Save race data changes to the database
+        for (let i = 0; i < entry.races.length; i++) {
+          if (entry.races[i] !== originalEntry.races[i]) {
+            const race_id = entry.race_ids[i]; // Get the correct race_id
+            if (!race_id) {
+              console.error('Race ID is missing for entry:', entry);
+              continue;
+            }
+            console.log(`Updating race result for race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${entry.races[i]}`);
+            await window.electron.sqlite.heatRaceDB.updateRaceResult(
+              race_id,
+              entry.boat_id,
+              entry.races[i],
+              false, // Disable shift positions for inline edit
+            );
+          }
+        }
+      }
+
+      // Refresh the leaderboard with the updated data after saving
+      const results = finalSeriesStarted
+        ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
+        : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
+
+      const leaderboardWithRaces = results.map((entry) => ({
+        ...entry,
+        races: entry.race_positions ? entry.race_positions.split(',') : [],
+        race_ids: entry.race_ids ? entry.race_ids.split(',') : [], // Ensure race_ids are included
+      }));
+
+      leaderboardWithRaces.sort((a, b) =>
+        finalSeriesStarted
+          ? a.total_points_final - b.total_points_final
+          : a.total_points_event - b.total_points_event,
       );
-      setEditingEntry(null);
-      setNewPosition('');
-      setShiftPositions(false);
+
+      setLeaderboard(leaderboardWithRaces);
+      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
+      setEditMode(false); // Exit edit mode after saving
+    } catch (error) {
+      console.error('Error saving leaderboard:', error.message);
     }
   };
+
 
   if (loading) {
     return <div>Loading...</div>;
@@ -123,43 +156,41 @@ function LeaderboardComponent({ eventId }) {
     return <div>No results available for this event.</div>;
   }
 
-  const groupedLeaderboard = leaderboard.reduce((acc, entry) => {
+  const groupedLeaderboard = editableLeaderboard?.reduce((acc, entry) => {
     const group = entry.placement_group || 'General';
     if (!acc[group]) {
       acc[group] = [];
     }
     acc[group].push(entry);
     return acc;
-  }, {});
+  }, {}) || {};
 
   const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
-  const sortedGroups = Object.keys(groupedLeaderboard).sort((a, b) => {
-    return groupOrder.indexOf(a) - groupOrder.indexOf(b);
-  });
+  const sortedGroups = Object.keys(groupedLeaderboard).sort(
+    (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
+  );
 
   const exportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Leaderboard');
 
-    // Add header row
     const header = [
       'Rank',
       'Name',
       'Country',
       'Boat Number',
       'Boat Type',
-      ...leaderboard[0].races.map((_, index) => `Race ${index + 1}`),
+      ...leaderboard[0]?.races?.map((_, index) => `Race ${index + 1}`) || [],
       'Total Points',
     ];
     worksheet.addRow(header);
 
-    // Add data rows
     if (finalSeriesStarted) {
       sortedGroups.forEach((group) => {
         const groupHeader = [`${group} Group`];
         worksheet.addRow(groupHeader);
 
-        groupedLeaderboard[group].forEach((entry, index) => {
+        groupedLeaderboard[group]?.forEach((entry, index) => {
           const row = [
             index + 1,
             `${entry.name} ${entry.surname}`,
@@ -187,7 +218,6 @@ function LeaderboardComponent({ eventId }) {
       });
     }
 
-    // Generate Excel file and trigger download
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -201,6 +231,16 @@ function LeaderboardComponent({ eventId }) {
       <button type="button" onClick={exportToExcel}>
         Export to Excel
       </button>
+      <div>
+        <button onClick={toggleEditMode}>
+          {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}
+        </button>
+        {editMode && (
+          <button onClick={handleSave} style={{ marginLeft: '10px' }}>
+            Save Changes
+          </button>
+        )}
+      </div>
       {sortedGroups.map((group) => (
         <div key={`group-${group}`}>
           <h3>{group} Group</h3>
@@ -212,15 +252,14 @@ function LeaderboardComponent({ eventId }) {
                 <th>Country</th>
                 <th>Boat Number</th>
                 <th>Boat Type</th>
-                {leaderboard[0].races.map((race, index) => (
+                {leaderboard[0]?.races?.map((_, index) => (
                   <th key={`header-race-${index}`}>Race {index + 1}</th>
-                ))}
-
+                )) || []}
                 <th>Total Points</th>
               </tr>
             </thead>
             <tbody>
-              {groupedLeaderboard[group].map((entry, index) => (
+              {groupedLeaderboard[group]?.map((entry, index) => (
                 <tr key={`boat-${entry.boat_id}-${index}`}>
                   <td>{index + 1}</td>
                   <td>
@@ -235,52 +274,32 @@ function LeaderboardComponent({ eventId }) {
                   </td>
                   <td>{entry.boat_number}</td>
                   <td>{entry.boat_type}</td>
-
-                  {entry.races.map((race, raceIndex) => (
-                    <td key={`entry-race-${entry.boat_id}-${raceIndex}`}>
-                      {race}
-                    </td>
-                  ))}
+                  {entry.races?.map((race, raceIndex) => (
+  <td
+    key={`entry-race-${entry.boat_id}-${raceIndex}`}
+    style={{
+      cursor: editMode ? 'pointer' : 'default',
+      backgroundColor: editMode ? '#f9f9f9' : 'transparent',
+    }}
+  >
+    {editMode ? (
+      <input
+        type="number"
+        value={race}
+        onChange={(e) =>
+          handleRaceChange(entry.boat_id, raceIndex, e.target.value)
+        }
+        style={{ width: '50px' }}
+      />
+    ) : (
+      race
+    )}
+  </td>
+))}
                   <td>
                     {finalSeriesStarted
                       ? entry.total_points_final
                       : entry.total_points_event}
-                  </td>
-                  <td>
-                    {editingEntry && editingEntry.boat_id === entry.boat_id ? (
-                      <>
-                        <input
-                          type="number"
-                          value={newPosition}
-                          onChange={(e) => setNewPosition(e.target.value)}
-                        />
-                        <label htmlFor="shift-positions-checkbox">
-                          Shift positions?
-                        </label>
-                        <input
-                          id="shift-positions-checkbox"
-                          type="checkbox"
-                          checked={shiftPositions}
-                          onChange={(e) => setShiftPositions(e.target.checked)}
-                        />
-                        <button type="button" onClick={handleSaveResult}>
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingEntry(null)}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleEditResult(entry)}
-                      >
-                        Edit Result
-                      </button>
-                    )}
                   </td>
                 </tr>
               ))}

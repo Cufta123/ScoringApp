@@ -448,18 +448,22 @@ const electronHandler = {
         }
       },
       async updateRaceResult(
+        event_id: string,
         race_id: string,
         boat_id: string,
         new_position: string,
         shift_positions: boolean,
+        heat_id: string
       ) {
         try {
           return await ipcRenderer.invoke(
             'updateRaceResult',
+            event_id,
             race_id,
             boat_id,
             new_position,
             shift_positions,
+            heat_id
           );
         } catch (error) {
           console.error('Error invoking updateRaceResult IPC:', error);

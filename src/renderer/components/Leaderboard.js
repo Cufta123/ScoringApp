@@ -13,6 +13,8 @@ function LeaderboardComponent({ eventId }) {
   const [newValue, setNewValue] = useState(''); // Stores the new value for the cell being edited
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
+  const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
+
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -73,21 +75,57 @@ function LeaderboardComponent({ eventId }) {
     setEditMode(!editMode);
   };
 
-  const handleRaceChange = (boatId, raceIndex, value) => {
-    if (!isNaN(value) && value >= 0) {
-      const updatedLeaderboard = editableLeaderboard.map((entry) =>
-        entry.boat_id === boatId
-          ? {
-              ...entry,
-              races: entry.races.map((race, index) =>
-                index === raceIndex ? value : race
-              ),
-              total_points_event: entry.races.reduce((acc, race, index) => acc + (index === raceIndex ? parseInt(value, 10) : parseInt(race, 10)), 0),
-              total_points_final: entry.races.reduce((acc, race, index) => acc + (index === raceIndex ? parseInt(value, 10) : parseInt(race, 10)), 0),
-            }
-          : entry
-      );
-      setEditableLeaderboard(updatedLeaderboard);
+  const handleRaceChange = (boatId, raceIndex, newValue) => {
+    if (!isNaN(newValue) && newValue >= 0) {
+      const updatedLeaderboard = editableLeaderboard.map((entry) => {
+        if (entry.boat_id === boatId) {
+          const oldPosition = parseInt(entry.races[raceIndex], 10);
+          const newPosition = parseInt(newValue, 10);
+          const heatId = entry.heat_ids && entry.heat_ids[raceIndex] ? entry.heat_ids[raceIndex] : null;
+
+          // Update the position of the selected boat
+          entry.races[raceIndex] = newPosition;
+
+          if (shiftPositions) {
+            // Shift positions of other boats in the same race within the same heat
+            editableLeaderboard.forEach((otherEntry) => {
+              if (otherEntry.boat_id !== boatId && otherEntry.races[raceIndex] !== undefined) {
+                const otherPosition = parseInt(otherEntry.races[raceIndex], 10);
+                if (oldPosition > newPosition && otherPosition >= newPosition && otherPosition < oldPosition) {
+                  otherEntry.races[raceIndex] = otherPosition + 1;
+                } else if (oldPosition < newPosition && otherPosition <= newPosition && otherPosition > oldPosition) {
+                  otherEntry.races[raceIndex] = otherPosition - 1;
+                }
+              }
+            });
+          }
+
+          const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+          const totalPointsFinal = totalPointsEvent;
+
+          return {
+            ...entry,
+            total_points_event: totalPointsEvent,
+            total_points_final: totalPointsFinal,
+            heat_id: heatId, // Include heat_id in the entry
+          };
+        }
+        return entry;
+      });
+
+      // Recalculate total points for all boats after shifting positions
+      const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
+        const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+        const totalPointsFinal = totalPointsEvent;
+
+        return {
+          ...entry,
+          total_points_event: totalPointsEvent,
+          total_points_final: totalPointsFinal,
+        };
+      });
+
+      setEditableLeaderboard(recalculatedLeaderboard);
     }
   };
   const handleSave = async () => {
@@ -119,6 +157,7 @@ function LeaderboardComponent({ eventId }) {
         for (let i = 0; i < entry.races.length; i++) {
           if (entry.races[i] !== originalEntry.races[i]) {
             const race_id = entry.race_ids[i]; // Get the correct race_id
+            const heat_id = entry.heat_id; // Get the heat_id
             if (!race_id) {
               console.error('Race ID is missing for entry:', entry);
               continue;
@@ -130,7 +169,8 @@ function LeaderboardComponent({ eventId }) {
               race_id,
               entry.boat_id,
               newPosition, // Pass new_position as a number
-              false, // Disable shift positions for inline edit
+              shiftPositions, // Use the checkbox state to determine if positions should be shifted
+              heat_id // Pass heat_id
             );
           }
         }
@@ -156,9 +196,9 @@ function LeaderboardComponent({ eventId }) {
       setLeaderboard(leaderboardWithRaces);
       setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
       setEditMode(false); // Exit edit mode after saving
-      } catch (error) {
-        console.error('Error saving leaderboard:', error.message);
-      }
+    } catch (error) {
+      console.error('Error saving leaderboard:', error.message);
+    }
   };
 
 
@@ -251,9 +291,19 @@ function LeaderboardComponent({ eventId }) {
           {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}
         </button>
         {editMode && (
-          <button onClick={handleSave} style={{ marginLeft: '10px' }}>
-            Save Changes
-          </button>
+  <div>
+    <button onClick={handleSave} style={{ marginLeft: '10px' }}>
+      Save Changes
+    </button>
+    <label style={{ marginLeft: '10px' }}>
+      <input
+        type="checkbox"
+        checked={shiftPositions}
+        onChange={(e) => setShiftPositions(e.target.checked)}
+      />
+      Shift positions of other boats
+    </label>
+  </div>
         )}
       </div>
       {sortedGroups.map((group) => (

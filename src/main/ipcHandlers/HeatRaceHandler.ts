@@ -399,10 +399,9 @@ ipcMain.handle(
   },
 );
 
-
 ipcMain.handle(
   'updateRaceResult',
-  async (event, event_id, race_id, boat_id, new_position, shift_positions) => {
+  async (event, event_id, race_id, boat_id, new_position, shift_positions, heat_id) => {
     try {
       console.log(`Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}`);
 
@@ -428,13 +427,20 @@ ipcMain.handle(
 
       // Step 3: Optionally shift positions if needed
       if (shift_positions) {
-        const shiftQuery = db.prepare(
-          `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND boat_id != ?`
-        );
-        shiftQuery.run(race_id, new_position, boat_id);
+        if (currentPosition > new_position) {
+          // Boat moved up, shift others down
+          const shiftQuery = db.prepare(
+            `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND position < ? AND boat_id != ?`
+          );
+          shiftQuery.run(race_id, new_position, currentPosition, boat_id);
+        } else if (currentPosition < new_position) {
+          // Boat moved down, shift others up
+          const shiftQuery = db.prepare(
+            `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position <= ? AND position > ? AND boat_id != ?`
+          );
+          shiftQuery.run(race_id, new_position, currentPosition, boat_id);
+        }
       }
-
-      console.log(`Updated race result for boat ID ${boat_id} in race ID ${race_id}.`);
 
       // Step 4: Recalculate the total points for the affected boat
       // Get all races for this boat in the event

@@ -168,14 +168,13 @@ ipcMain.handle(
     }
   },
 );
-
 ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
   if (isEventLocked(event_id)) {
     throw new Error('Cannot insert heat for locked event.');
   }
   try {
     const query = `
-      SELECT boat_id, SUM(points) as total_points_event
+      SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
       JOIN Heats ON Races.heat_id = Heats.heat_id
@@ -192,8 +191,39 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
     );
 
-    results.forEach((result: { boat_id: any; total_points_event: any }) => {
-      updateQuery.run(result.boat_id, result.total_points_event, event_id);
+    results.forEach((result: { boat_id: any; total_points_event: any; number_of_races: any }) => {
+      const { boat_id, number_of_races } = result;
+
+      // Fetch all scores for the boat
+      const scoresQuery = db.prepare(`
+        SELECT points
+        FROM Scores
+        JOIN Races ON Scores.race_id = Races.race_id
+        JOIN Heats ON Races.heat_id = Heats.heat_id
+        WHERE Heats.event_id = ? AND Scores.boat_id = ?
+        ORDER BY points DESC
+      `);
+      const scores = scoresQuery.all(event_id, boat_id).map((row: { points: any; }) => row.points);
+
+      // Determine the number of scores to exclude
+      let excludeCount = 0;
+      if (number_of_races >= 4) {
+        excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
+      }
+      console.log(`Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Places to Exclude: ${excludeCount}`);
+
+      // Exclude the worst scores
+      const initialTotalPoints = scores.reduce((acc: any, score: any) => acc + score, 0);
+      const worstPlaces = scores.slice(0, excludeCount);
+      const scoresToInclude = scores.slice(excludeCount);
+      const totalPoints = scoresToInclude.reduce((acc: any, score: any) => acc + score, 0);
+      console.log(`Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Worst Places: ${worstPlaces}`);
+
+
+      console.log(`Boat ID: ${boat_id}, Total Points After Exclusion: ${totalPoints}`);
+
+      // Update the leaderboard with the calculated total points
+      updateQuery.run(boat_id, totalPoints, event_id);
     });
 
     console.log('Event leaderboard updated successfully.');

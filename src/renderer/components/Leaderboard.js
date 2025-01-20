@@ -36,36 +36,73 @@ function LeaderboardComponent({ eventId }) {
     return iocToFlagCodeMap[iocCode] || iocCode;
   };
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const results = finalSeriesStarted
-          ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
-          : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const results = finalSeriesStarted
+        ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
+        : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
 
-        const leaderboardWithRaces = results.map((entry) => ({
+      console.log('Fetched results:', results);
+
+      const leaderboardWithRaces = results.map((entry) => {
+        const races = entry.race_positions ? entry.race_positions.split(',') : [];
+        const race_ids = entry.race_ids ? entry.race_ids.split(',') : [];
+
+        // Calculate the number of worst places to exclude
+        const number_of_races = races.length;
+        let excludeCount = 0;
+        if (number_of_races >= 4) {
+          excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
+        }
+
+        // Sort races in descending order to find the worst places
+        const sortedRaces = [...races].map(r => parseInt(r)).sort((a, b) => b - a);
+        const worstPlaces = sortedRaces.slice(0, excludeCount);
+
+        // Mark the worst places with parentheses
+        let excludeCounter = 0;
+        const markedRaces = races.map((race) => {
+          const raceInt = parseInt(race);
+          if (worstPlaces.includes(raceInt) && excludeCounter < excludeCount) {
+            excludeCounter++;
+            worstPlaces.splice(worstPlaces.indexOf(raceInt), 1); // Remove the marked race from worstPlaces
+            return `(${race})`;
+          }
+          return race;
+        });
+
+        return {
           ...entry,
-          races: entry.race_positions ? entry.race_positions.split(',') : [],
-          race_ids: entry.race_ids ? entry.race_ids.split(',') : [], // Ensure race_ids are included
-        }));
+          races: markedRaces,
+          race_ids: race_ids, // Ensure race_ids are included
+        };
+      });
 
-        leaderboardWithRaces.sort((a, b) =>
-          finalSeriesStarted
-            ? a.total_points_final - b.total_points_final
-            : a.total_points_event - b.total_points_event,
-        );
+      leaderboardWithRaces.sort((a, b) =>
+        finalSeriesStarted
+          ? a.total_points_final - b.total_points_final
+          : a.total_points_event - b.total_points_event,
+      );
 
-        setLeaderboard(leaderboardWithRaces);
-        setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
+      setLeaderboard(leaderboardWithRaces);
+      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error.message);
+    } finally {
+      setLoading(false);
+    }
   }, [eventId, finalSeriesStarted]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+
+
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   const toggleEditMode = () => {
     if (editMode) {
@@ -74,6 +111,7 @@ function LeaderboardComponent({ eventId }) {
     }
     setEditMode(!editMode);
   };
+
 
   const handleRaceChange = (boatId, raceIndex, newValue) => {
     if (!isNaN(newValue) && newValue >= 0) {
@@ -350,7 +388,7 @@ function LeaderboardComponent({ eventId }) {
     {editMode ? (
       <input
         type="number"
-        value={race}
+        value={race.replace(/[()]/g, '')} // Remove parentheses for editing
         onChange={(e) =>
           handleRaceChange(entry.boat_id, raceIndex, e.target.value)
         }

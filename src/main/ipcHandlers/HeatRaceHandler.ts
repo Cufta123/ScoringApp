@@ -191,11 +191,16 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
     );
 
-    results.forEach((result: { boat_id: any; total_points_event: any; number_of_races: any }) => {
-      const { boat_id, number_of_races } = result;
+    results.forEach(
+      (result: {
+        boat_id: any;
+        total_points_event: any;
+        number_of_races: any;
+      }) => {
+        const { boat_id, number_of_races } = result;
 
-      // Fetch all scores for the boat
-      const scoresQuery = db.prepare(`
+        // Fetch all scores for the boat
+        const scoresQuery = db.prepare(`
         SELECT points
         FROM Scores
         JOIN Races ON Scores.race_id = Races.race_id
@@ -203,28 +208,43 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
         WHERE Heats.event_id = ? AND Scores.boat_id = ?
         ORDER BY points DESC
       `);
-      const scores = scoresQuery.all(event_id, boat_id).map((row: { points: any; }) => row.points);
+        const scores = scoresQuery
+          .all(event_id, boat_id)
+          .map((row: { points: any }) => row.points);
 
-      // Determine the number of scores to exclude
-      let excludeCount = 0;
-      if (number_of_races >= 4) {
-        excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
-      }
-      console.log(`Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Places to Exclude: ${excludeCount}`);
+        // Determine the number of scores to exclude
+        let excludeCount = 0;
+        const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+        excludeCount = thresholds.filter(
+          (threshold) => number_of_races >= threshold,
+        ).length;
+        console.log(
+          `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Places to Exclude: ${excludeCount}`,
+        );
 
-      // Exclude the worst scores
-      const initialTotalPoints = scores.reduce((acc: any, score: any) => acc + score, 0);
-      const worstPlaces = scores.slice(0, excludeCount);
-      const scoresToInclude = scores.slice(excludeCount);
-      const totalPoints = scoresToInclude.reduce((acc: any, score: any) => acc + score, 0);
-      console.log(`Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Worst Places: ${worstPlaces}`);
+        // Exclude the worst scores
+        const initialTotalPoints = scores.reduce(
+          (acc: any, score: any) => acc + score,
+          0,
+        );
+        const worstPlaces = scores.slice(0, excludeCount);
+        const scoresToInclude = scores.slice(excludeCount);
+        const totalPoints = scoresToInclude.reduce(
+          (acc: any, score: any) => acc + score,
+          0,
+        );
+        console.log(
+          `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Worst Places: ${worstPlaces}`,
+        );
 
+        console.log(
+          `Boat ID: ${boat_id}, Total Points After Exclusion: ${totalPoints}`,
+        );
 
-      console.log(`Boat ID: ${boat_id}, Total Points After Exclusion: ${totalPoints}`);
-
-      // Update the leaderboard with the calculated total points
-      updateQuery.run(boat_id, totalPoints, event_id);
-    });
+        // Update the leaderboard with the calculated total points
+        updateQuery.run(boat_id, totalPoints, event_id);
+      },
+    );
 
     console.log('Event leaderboard updated successfully.');
     return { success: true };
@@ -431,9 +451,11 @@ ipcMain.handle(
 
 ipcMain.handle(
   'updateRaceResult',
-  async (event, event_id, race_id, boat_id, new_position, shift_positions, heat_id) => {
+  async (event, event_id, race_id, boat_id, new_position, shift_positions) => {
     try {
-      console.log(`Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}`);
+      console.log(
+        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}`,
+      );
 
       // Step 1: Get the current race result
       const currentResult = db
@@ -443,7 +465,9 @@ ipcMain.handle(
         .get(race_id, boat_id);
 
       if (!currentResult) {
-        console.error(`Current result not found for race_id: ${race_id}, boat_id: ${boat_id}`);
+        console.error(
+          `Current result not found for race_id: ${race_id}, boat_id: ${boat_id}`,
+        );
         throw new Error('Current result not found.');
       }
 
@@ -460,13 +484,13 @@ ipcMain.handle(
         if (currentPosition > new_position) {
           // Boat moved up, shift others down
           const shiftQuery = db.prepare(
-            `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND position < ? AND boat_id != ?`
+            `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND position < ? AND boat_id != ?`,
           );
           shiftQuery.run(race_id, new_position, currentPosition, boat_id);
         } else if (currentPosition < new_position) {
           // Boat moved down, shift others up
           const shiftQuery = db.prepare(
-            `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position <= ? AND position > ? AND boat_id != ?`
+            `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position <= ? AND position > ? AND boat_id != ?`,
           );
           shiftQuery.run(race_id, new_position, currentPosition, boat_id);
         }
@@ -480,7 +504,10 @@ ipcMain.handle(
         )
         .all(boat_id, event_id);
 
-      const totalPointsEvent = races.reduce((acc: any, race: { position: any; }) => acc + race.position, 0);
+      const totalPointsEvent = races.reduce(
+        (acc: any, race: { position: any }) => acc + race.position,
+        0,
+      );
 
       // Step 5: Update the total points in the Leaderboard (or FinalLeaderboard) table
       const leaderboardUpdateQuery = db.prepare(

@@ -80,9 +80,41 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
       const leaderboard =
         await window.electron.sqlite.heatRaceDB.readLeaderboard(event.event_id);
 
+      // Fetch race scores for each boat
+      const boatScores = await Promise.all(
+        leaderboard.map(async (boat) => {
+          const scores = await window.electron.sqlite.heatRaceDB.readAllScores(
+            boat.boat_id,
+          );
+          return {
+            boat_id: boat.boat_id,
+            scores: scores.map((score) => score.position).sort((a, b) => a - b),
+          };
+        }),
+      );
+      // Adjust scores by excluding the second worst score if applicable
+      const adjustedLeaderboard = boatScores.map((boat) => {
+        const { scores } = boat;
+        let totalPoints = scores.reduce((acc, score) => acc + score, 0);
+
+        if (scores.length > 5 && scores.length < 8) {
+          // Exclude the second worst score
+          totalPoints -= scores[scores.length - 2];
+        }
+
+        return {
+          boat_id: boat.boat_id,
+          totalPoints,
+        };
+      });
+
+      // Sort boats by adjusted total points
+      adjustedLeaderboard.sort((a, b) => a.totalPoints - b.totalPoints);
       // Determine fleet sizes
-      const boatsPerFleet = Math.floor(leaderboard.length / numFinalHeats);
-      const extraBoats = leaderboard.length % numFinalHeats;
+      const boatsPerFleet = Math.floor(
+        adjustedLeaderboard.length / numFinalHeats,
+      );
+      const extraBoats = adjustedLeaderboard.length % numFinalHeats;
 
       const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
       const fleetPromises = [];

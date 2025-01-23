@@ -3,6 +3,7 @@ import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
+import Navbar from '../../components/Navbar';
 import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
 import LeaderboardComponent from '../../components/Leaderboard';
@@ -237,22 +238,14 @@ function EventPage() {
 
   return (
     <div>
-      <div className="button-container">
-        <button type="button" onClick={handleBackClick}>
-          Back to Landing Page
-        </button>
-        {!isEventLocked && (
-          <button type="button" onClick={handleHeatRaceClick}>
-            Go to scoring
-          </button>
-        )}
-      </div>
+      <Navbar
+        onOpenLeaderboard={handleOpenLeaderboard}
+        isEventLocked={isEventLocked}
+        onHeatRaceClick={handleHeatRaceClick}
+      />
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>
-      <button type="button" onClick={handleOpenLeaderboard}>
-        Open Leaderboard
-      </button>
       {raceHappened || isEventLocked ? (
         <div className="warning">
           <p>

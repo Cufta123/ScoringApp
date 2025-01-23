@@ -612,12 +612,11 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
     );
-
     results.forEach(
       (result: {
+        heat_name: string;
         boat_id: any;
         total_points_final: any;
-        heat_name: string;
       }) => {
         const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
         updateQuery.run(
@@ -625,6 +624,28 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
           result.total_points_final,
           event_id,
           placementGroup,
+        );
+      },
+    );
+    // Calculate overall series score
+    const overallQuery = `
+    SELECT fl.boat_id, fl.total_points_final + lb.total_points_event as overall_series_score, fl.placement_group
+    FROM FinalLeaderboard fl
+    JOIN Leaderboard lb ON fl.boat_id = lb.boat_id
+    WHERE fl.event_id = ? AND lb.event_id = ?
+  `;
+    const overallResults = db.prepare(overallQuery).all(event_id, event_id);
+
+    const updateOverallQuery = db.prepare(
+      `UPDATE FinalLeaderboard SET overall_series_score = ? WHERE boat_id = ? AND event_id = ?`,
+    );
+
+    overallResults.forEach(
+      (result: { overall_series_score: any; boat_id: any }) => {
+        updateOverallQuery.run(
+          result.overall_series_score,
+          result.boat_id,
+          event_id,
         );
       },
     );

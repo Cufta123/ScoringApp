@@ -306,7 +306,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
   try {
     // Read the current leaderboard for the specific event
     const leaderboardQuery = `
-      SELECT boat_id
+       SELECT boat_id, total_points_event
       FROM Leaderboard
       WHERE event_id = ?
       ORDER BY total_points_event ASC
@@ -385,6 +385,92 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
       (base) => `Heat ${base}${latestHeats[base].suffix + 1}`,
     );
 
+    console.log('Before tie braking logic:', leaderboardResults);
+// Implement tie-breaking logic
+const tiedBoats = leaderboardResults.filter((boat: { total_points_event: any; }, index: number, array: { total_points_event: any; }[]) => {
+  return (
+    index > 0 &&
+    boat.total_points_event === array[index - 1].total_points_event
+  );
+});
+
+    tiedBoats.forEach((boat: { total_points_event: any; boat_id: any; }, index: number, array: any[]) => {
+      const previousBoat = array[index - 1];
+      if (previousBoat && boat.total_points_event === previousBoat.total_points_event) {
+        // Fetch races where the tied boats competed in the same heat
+        const racesQuery = db.prepare(`
+          SELECT r.race_id, sc.position, h.heat_name
+          FROM Scores sc
+          JOIN Races r ON sc.race_id = r.race_id
+          JOIN Heats h ON r.heat_id = h.heat_id
+          WHERE h.event_id = ? AND sc.boat_id = ?
+          ORDER BY r.race_number
+        `);
+        const boatRaces = racesQuery.all(event_id, boat.boat_id);
+        const previousBoatRaces = racesQuery.all(event_id, previousBoat.boat_id);
+
+        // Find common heats
+        const commonHeats = boatRaces.filter((boatRace: { heat_name: any; }) =>
+          previousBoatRaces.some((prevBoatRace: { heat_name: any; }) => prevBoatRace.heat_name === boatRace.heat_name)
+        ).map((boatRace: { heat_name: any; race_id: any; position: any; }) => {
+          const prevBoatRace = previousBoatRaces.find((prevBoatRace: { heat_name: any; }) => prevBoatRace.heat_name === boatRace.heat_name);
+          return {
+            race_id: boatRace.race_id,
+            heat_name: boatRace.heat_name,
+            boat_position: boatRace.position,
+            previous_boat_position: prevBoatRace ? prevBoatRace.position : null
+          };
+        });
+
+             // Log the common heats for debugging
+             console.log(`Tied boats: ${boat.boat_id} and ${previousBoat.boat_id}`);
+             console.log(`Total points: ${boat.total_points_event} and ${previousBoat.total_points_event}`);
+             console.log('Common heats:', commonHeats);
+
+// Apply tie-breaking rules
+if (commonHeats.length > 0) {
+  // Use only scores from common heats
+  const boatScores = commonHeats.map((heat: { boat_position: any; }) => heat.boat_position);
+  const previousBoatScores = commonHeats.map((heat: { previous_boat_position: any; }) => heat.previous_boat_position);
+
+  // Compare scores to break the tie
+  let boatWins = 0;
+  let previousBoatWins = 0;
+
+  for (let i = 0; i < boatScores.length; i++) {
+    console.log(`Comparing scores for heat ${commonHeats[i].heat_name}: Boat ${boat.boat_id} position ${boatScores[i]} vs Boat ${previousBoat.boat_id} position ${previousBoatScores[i]}`);
+    if (boatScores[i] < previousBoatScores[i]) {
+      // Boat wins this heat
+      console.log(`Boat ${boat.boat_id} wins the heat ${commonHeats[i].heat_name} over Boat ${previousBoat.boat_id}`);
+      boatWins++;
+    } else if (boatScores[i] > previousBoatScores[i]) {
+      // Previous boat wins this heat
+      console.log(`Boat ${previousBoat.boat_id} wins the heat ${commonHeats[i].heat_name} over Boat ${boat.boat_id}`);
+      previousBoatWins++;
+    }
+  }
+
+  // Determine the overall winner based on the majority of better positions
+  if (boatWins > previousBoatWins) {
+    console.log(`Boat ${boat.boat_id} wins the tie over Boat ${previousBoat.boat_id} with ${boatWins} to ${previousBoatWins}`);
+  } else if (previousBoatWins > boatWins) {
+    console.log(`Boat ${previousBoat.boat_id} wins the tie over Boat ${boat.boat_id} with ${previousBoatWins} to ${boatWins}`);
+    [array[index - 1], array[index]] = [array[index], array[index - 1]];
+  } else {
+    console.log(`Tie remains unresolved between Boat ${boat.boat_id} and Boat ${previousBoat.boat_id} after comparing all common heats.`);
+  }
+} else {
+  // Use RRS 8.1 and 8.2 without modification
+  // This part is already handled by the existing logic
+  console.log(`No common heats found for boats ${boat.boat_id} and ${previousBoat.boat_id}. Using RRS 8.1 and 8.2 without modification.`);
+}
+           }
+         });
+         // Log after applying tie-breaking rules
+console.log('After applying tie-breaking rules:', leaderboardResults);
+         leaderboardResults.sort((a: { total_points_event: number; }, b: { total_points_event: number; }) => a.total_points_event - b.total_points_event);
+// Log after sorting the leaderboard results
+console.log('After sorting leaderboard results:', leaderboardResults);
     // Create new heats and assign boats to them
     for (let i = 0; i < nextHeatNames.length; i += 1) {
       const heatName = nextHeatNames[i];

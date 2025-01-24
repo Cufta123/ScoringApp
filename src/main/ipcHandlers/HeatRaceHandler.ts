@@ -61,7 +61,7 @@ ipcMain.handle('deleteHeatsByEvent', async (event, event_id) => {
       )
       .run(event_id);
     console.log(
-      `Deleted ${result.changes} row(s) from HeatBoats for event ID ${event_id}.`,
+      `Deleted ${result.changes} row(s) from Heat_Boat for event ID ${event_id}.`,
     );
 
     const resultHeats = db
@@ -521,6 +521,8 @@ ipcMain.handle(
       );
       finalLeaderboardUpdateQuery.run(totalPointsEvent, boat_id, event_id);
 
+      // Call updateEventLeaderboard to recalculate scores and exclude the worst ones
+
       return { success: true };
     } catch (err) {
       console.error('Error updating race result:', (err as Error).message);
@@ -613,15 +615,29 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
     );
 
-    results.forEach((result: { heat_name: string; boat_id: any; total_points_final: any; }) => {
-      const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
-      updateQuery.run(result.boat_id, result.total_points_final, event_id, placementGroup);
-    });
+    results.forEach(
+      (result: {
+        heat_name: string;
+        boat_id: any;
+        total_points_final: any;
+      }) => {
+        const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
+        updateQuery.run(
+          result.boat_id,
+          result.total_points_final,
+          event_id,
+          placementGroup,
+        );
+      },
+    );
 
     console.log('Final leaderboard updated successfully.');
     return { success: true };
   } catch (error) {
-    console.error('Error updating final leaderboard:', (error as Error).message);
+    console.error(
+      'Error updating final leaderboard:',
+      (error as Error).message,
+    );
     throw error;
   }
 });

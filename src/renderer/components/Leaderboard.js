@@ -15,7 +15,6 @@ function LeaderboardComponent({ eventId }) {
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
 
-
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
       const heats =
@@ -41,14 +40,13 @@ function LeaderboardComponent({ eventId }) {
     try {
       const [finalResults, eventResults] = await Promise.all([
         window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId),
-        window.electron.sqlite.heatRaceDB.readLeaderboard(eventId)
+        window.electron.sqlite.heatRaceDB.readLeaderboard(eventId),
       ]);
       const results = finalSeriesStarted
         ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
         : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
 
       console.log('Fetched results:', results);
-
 
       const leaderboardWithRaces = results.map((entry) => {
         const races = entry.race_positions
@@ -64,7 +62,9 @@ function LeaderboardComponent({ eventId }) {
         }
 
         // Sort races in descending order to find the worst places
-        const sortedRaces = [...races].map(r => parseInt(r)).sort((a, b) => b - a);
+        const sortedRaces = [...races]
+          .map((r) => parseInt(r))
+          .sort((a, b) => b - a);
         const worstPlaces = sortedRaces.slice(0, excludeCount);
 
         // Mark the worst places with parentheses
@@ -86,23 +86,35 @@ function LeaderboardComponent({ eventId }) {
         };
       });
 
-
-      const combinedResults = finalResults.map(finalResult => {
-        const eventResult = eventResults.find(eventResult => eventResult.boat_id === finalResult.boat_id);
+      const combinedResults = finalResults.map((finalResult) => {
+        const eventResult = eventResults.find(
+          (eventResult) => eventResult.boat_id === finalResult.boat_id,
+        );
         const total_points_final = finalResult.total_points_final || 0;
-        const total_points_event = eventResult ? eventResult.total_points_event || 0 : 0;
+        const total_points_event = eventResult
+          ? eventResult.total_points_event || 0
+          : 0;
         const total_points_combined = total_points_final + total_points_event;
         return {
           ...finalResult,
-          races: finalResult.race_positions ? finalResult.race_positions.split(',') : [],
+          races: finalResult.race_positions
+            ? finalResult.race_positions.split(',')
+            : [],
           race_ids: finalResult.race_ids ? finalResult.race_ids.split(',') : [],
           total_points_combined,
         };
       });
 
-      const mergedResults = leaderboardWithRaces.map(entry => {
-        const combinedEntry = combinedResults.find(combined => combined.boat_id === entry.boat_id);
-        return combinedEntry ? { ...entry, total_points_combined: combinedEntry.total_points_combined } : entry;
+      const mergedResults = leaderboardWithRaces.map((entry) => {
+        const combinedEntry = combinedResults.find(
+          (combined) => combined.boat_id === entry.boat_id,
+        );
+        return combinedEntry
+          ? {
+              ...entry,
+              total_points_combined: combinedEntry.total_points_combined,
+            }
+          : entry;
       });
 
       mergedResults.sort((a, b) =>
@@ -125,8 +137,6 @@ function LeaderboardComponent({ eventId }) {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
 
-
-
   const toggleEditMode = () => {
     if (editMode) {
       // Discard changes if exiting edit mode
@@ -135,14 +145,16 @@ function LeaderboardComponent({ eventId }) {
     setEditMode(!editMode);
   };
 
-
   const handleRaceChange = (boatId, raceIndex, newValue) => {
     if (!isNaN(newValue) && newValue >= 0) {
       const updatedLeaderboard = editableLeaderboard.map((entry) => {
         if (entry.boat_id === boatId) {
           const oldPosition = parseInt(entry.races[raceIndex], 10);
           const newPosition = parseInt(newValue, 10);
-          const heatId = entry.heat_ids && entry.heat_ids[raceIndex] ? entry.heat_ids[raceIndex] : null;
+          const heatId =
+            entry.heat_ids && entry.heat_ids[raceIndex]
+              ? entry.heat_ids[raceIndex]
+              : null;
 
           // Update the position of the selected boat
           entry.races[raceIndex] = newPosition;
@@ -150,18 +162,32 @@ function LeaderboardComponent({ eventId }) {
           if (shiftPositions) {
             // Shift positions of other boats in the same race within the same heat
             editableLeaderboard.forEach((otherEntry) => {
-              if (otherEntry.boat_id !== boatId && otherEntry.races[raceIndex] !== undefined) {
+              if (
+                otherEntry.boat_id !== boatId &&
+                otherEntry.races[raceIndex] !== undefined
+              ) {
                 const otherPosition = parseInt(otherEntry.races[raceIndex], 10);
-                if (oldPosition > newPosition && otherPosition >= newPosition && otherPosition < oldPosition) {
+                if (
+                  oldPosition > newPosition &&
+                  otherPosition >= newPosition &&
+                  otherPosition < oldPosition
+                ) {
                   otherEntry.races[raceIndex] = otherPosition + 1;
-                } else if (oldPosition < newPosition && otherPosition <= newPosition && otherPosition > oldPosition) {
+                } else if (
+                  oldPosition < newPosition &&
+                  otherPosition <= newPosition &&
+                  otherPosition > oldPosition
+                ) {
                   otherEntry.races[raceIndex] = otherPosition - 1;
                 }
               }
             });
           }
 
-          const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+          const totalPointsEvent = entry.races.reduce(
+            (acc, race) => acc + parseInt(race, 10),
+            0,
+          );
           const totalPointsFinal = totalPointsEvent;
 
           return {
@@ -176,7 +202,10 @@ function LeaderboardComponent({ eventId }) {
 
       // Recalculate total points for all boats after shifting positions
       const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
-        const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+        const totalPointsEvent = entry.races.reduce(
+          (acc, race) => acc + parseInt(race, 10),
+          0,
+        );
         const totalPointsFinal = totalPointsEvent;
 
         return {
@@ -199,7 +228,10 @@ function LeaderboardComponent({ eventId }) {
       // Recalculate total points before saving
       const updatedLeaderboard = editableLeaderboard.map((entry) => {
         // Calculate total points based on updated races
-        const totalPointsEvent = entry.races.reduce((acc, race) => acc + parseInt(race, 10), 0);
+        const totalPointsEvent = entry.races.reduce(
+          (acc, race) => acc + parseInt(race, 10),
+          0,
+        );
         const totalPointsFinal = totalPointsEvent; // Use the same logic for final points if needed
 
         return {
@@ -211,7 +243,9 @@ function LeaderboardComponent({ eventId }) {
 
       // Update changes to the database
       for (const entry of updatedLeaderboard) {
-        const originalEntry = leaderboard.find((e) => e.boat_id === entry.boat_id);
+        const originalEntry = leaderboard.find(
+          (e) => e.boat_id === entry.boat_id,
+        );
         if (!originalEntry) continue;
 
         // Save race data changes to the database
@@ -224,18 +258,22 @@ function LeaderboardComponent({ eventId }) {
               continue;
             }
             const newPosition = parseInt(entry.races[i], 10); // Ensure new_position is a number
-            console.log(`Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}`);
+            console.log(
+              `Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}`,
+            );
             await window.electron.sqlite.heatRaceDB.updateRaceResult(
               eventId, // Pass event_id
               race_id,
               entry.boat_id,
               newPosition, // Pass new_position as a number
               shiftPositions, // Use the checkbox state to determine if positions should be shifted
-              heat_id // Pass heat_id
+              heat_id, // Pass heat_id
             );
           }
         }
       }
+
+      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(eventId);
 
       // Refresh the leaderboard with the updated data after saving
       const results = finalSeriesStarted
@@ -262,8 +300,6 @@ function LeaderboardComponent({ eventId }) {
     }
   };
 
-
-
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -272,14 +308,15 @@ function LeaderboardComponent({ eventId }) {
     return <div>No results available for this event.</div>;
   }
 
-  const groupedLeaderboard = editableLeaderboard?.reduce((acc, entry) => {
-    const group = entry.placement_group || 'General';
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(entry);
-    return acc;
-  }, {}) || {};
+  const groupedLeaderboard =
+    editableLeaderboard?.reduce((acc, entry) => {
+      const group = entry.placement_group || 'General';
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push(entry);
+      return acc;
+    }, {}) || {};
 
   const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
   const sortedGroups = Object.keys(groupedLeaderboard).sort(
@@ -296,7 +333,7 @@ function LeaderboardComponent({ eventId }) {
       'Country',
       'Boat Number',
       'Boat Type',
-      ...leaderboard[0]?.races?.map((_, index) => `Race ${index + 1}`) || [],
+      ...(leaderboard[0]?.races?.map((_, index) => `Race ${index + 1}`) || []),
       'Total Points',
     ];
     worksheet.addRow(header);
@@ -352,19 +389,19 @@ function LeaderboardComponent({ eventId }) {
           {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}
         </button>
         {editMode && (
-  <div>
-    <button onClick={handleSave} style={{ marginLeft: '10px' }}>
-      Save Changes
-    </button>
-    <label style={{ marginLeft: '10px' }}>
-      <input
-        type="checkbox"
-        checked={shiftPositions}
-        onChange={(e) => setShiftPositions(e.target.checked)}
-      />
-      Shift positions of other boats
-    </label>
-  </div>
+          <div>
+            <button onClick={handleSave} style={{ marginLeft: '10px' }}>
+              Save Changes
+            </button>
+            <label style={{ marginLeft: '10px' }}>
+              <input
+                type="checkbox"
+                checked={shiftPositions}
+                onChange={(e) => setShiftPositions(e.target.checked)}
+              />
+              Shift positions of other boats
+            </label>
+          </div>
         )}
       </div>
       {sortedGroups.map((group) => (
@@ -401,32 +438,40 @@ function LeaderboardComponent({ eventId }) {
                   <td>{entry.boat_number}</td>
                   <td>{entry.boat_type}</td>
                   {entry.races?.map((race, raceIndex) => (
-  <td
-    key={`entry-race-${entry.boat_id}-${raceIndex}`}
-    style={{
-      cursor: editMode ? 'pointer' : 'default',
-      backgroundColor: editMode ? '#f9f9f9' : 'transparent',
-    }}
-  >
-    {editMode ? (
-      <input
-        type="number"
-        value={race.replace(/[()]/g, '')} // Remove parentheses for editing
-        onChange={(e) =>
-          handleRaceChange(entry.boat_id, raceIndex, e.target.value)
-        }
-        style={{ width: '50px' }}
-      />
-    ) : (
-      race
-    )}
-  </td>
-))}
-<td>
-  {finalSeriesStarted
-    ? entry.total_points_combined // Use total_points_combined when final series has started
-    : entry.total_points_event}
-</td>
+                    <td
+                      key={`entry-race-${entry.boat_id}-${raceIndex}`}
+                      style={{
+                        cursor: editMode ? 'pointer' : 'default',
+                        backgroundColor: editMode ? '#f9f9f9' : 'transparent',
+                      }}
+                    >
+                      {editMode ? (
+                        <input
+                          type="number"
+                          value={
+                            typeof race === 'string'
+                              ? race.replace(/[()]/g, '')
+                              : race
+                          } // Remove parentheses for editing
+                          onChange={(e) =>
+                            handleRaceChange(
+                              entry.boat_id,
+                              raceIndex,
+                              e.target.value,
+                            )
+                          }
+                          style={{ width: '50px' }}
+                        />
+                      ) : (
+                        race
+                      )}
+                    </td>
+                  ))}
+                  <td>
+                    {finalSeriesStarted
+                      ? entry.total_points_combined // Use total_points_combined when final series has started
+                      : entry.total_points_event}
+                  </td>
                 </tr>
               ))}
             </tbody>

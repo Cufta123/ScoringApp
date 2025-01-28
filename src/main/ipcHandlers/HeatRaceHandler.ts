@@ -11,6 +11,18 @@ const isEventLocked = (event_id: any) => {
   return result.is_locked === 1;
 };
 
+function getScores(event_id: any, boat_id: any) {
+  const scoresQuery = db.prepare(`
+    SELECT points
+    FROM Scores
+    JOIN Races ON Scores.race_id = Races.race_id
+    JOIN Heats ON Races.heat_id = Heats.heat_id
+    WHERE Heats.event_id = ? AND Scores.boat_id = ?
+    ORDER BY points DESC
+  `);
+  return scoresQuery.all(event_id, boat_id).map((row: { points: any; }) => row.points);
+}
+
 ipcMain.handle('readAllHeats', async (event, event_id) => {
   try {
     const heats = db
@@ -191,6 +203,7 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
     );
 
+    const pointsMap = new Map<number, any[]>();
     results.forEach(
       (result: {
         boat_id: any;
@@ -240,11 +253,56 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
         console.log(
           `Boat ID: ${boat_id}, Total Points After Exclusion: ${totalPoints}`,
         );
+        if (!pointsMap.has(totalPoints)) {
+          pointsMap.set(totalPoints, []);
+        }
+        const boats = pointsMap.get(totalPoints);
+        if (boats) {
+          boats.push(boat_id);
+        }
+// Log places for boats with ties and apply tie-breaking rule
+pointsMap.forEach((boats, points) => {
+  if (boats.length > 1) {
+    console.log(`Tie detected: Boats with ${points} points:`);
+    const boatScoresMap = new Map();
+    boats.forEach((boat) => {
+      const boatScoresQuery = db.prepare(`
+        SELECT points
+        FROM Scores
+        JOIN Races ON Scores.race_id = Races.race_id
+        JOIN Heats ON Races.heat_id = Heats.heat_id
+        WHERE Heats.event_id = ? AND Scores.boat_id = ?
+        ORDER BY points ASC
+      `);
+      const boatScores = boatScoresQuery
+        .all(event_id, boat)
+        .map((row: { points: any }) => row.points);
+      boatScoresMap.set(boat, boatScores);
+      console.log(`  Boat ID: ${boat}, Scores: ${boatScores.join(', ')}`);
+    });
+// Log the order before sorting
+console.log(`Order before tie-breaking: ${boats.join(', ')}`);
 
-        // Update the leaderboard with the calculated total points
-        updateQuery.run(boat_id, totalPoints, event_id);
-      },
-    );
+// Apply tie-breaking rule
+boats.sort((a, b) => {
+  const scoresA = boatScoresMap.get(a);
+  const scoresB = boatScoresMap.get(b);
+  for (let i = 0; i < Math.min(scoresA.length, scoresB.length); i++) {
+    if (scoresA[i] !== scoresB[i]) {
+      return scoresA[i] - scoresB[i];
+    }
+  }
+  return 0;
+});
+
+// Log the order after sorting
+console.log(`Order after tie-breaking: ${boats.join(', ')}`);
+}
+});
+
+// Update the leaderboard with the calculated total points
+updateQuery.run(boat_id, totalPoints, event_id);
+        });
 
     console.log('Event leaderboard updated successfully.');
     return { success: true };

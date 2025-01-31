@@ -689,6 +689,7 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
       SELECT
         lb.boat_id,
         lb.total_points_event,
+        lb.place,
         b.sail_number AS boat_number,
         b.model AS boat_type,
         s.name,
@@ -705,7 +706,7 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
       LEFT JOIN Scores sc ON r.race_id = sc.race_id AND sc.boat_id = b.boat_id
       WHERE lb.event_id = ? AND h.event_id = ? AND h.heat_type = 'Qualifying'
       GROUP BY lb.boat_id
-      ORDER BY lb.total_points_event ASC
+      ORDER BY lb.place ASC
     `;
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id, event_id);
@@ -716,7 +717,6 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
-
 ipcMain.handle('readGlobalLeaderboard', async () => {
   try {
     const results = db

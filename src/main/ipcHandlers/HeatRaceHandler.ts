@@ -194,14 +194,22 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
       GROUP BY boat_id
       ORDER BY total_points_event ASC
     `;
+    console.log('Executing query:', query);
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id);
+    console.log('Query results:', results);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
-       VALUES (?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event, place = excluded.place`,
     );
+
+    results.forEach((result: { boat_id: any; total_points_event: any; }, index: number) => {
+      const place = index + 1; // Calculate the place based on the index
+      updateQuery.run(result.boat_id, result.total_points_event, event_id, place);
+    });
+
 
     const pointsMap = new Map<number, any[]>();
     results.forEach(
@@ -300,8 +308,14 @@ console.log(`Order after tie-breaking: ${boats.join(', ')}`);
 }
 });
 
-// Update the leaderboard with the calculated total points
-updateQuery.run(boat_id, totalPoints, event_id);
+// Define the place variable
+let place = 1;
+pointsMap.forEach((boats, points) => {
+  boats.forEach((boat) => {
+    updateQuery.run(boat, points, event_id, place);
+    place++;
+  });
+});
         });
 
     console.log('Event leaderboard updated successfully.');

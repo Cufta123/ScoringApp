@@ -66,7 +66,7 @@ const insertHeat = (event_id, heat_name, heat_type) => {
 const updateEventLeaderboard = (event_id) => {
   try {
     const query = `
-      SELECT boat_id, SUM(points) as total_points_event
+      SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
       JOIN Heats ON Races.heat_id = Heats.heat_id
@@ -78,9 +78,9 @@ const updateEventLeaderboard = (event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
-       VALUES (?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event, place = excluded.place`,
     );
 
     results.forEach(result => {

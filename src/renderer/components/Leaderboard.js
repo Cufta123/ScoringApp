@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
@@ -63,16 +64,16 @@ function LeaderboardComponent({ eventId }) {
 
         // Sort races in descending order to find the worst places
         const sortedRaces = [...races]
-          .map((r) => parseInt(r))
+          .map((r) => parseInt(r, 10))
           .sort((a, b) => b - a);
         const worstPlaces = sortedRaces.slice(0, excludeCount);
 
         // Mark the worst places with parentheses
         let excludeCounter = 0;
         const markedRaces = races.map((race) => {
-          const raceInt = parseInt(race);
+          const raceInt = parseInt(race, 10);
           if (worstPlaces.includes(raceInt) && excludeCounter < excludeCount) {
-            excludeCounter++;
+            excludeCounter += 1;
             worstPlaces.splice(worstPlaces.indexOf(raceInt), 1); // Remove the marked race from worstPlaces
             return `(${race})`;
           }
@@ -88,7 +89,7 @@ function LeaderboardComponent({ eventId }) {
 
       const combinedResults = finalResults.map((finalResult) => {
         const eventResult = eventResults.find(
-          (eventResult) => eventResult.boat_id === finalResult.boat_id,
+          (result) => result.boat_id === finalResult.boat_id,
         );
         const total_points_final = finalResult.total_points_final || 0;
         const total_points_event = eventResult
@@ -145,12 +146,15 @@ function LeaderboardComponent({ eventId }) {
     setEditMode(!editMode);
   };
 
-  const handleRaceChange = (boatId, raceIndex, newValue) => {
-    if (!isNaN(newValue) && newValue >= 0) {
+  const handleRaceChange = (boatId, raceIndex, newHandleRaceChangeValue) => {
+    if (
+      !Number.isNaN(Number(newHandleRaceChangeValue)) &&
+      newHandleRaceChangeValue >= 0
+    ) {
       const updatedLeaderboard = editableLeaderboard.map((entry) => {
         if (entry.boat_id === boatId) {
           const oldPosition = parseInt(entry.races[raceIndex], 10);
-          const newPosition = parseInt(newValue, 10);
+          const newPosition = parseInt(newHandleRaceChangeValue, 10);
           const heatId =
             entry.heat_ids && entry.heat_ids[raceIndex]
               ? entry.heat_ids[raceIndex]
@@ -385,16 +389,24 @@ function LeaderboardComponent({ eventId }) {
         Export to Excel
       </button>
       <div>
-        <button onClick={toggleEditMode}>
+        <button type="button" onClick={toggleEditMode}>
           {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}
         </button>
         {editMode && (
           <div>
-            <button onClick={handleSave} style={{ marginLeft: '10px' }}>
+            <button
+              type="button"
+              onClick={handleSave}
+              style={{ marginLeft: '10px' }}
+            >
               Save Changes
             </button>
-            <label style={{ marginLeft: '10px' }}>
+            <label
+              htmlFor="shiftPositionsCheckbox"
+              style={{ marginLeft: '10px' }}
+            >
               <input
+                id="shiftPositionsCheckbox"
                 type="checkbox"
                 checked={shiftPositions}
                 onChange={(e) => setShiftPositions(e.target.checked)}

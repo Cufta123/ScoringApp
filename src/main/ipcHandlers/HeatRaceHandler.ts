@@ -20,7 +20,9 @@ function getScores(event_id: any, boat_id: any) {
     WHERE Heats.event_id = ? AND Scores.boat_id = ?
     ORDER BY points DESC
   `);
-  return scoresQuery.all(event_id, boat_id).map((row: { points: any; }) => row.points);
+  return scoresQuery
+    .all(event_id, boat_id)
+    .map((row: { points: any }) => row.points);
 }
 
 ipcMain.handle('readAllHeats', async (event, event_id) => {
@@ -198,8 +200,8 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
-       VALUES (?, ?, ?)
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, position)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`,
     );
 
@@ -260,13 +262,13 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
         if (boats) {
           boats.push(boat_id);
         }
-// Log places for boats with ties and apply tie-breaking rule
-pointsMap.forEach((boats, points) => {
-  if (boats.length > 1) {
-    console.log(`Tie detected: Boats with ${points} points:`);
-    const boatScoresMap = new Map();
-    boats.forEach((boat) => {
-      const boatScoresQuery = db.prepare(`
+        // Log places for boats with ties and apply tie-breaking rule
+        pointsMap.forEach((boatsForEach, points) => {
+          if (boatsForEach.length > 1) {
+            console.log(`Tie detected: Boats with ${points} points:`);
+            const boatScoresMap = new Map();
+            boatsForEach.forEach((boat) => {
+              const boatScoresQuery = db.prepare(`
         SELECT points
         FROM Scores
         JOIN Races ON Scores.race_id = Races.race_id
@@ -274,35 +276,44 @@ pointsMap.forEach((boats, points) => {
         WHERE Heats.event_id = ? AND Scores.boat_id = ?
         ORDER BY points ASC
       `);
-      const boatScores = boatScoresQuery
-        .all(event_id, boat)
-        .map((row: { points: any }) => row.points);
-      boatScoresMap.set(boat, boatScores);
-      console.log(`  Boat ID: ${boat}, Scores: ${boatScores.join(', ')}`);
-    });
-// Log the order before sorting
-console.log(`Order before tie-breaking: ${boats.join(', ')}`);
+              const boatScores = boatScoresQuery
+                .all(event_id, boat)
+                .map((row: { points: any }) => row.points);
+              boatScoresMap.set(boat, boatScores);
+              console.log(
+                `  Boat ID: ${boat}, Scores: ${boatScores.join(', ')}`,
+              );
+            });
+            // Log the order before sorting
+            console.log(
+              `Order before tie-breaking: ${boatsForEach.join(', ')}`,
+            );
 
-// Apply tie-breaking rule
-boats.sort((a, b) => {
-  const scoresA = boatScoresMap.get(a);
-  const scoresB = boatScoresMap.get(b);
-  for (let i = 0; i < Math.min(scoresA.length, scoresB.length); i++) {
-    if (scoresA[i] !== scoresB[i]) {
-      return scoresA[i] - scoresB[i];
-    }
-  }
-  return 0;
-});
+            // Apply tie-breaking rule
+            boatsForEach.sort((a, b) => {
+              const scoresA = boatScoresMap.get(a);
+              const scoresB = boatScoresMap.get(b);
+              for (
+                let i = 0;
+                i < Math.min(scoresA.length, scoresB.length);
+                i += 1
+              ) {
+                if (scoresA[i] !== scoresB[i]) {
+                  return scoresA[i] - scoresB[i];
+                }
+              }
+              return 0;
+            });
 
-// Log the order after sorting
-console.log(`Order after tie-breaking: ${boats.join(', ')}`);
-}
-});
-
-// Update the leaderboard with the calculated total points
-updateQuery.run(boat_id, totalPoints, event_id);
+            // Log the order after sorting
+            console.log(`Order after tie-breaking: ${boatsForEach.join(', ')}`);
+          }
         });
+
+        // Update the leaderboard with the calculated total points
+        updateQuery.run(boat_id, totalPoints, event_id);
+      },
+    );
 
     console.log('Event leaderboard updated successfully.');
     return { success: true };
@@ -445,40 +456,54 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     console.log('Before tie braking logic:', leaderboardResults);
 
-       // Create new heats and assign boats to them
-       const heatIds = [];
-       for (let i = 0; i < nextHeatNames.length; i += 1) {
-         const heatName = nextHeatNames[i];
-         const heatType = 'Qualifying';
+    // Create new heats and assign boats to them
+    const heatIds = [];
+    for (let i = 0; i < nextHeatNames.length; i += 1) {
+      const heatName = nextHeatNames[i];
+      const heatType = 'Qualifying';
 
-         // Insert the new heat into the database
-         const { lastInsertRowid: newHeatId } = db
-           .prepare(
-             'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
-           )
-           .run(event_id, heatName, heatType);
+      // Insert the new heat into the database
+      const { lastInsertRowid: newHeatId } = db
+        .prepare(
+          'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
+        )
+        .run(event_id, heatName, heatType);
 
-         heatIds.push(newHeatId);
-       }
+      heatIds.push(newHeatId);
+    }
 
-       // Assign boats to the new heats in a zigzag pattern
-       let direction = 1; // 1 for forward, -1 for backward
-       let heatIndex = 0;
-       for (let i = 0; i < leaderboardResults.length; i += 1) {
-         const boatId = leaderboardResults[i].boat_id;
-         db.prepare(
-           'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)',
-         ).run(heatIds[heatIndex], boatId);
+    // Assign boats to the new heats in a zigzag pattern
 
-         heatIndex += direction;
-         if (heatIndex === nextHeatNames.length || heatIndex === -1) {
-           direction *= -1;
-           heatIndex += direction;
-         }
-       }
+    let direction = 1; // 1 for forward, -1 for backward
+    let heatIndex = 0;
+    const numHeats = heatIds.length;
+    const numBoats = leaderboardResults.length;
+    const baseParticipantsPerHeat = Math.floor(numBoats / numHeats);
+    const extraParticipants = numBoats % numHeats;
+    for (let i = 0; i < leaderboardResults.length; i += 1) {
+      const boatId = leaderboardResults[i].boat_id;
+      db.prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)').run(
+        heatIds[heatIndex],
+        boatId,
+      );
 
-// Log the updated leaderboard results with heat names
-console.log('After assigning heats:', leaderboardResults);
+      // Move to the next heat index
+      if (
+        (heatIndex < extraParticipants &&
+          (i + 1) % (baseParticipantsPerHeat + 1) === 0) ||
+        (heatIndex >= extraParticipants &&
+          (i + 1 - extraParticipants) % baseParticipantsPerHeat === 0)
+      ) {
+        heatIndex += direction;
+        if (heatIndex === numHeats || heatIndex === -1) {
+          direction *= -1;
+          heatIndex += direction;
+        }
+      }
+    }
+
+    // Log the updated leaderboard results with heat names
+    console.log('After assigning heats:', leaderboardResults);
 
     console.log('New heats created based on leaderboard.');
     return { success: true };

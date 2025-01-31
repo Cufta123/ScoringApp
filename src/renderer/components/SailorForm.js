@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-
+import Autosuggest from 'react-autosuggest';
 import { toast } from 'react-toastify';
 
 import iocCountries from '../constants/iocCountries.json';
@@ -22,6 +22,7 @@ function SailorForm({ onAddSailor, eventId }) {
   const [model, setModel] = useState('');
   const [boats, setBoats] = useState([]);
   const [raceHappened, setRaceHappened] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
 
   const fetchSailors = async () => {
     try {
@@ -87,6 +88,7 @@ function SailorForm({ onAddSailor, eventId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
 
     if (raceHappened) {
       toast.error(
@@ -245,6 +247,22 @@ function SailorForm({ onAddSailor, eventId }) {
           return; // Exit the function gracefully
         }
       }
+      await onAddSailor({
+        name,
+        surname,
+        birthday,
+        club_id,
+        selectedCountry,
+        sailNumber,
+        model,
+      });
+      setName('');
+      setSurname('');
+      setBirthday('');
+      setClub('');
+      setSelectedCountry('');
+      setSailNumber('');
+      setModel('');
 
       fetchSailors();
       fetchBoats();
@@ -254,6 +272,91 @@ function SailorForm({ onAddSailor, eventId }) {
       alert('An unexpected error occurred.');
     }
   };
+  const getSuggestions = (value) => {
+    const inputValue = value.trim().toLowerCase();
+    const inputLength = inputValue.length;
+
+    return inputLength === 0
+      ? []
+      : clubs.filter(
+          (c) => c.club_name.toLowerCase().slice(0, inputLength) === inputValue,
+        );
+  };
+
+  const getSuggestionValue = (suggestion) => suggestion.club_name;
+
+  const renderSuggestion = (suggestion) => (
+    <div>
+      {suggestion.club_name} ({suggestion.country})
+    </div>
+  );
+
+  const onSuggestionsFetchRequested = ({ value }) => {
+    setSuggestions(getSuggestions(value));
+  };
+
+  const onSuggestionsClearRequested = () => {
+    setSuggestions([]);
+  };
+
+  const onClubChange = (event, { newValue }) => {
+    setClub(newValue);
+  };
+  const inputFieldStyle = {
+    width: '100%',
+    maxWidth: '400px',
+    margin: '5px',
+    boxSizing: 'border-box',
+  };
+
+  const autosuggestStyles = {
+    container: {
+      position: 'relative',
+    },
+    input: {
+      width: '100%',
+      maxWidth: '400px',
+      padding: '2px 2px', // Adjust padding to match other inputs
+      fontSize: '13px', // Ensure this matches the other fields
+      lineHeight: '1', // Adjust line height for consistent height
+      border: '1px solid #ccc',
+      borderRadius: '4px',
+      boxSizing: 'border-box', // Ensures padding doesn't affect height
+    },
+    suggestionsContainer: {
+      position: 'absolute',
+      zIndex: 1000,
+      width: '100%',
+      maxWidth: '400px',
+      background: '#fff',
+      border: '1px solid #ccc',
+      borderTop: 'none',
+      maxHeight: '200px',
+      overflowY: 'auto',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    },
+    suggestion: {
+      padding: '8px',
+      cursor: 'pointer',
+      backgroundColor: '#fff',
+    },
+    suggestionHighlighted: {
+      backgroundColor: '#f0f0f0',
+    },
+  };
+
+  const formRowStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  };
+
+  const formFieldStyle = {
+    flex: '1 1 calc(33.33% - 10px)',
+    margin: '5px',
+    boxSizing: 'border-box',
+    ...inputFieldStyle, // Ensure existing input field styles are applied
+  };
 
   return (
     <div>
@@ -261,60 +364,84 @@ function SailorForm({ onAddSailor, eventId }) {
         <p>No more sailors can be added as a race has already happened.</p>
       ) : (
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Surname"
-            value={surname}
-            onChange={(e) => setSurname(e.target.value)}
-            required
-          />
-          <input
-            type="date"
-            placeholder="Birthdate"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-            required
-          />
-          <input
-            type="text"
-            value={club}
-            onChange={(e) => setClub(e.target.value)}
-            placeholder="Club name"
-            required
-          />
-          <input
-            type="text"
-            placeholder="Sail Number"
-            value={sailNumber}
-            onChange={(e) => setSailNumber(e.target.value)}
-            required
-          />
-          <select
-            value={selectedCountry}
-            onChange={(e) => setSelectedCountry(e.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Select Country
-            </option>
-            {Object.entries(iocCountries).map(([code, countryName]) => (
-              <option key={code} value={code}>
-                {countryName} ({code})
+          <div style={formRowStyle}>
+            <input
+              type="text"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              style={formFieldStyle}
+            />
+            <input
+              type="text"
+              placeholder="Surname"
+              value={surname}
+              onChange={(e) => setSurname(e.target.value)}
+              required
+              style={formFieldStyle}
+            />
+            <input
+              type="date"
+              placeholder="Birthdate"
+              value={birthday}
+              onChange={(e) => setBirthday(e.target.value)}
+              required
+              style={formFieldStyle}
+            />
+          </div>
+          <div style={formRowStyle}>
+            <input
+              type="text"
+              placeholder="Sail Number"
+              value={sailNumber}
+              onChange={(e) => setSailNumber(e.target.value)}
+              required
+              style={formFieldStyle}
+            />
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              required
+              style={formFieldStyle}
+            >
+              <option value="" disabled>
+                Select Country
               </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
+              {Object.entries(iocCountries).map(([code, countryName]) => (
+                <option key={code} value={code}>
+                  {countryName} ({code})
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              style={formFieldStyle}
+            />
+          </div>
+          <Autosuggest
+            suggestions={suggestions}
+            onSuggestionsFetchRequested={onSuggestionsFetchRequested}
+            onSuggestionsClearRequested={onSuggestionsClearRequested}
+            getSuggestionValue={getSuggestionValue}
+            renderSuggestion={renderSuggestion}
+            inputProps={{
+              placeholder: 'Club name',
+              value: club,
+              onChange: onClubChange,
+              required: true,
+              style: inputFieldStyle,
+            }}
+            theme={{
+              container: autosuggestStyles.container,
+              input: autosuggestStyles.input,
+              suggestionsContainer: autosuggestStyles.suggestionsContainer,
+              suggestion: autosuggestStyles.suggestion,
+              suggestionHighlighted: autosuggestStyles.suggestionHighlighted,
+            }}
           />
           <button type="submit">Add Sailor</button>
         </form>

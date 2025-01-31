@@ -3,6 +3,7 @@ import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
+import Navbar from '../../components/Navbar';
 import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
 import LeaderboardComponent from '../../components/Leaderboard';
@@ -24,6 +25,7 @@ function EventPage() {
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isEventLocked, setIsEventLocked] = useState(event.is_locked === 1);
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -68,13 +70,30 @@ function EventPage() {
     }
   }, [event.event_id]);
 
+  const fetchEventLockStatus = useCallback(async () => {
+    try {
+      const events = await window.electron.sqlite.eventDB.readAllEvents();
+      const currentEvent = events.find((e) => e.event_id === event.event_id);
+      setIsEventLocked(currentEvent.is_locked === 1);
+    } catch (error) {
+      console.error('Error fetching event lock status:', error);
+    }
+  }, [event.event_id]);
+
   useEffect(() => {
     if (event) {
       fetchBoatsWithSailors();
       fetchAllBoats();
       checkIfRaceHappened();
+      fetchEventLockStatus();
     }
-  }, [event, fetchBoatsWithSailors, fetchAllBoats, checkIfRaceHappened]);
+  }, [
+    event,
+    fetchBoatsWithSailors,
+    fetchAllBoats,
+    checkIfRaceHappened,
+    fetchEventLockStatus,
+  ]);
 
   const handleAddSailor = () => {
     fetchBoatsWithSailors();
@@ -160,6 +179,28 @@ function EventPage() {
     }
   };
 
+  const handleLockEvent = async () => {
+    try {
+      if (isEventLocked) {
+        await window.electron.sqlite.eventDB.unlockEvent(event.event_id);
+        setIsEventLocked(false);
+        alert('Event unlocked successfully!');
+      } else {
+        await window.electron.sqlite.eventDB.lockEvent(event.event_id);
+        setIsEventLocked(true);
+        alert('Event locked successfully!');
+      }
+    } catch (error) {
+      console.error('Error locking/unlocking event:', error);
+      alert('Error locking/unlocking event. Please try again later.');
+    }
+  };
+  const handleLockEventClick = () => {
+    const userConfirmed = window.confirm('Do you want to lock the event?');
+    if (userConfirmed) {
+      handleLockEvent();
+    }
+  };
   useEffect(() => {
     // Ensure that the allBoats state is updated when boats state changes
     setAllBoats((prevBoats) => {
@@ -197,25 +238,19 @@ function EventPage() {
 
   return (
     <div>
-      <div className="button-container">
-        <button type="button" onClick={handleBackClick}>
-          Back to Landing Page
-        </button>
-        <button type="button" onClick={handleHeatRaceClick}>
-          Go to scoring
-        </button>
-      </div>
+      <Navbar
+        onOpenLeaderboard={handleOpenLeaderboard}
+        isEventLocked={isEventLocked}
+        onHeatRaceClick={handleHeatRaceClick}
+      />
       <h1>{event.event_name}</h1>
       <p>Start Date: {event.start_date}</p>
       <p>End Date: {event.end_date}</p>
-      <button type="button" onClick={handleOpenLeaderboard}>
-        Open Leaderboard
-      </button>
-      {raceHappened ? (
+      {raceHappened || isEventLocked ? (
         <div className="warning">
           <p>
-            No more sailors or boats can be added as atleast one race has
-            happened.
+            No more sailors or boats can be added as at least one race has
+            happened or the event is locked.
           </p>
         </div>
       ) : (
@@ -252,6 +287,13 @@ function EventPage() {
         raceHappened={raceHappened} // Pass raceHappened state to SailorList
       />
       <HeatComponent event={event} clickable={false} />
+      <button
+        type="button"
+        onClick={handleLockEventClick}
+        style={{ backgroundColor: 'red', color: 'white' }}
+      >
+        {isEventLocked ? 'Unlock Event' : 'Lock Event'}
+      </button>
     </div>
   );
 }

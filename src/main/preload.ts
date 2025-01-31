@@ -32,8 +32,14 @@ export type Channels =
   | 'updateEventLeaderboard'
   | 'updateGlobalLeaderboard'
   | 'createNewHeatsBasedOnLeaderboard'
+  | 'transferBoatBetweenHeats'
   | 'readLeaderboard'
-  | 'readGlobalLeaderboard';
+  | 'readGlobalLeaderboard'
+  | 'updateFinalLeaderboard'
+  | 'readFinalLeaderboard'
+  | 'lockEvent'
+  | 'unlockEvent'
+  | 'updateRaceResult';
 
 const electronHandler = {
   ipcRenderer: {
@@ -227,6 +233,22 @@ const electronHandler = {
           return false;
         }
       },
+      async lockEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('lockEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking lockEvent IPC:', error);
+          return false;
+        }
+      },
+      async unlockEvent(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('unlockEvent', event_id);
+        } catch (error) {
+          console.error('Error invoking unlockEvent IPC:', error);
+          return false;
+        }
+      },
     },
     heatRaceDB: {
       async readAllHeats(event_id: string) {
@@ -384,6 +406,23 @@ const electronHandler = {
           return false;
         }
       },
+      async transferBoatBetweenHeats(
+        from_heat_id: string,
+        to_heat_id: string,
+        boat_id: string,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'transferBoatBetweenHeats',
+            from_heat_id,
+            to_heat_id,
+            boat_id,
+          );
+        } catch (error) {
+          console.error('Error invoking transferBoatBetweenHeats IPC:', error);
+          return false;
+        }
+      },
       async readLeaderboard(event_id: string) {
         try {
           return await ipcRenderer.invoke('readLeaderboard', event_id);
@@ -397,6 +436,45 @@ const electronHandler = {
           return await ipcRenderer.invoke('readGlobalLeaderboard');
         } catch (error) {
           console.error('Error invoking readGlobalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async updateFinalLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('updateFinalLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking updateFinalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async updateRaceResult(
+        event_id: string,
+        race_id: string,
+        boat_id: string,
+        new_position: string,
+        shift_positions: boolean,
+        heat_id: string
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'updateRaceResult',
+            event_id,
+            race_id,
+            boat_id,
+            new_position,
+            shift_positions,
+            heat_id
+          );
+        } catch (error) {
+          console.error('Error invoking updateRaceResult IPC:', error);
+          return false;
+        }
+      },
+      async readFinalLeaderboard(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('readFinalLeaderboard', event_id);
+        } catch (error) {
+          console.error('Error invoking readFinalLeaderboard IPC:', error);
           return false;
         }
       },

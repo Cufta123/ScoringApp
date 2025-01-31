@@ -66,7 +66,7 @@ const insertHeat = (event_id, heat_name, heat_type) => {
 const updateEventLeaderboard = (event_id) => {
   try {
     const query = `
-      SELECT boat_id, SUM(points) as total_points_event
+      SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
       JOIN Heats ON Races.heat_id = Heats.heat_id
@@ -78,9 +78,9 @@ const updateEventLeaderboard = (event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id)
-       VALUES (?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event`
+      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event, place = excluded.place`,
     );
 
     results.forEach(result => {
@@ -321,6 +321,7 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
 
     const heatRaceCounts = lastHeats.map((heat) => {
       const raceCount = raceCountQuery.get(heat.heat_id).race_count;
+       console.log(`Heat ${heat.heat_name} has ${raceCount} races`);
       return { heat_name: heat.heat_name, raceCount };
     });
     console.log('Heat race counts:', heatRaceCounts); // Log the heat race counts
@@ -329,6 +330,7 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
     const uniqueRaceCounts = [
       ...new Set(heatRaceCounts.map((item) => item.raceCount)),
     ];
+    console.log('Unique race counts:', uniqueRaceCounts); // Log the unique race counts
 
     if (uniqueRaceCounts.length > 1) {
       console.error('Latest heats do not have the same number of races.');
@@ -381,6 +383,31 @@ const createNewHeatsBasedOnLeaderboard = (event_id) => {
   }
 };
 
+const transferBoatBetweenHeats = (from_heat_id, to_heat_id, boat_id) => {
+  try {
+    const deleteQuery = db.prepare(
+      `DELETE FROM HeatBoats WHERE heat_id = ? AND boat_id = ?`
+    );
+    const deleteInfo = deleteQuery.run(from_heat_id, boat_id);
+    console.log(
+      `Deleted ${deleteInfo.changes} row(s) from HeatBoats for heat ID ${from_heat_id} and boat ID ${boat_id}.`
+    );
+
+    const insertQuery = db.prepare(
+      `INSERT INTO HeatBoats (heat_id, boat_id) VALUES (?, ?)`
+    );
+    const insertInfo = insertQuery.run(to_heat_id, boat_id);
+    console.log(
+      `Inserted ${insertInfo.changes} row(s) with last ID ${insertInfo.lastInsertRowid} into HeatBoats for heat ID ${to_heat_id}.`
+    );
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error transferring boat between heats:', err.message);
+    throw err;
+  }
+};
+
 const readLeaderboard = (event_id) => {
   try {
     const query = `
@@ -409,6 +436,37 @@ const readLeaderboard = (event_id) => {
     return [];
   }
 };
+const updateRaceResult = (race_id, boat_id, new_position, shift_positions) => {
+  try {
+    const currentResult = db.prepare(
+      `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`
+    ).get(race_id, boat_id);
+
+    if (!currentResult) {
+      throw new Error('Race result not found.');
+    }
+
+    const currentPosition = currentResult.position;
+
+    const updateQuery = db.prepare(
+      `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`
+    );
+    updateQuery.run(new_position, race_id, boat_id);
+
+    if (shift_positions) {
+      const shiftQuery = db.prepare(
+        `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND boat_id != ?`
+      );
+      shiftQuery.run(race_id, new_position, boat_id);
+    }
+
+    console.log(`Updated race result for boat ID ${boat_id} in race ID ${race_id}.`);
+    return { success: true };
+  } catch (err) {
+    console.error('Error updating race result:', err.message);
+    throw err;
+  }
+};
 
 const readGlobalLeaderboard = () => {
   try {
@@ -435,6 +493,66 @@ const readGlobalLeaderboard = () => {
     return [];
   }
 };
+const updateFinalLeaderboard = (event_id) => {
+  try {
+    const query = `
+      SELECT boat_id, heat_name, SUM(points) as total_points_final
+      FROM Scores
+      JOIN Races ON Scores.race_id = Races.race_id
+      JOIN Heats ON Races.heat_id = Heats.heat_id
+      WHERE Heats.event_id = ? AND Heats.heat_type = 'Final'
+      GROUP BY boat_id, heat_name
+      ORDER BY heat_name, total_points_final ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+
+    const updateQuery = db.prepare(
+      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
+    );
+
+    results.forEach((result) => {
+      const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
+      updateQuery.run(result.boat_id, result.total_points_final, event_id, placementGroup);
+    });
+
+    console.log('Final leaderboard updated successfully.');
+  } catch (err) {
+    console.error('Error updating final leaderboard:', err.message);
+    throw err;
+  }
+};
+
+const readFinalLeaderboard = (event_id) => {
+  try {
+    const query = `
+      SELECT
+        fl.boat_id,
+        fl.total_points_final,
+        fl.event_id,
+        fl.placement_group,
+        b.sail_number AS boat_number,
+        b.model AS boat_type,
+        s.name,
+        s.surname,
+        b.country
+      FROM FinalLeaderboard fl
+      LEFT JOIN Boats b ON fl.boat_id = b.boat_id
+      LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      WHERE fl.event_id = ?
+      ORDER BY fl.placement_group, fl.total_points_final ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+    console.log('Final leaderboard results:', results);
+    return results;
+  } catch (err) {
+    console.error('Error reading final leaderboard from the database:', err.message);
+    return [];
+  }
+};
 
 module.exports = {
   readAllHeats,
@@ -451,6 +569,10 @@ module.exports = {
   updateEventLeaderboard,
   updateGlobalLeaderboard,
   createNewHeatsBasedOnLeaderboard,
+  transferBoatBetweenHeats,
   readLeaderboard,
   readGlobalLeaderboard,
+  updateFinalLeaderboard,
+  readFinalLeaderboard,
+  updateRaceResult,
 };

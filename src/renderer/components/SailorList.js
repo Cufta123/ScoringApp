@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import 'font-awesome/css/font-awesome.min.css';
+import Flag from 'react-world-flags';
+import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 
 const categoryOptions = ['KADET', 'SENIOR', 'JUNIOR', 'MASTER', 'CADET'];
 
@@ -9,6 +11,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [editingSailorId, setEditingSailorId] = useState(null);
   const [editedSailor, setEditedSailor] = useState({});
   const [isExpanded, setIsExpanded] = useState(true);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     const savedIsExpanded = localStorage.getItem('isExpanded');
@@ -26,6 +29,19 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
     if (a[sortCriteria] > b[sortCriteria]) return 1;
     return 0;
   });
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const result = await window.electron.sqlite.sailorDB.readAllCategories();
+      if (result) {
+        setCategories(result);
+      } else {
+        console.error('Failed to fetch categories');
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const handleEditClick = (sailor) => {
     setEditingSailorId(sailor.boat_id);
@@ -76,6 +92,10 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
+  };
+
+  const getFlagCode = (iocCode) => {
+    return iocToFlagCodeMap[iocCode] || iocCode;
   };
 
   return (
@@ -154,7 +174,13 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                         className="editable-input"
                       />
                     ) : (
-                      sailor.country
+                      <div>
+                        <Flag
+                          code={getFlagCode(sailor.country)}
+                          style={{ width: '30px', marginRight: '5px' }}
+                        />
+                        <span>{sailor.country}</span>
+                      </div>
                     )}
                   </td>
                   <td>
@@ -226,9 +252,12 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                         onChange={handleInputChange}
                         className="editable-input"
                       >
-                        {categoryOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
+                        {categories.map((category) => (
+                          <option
+                            key={category.category_id}
+                            value={category.category_name}
+                          >
+                            {category.category_name}
                           </option>
                         ))}
                       </select>

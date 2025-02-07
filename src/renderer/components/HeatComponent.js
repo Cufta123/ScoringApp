@@ -198,29 +198,37 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
         event.event_id,
       );
 
-      // Calculate the number of boats per heat
-      const boatsPerHeat = Math.floor(eventBoats.length / numHeats);
-      const extraBoats = eventBoats.length % numHeats;
+         // Calculate the number of boats per heat
+    const boatsPerHeat = Math.floor(eventBoats.length / numHeats);
+    const extraBoats = eventBoats.length % numHeats;
 
-      const heatBoatPromises = [];
-      let boatIndex = 0;
+    const heatBoatPromises = [];
+    let boatIndex = 0;
 
-      for (let i = 0; i < numHeats; i += 1) {
-        const heat = FetchedHeats.find(
-          (h) => h.heat_name === `Heat ${String.fromCharCode(65 + i)}`,
-        );
-        const boatsInThisHeat = boatsPerHeat + (i < extraBoats ? 1 : 0);
+    // Assign boats to heats in A, B, C, D, A, B, C, D... pattern
+    for (let i = 0; i < eventBoats.length - extraBoats; i += 1) {
+      const heatIndex = i % numHeats;
+      const heat = FetchedHeats[heatIndex];
+      heatBoatPromises.push(
+        window.electron.sqlite.heatRaceDB.insertHeatBoat(
+          heat.heat_id,
+          eventBoats[boatIndex].boat_id,
+        ),
+      );
+      boatIndex += 1;
+    }
 
-        for (let j = 0; j < boatsInThisHeat; j += 1) {
-          heatBoatPromises.push(
-            window.electron.sqlite.heatRaceDB.insertHeatBoat(
-              heat.heat_id,
-              eventBoats[boatIndex].boat_id,
-            ),
-          );
-          boatIndex += 1;
-        }
-      }
+    // Assign extra boats to heats
+    for (let i = 0; i < extraBoats; i += 1) {
+      const heat = FetchedHeats[i];
+      heatBoatPromises.push(
+        window.electron.sqlite.heatRaceDB.insertHeatBoat(
+          heat.heat_id,
+          eventBoats[boatIndex].boat_id,
+        ),
+      );
+      boatIndex += 1;
+    }
 
       await Promise.all(heatBoatPromises);
 

@@ -2,6 +2,7 @@
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';
 import { calculateBoatScores } from '../functions/calculateBoatScores';
+import { assignBoatsToNewHeatsZigZag, checkRaceCountForLatestHeats, findLatestHeatsBySuffix, generateNextHeatNames } from '../functions/creatingNewHeatsUtls';
 
 console.log('HeatRaceHandler.ts loaded');
 
@@ -238,10 +239,12 @@ ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
        VALUES (?, ?)
        ON CONFLICT(boat_id) DO UPDATE SET total_points_global = total_points_global + excluded.total_points_global`,
     );
-
-    results.forEach((result: { boat_id: any; final_position: any }) => {
-      updateQuery.run(result.boat_id, result.final_position);
-    });
+    const pointsMap = new Map<number, any[]>();
+    const temporaryTable = calculateBoatScores(results, event_id, pointsMap);
+// Update the leaderboard with the sorted results
+temporaryTable.forEach((boat) => {
+  updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
+});
 
     console.log('Global leaderboard updated successfully.');
     return { success: true };
@@ -270,7 +273,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
   try {
     // Read the current leaderboard for the specific event
     const leaderboardQuery = `
-       SELECT boat_id, total_points_event
+      SELECT boat_id, total_points_event
       FROM Leaderboard
       WHERE event_id = ?
       ORDER BY place ASC
@@ -285,112 +288,42 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     const existingHeats = existingHeatsQuery.all(event_id);
 
     // Find the latest heats by suffix
-    const latestHeats = existingHeats.reduce(
-      (
-        acc: Record<
-          string,
-          { suffix: number; heat: { heat_name: string; heat_id: number } }
-        >,
-        heat: { heat_name: string; heat_id: number },
-      ) => {
-        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-        if (match) {
-          const [_, base, suffix] = match;
-          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-          acc[base] = acc[base] || { suffix: 0, heat: null };
-          if (numericSuffix > acc[base].suffix) {
-            acc[base] = { suffix: numericSuffix, heat };
-          }
-        }
-        return acc;
-      },
-      {},
-    );
-
-    // Extract only the latest heats
-    const lastHeats = Object.values(latestHeats)
-      .map(
-        (entry) =>
-          (
-            entry as {
-              suffix: number;
-              heat: { heat_name: string; heat_id: number };
-            }
-          ).heat,
-      )
-      .filter((heat) => heat !== null); // Filter out null values
+    const latestHeats = findLatestHeatsBySuffix(existingHeats);
 
     // Check race count for the latest heats
-    const raceCountQuery = db.prepare(
-      `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`,
-    );
+    checkRaceCountForLatestHeats(latestHeats, db);
 
-    const heatRaceCounts = lastHeats.map((heat) => {
-      const raceCount = raceCountQuery.get(heat.heat_id).race_count;
-      return { heat_name: heat.heat_name, raceCount };
-    });
-
-    // Ensure all latest heats have the same number of races
-    const uniqueRaceCounts = [
-      ...new Set(heatRaceCounts.map((item) => item.raceCount)),
-    ];
-
-    if (uniqueRaceCounts.length > 1) {
-      console.error('Latest heats do not have the same number of races.');
-      return {
-        success: false,
-        message:
-          'The latest heats must have the same number of races before creating new heats.',
-      };
-    }
-
+    // Define the new race number
+    const heatNameMatch = latestHeats[0].heat_name.match(/(\d+)$/);
+    const lastRaceNumber = heatNameMatch ? parseInt(heatNameMatch[1], 10) : 0;
+    const raceNumber = lastRaceNumber + 1;
+    console.log(raceNumber);
     // Generate names for the next round of heats
-    const nextHeatNames = Object.keys(latestHeats).map(
-      (base) => `Heat ${base}${latestHeats[base].suffix + 1}`,
-    );
+    const nextHeatNames = generateNextHeatNames(latestHeats);
 
-    console.log('Before tie braking logic:', leaderboardResults);
+    // Insert new heats into the database
+    const heatIds: any[] = [];
+    for (let i = 0; i < nextHeatNames.length; i += 1) {
+      const heatName = nextHeatNames[i];
+      const heatType = 'Qualifying';
 
-       // Create new heats and assign boats to them
-       const heatIds = [];
-       for (let i = 0; i < nextHeatNames.length; i += 1) {
-         const heatName = nextHeatNames[i];
-         const heatType = 'Qualifying';
+      const { lastInsertRowid: newHeatId } = db
+        .prepare(
+          'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
+        )
+        .run(event_id, heatName, heatType);
 
-         // Insert the new heat into the database
-         const { lastInsertRowid: newHeatId } = db
-           .prepare(
-             'INSERT INTO Heats (event_id, heat_name, heat_type) VALUES (?, ?, ?)',
-           )
-           .run(event_id, heatName, heatType);
-
-         heatIds.push(newHeatId);
-       }
-  // Assign boats to the new heats in a zigzag pattern
-  let direction = 1; // 1 for forward, -1 for backward
-  let heatIndex = 0;
-  const numHeats = nextHeatNames.length;
-  const numBoats = leaderboardResults.length;
-  const baseParticipantsPerHeat = Math.floor(numBoats / numHeats);
-  const extraParticipants = numBoats % numHeats;
-
-  for (let i = 0; i < leaderboardResults.length; i += 1) {
-    const boatId = leaderboardResults[i].boat_id;
-    db.prepare(
-      'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)',
-    ).run(heatIds[heatIndex], boatId);
-
-      heatIndex += direction;
-      if (heatIndex === numHeats || heatIndex === -1) {
-        direction *= -1;
-        heatIndex += direction;
-
+      heatIds.push(newHeatId);
     }
-  }
 
+    // Assign boats to new heats
+    const assignments = assignBoatsToNewHeatsZigZag(leaderboardResults, nextHeatNames, raceNumber);
 
-// Log the updated leaderboard results with heat names
-console.log('After assigning heats:', leaderboardResults);
+    assignments.forEach(({ heatId, boatId }) => {
+      db.prepare(
+        'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)'
+      ).run(heatIds[heatId], boatId);
+    });
 
     console.log('New heats created based on leaderboard.');
     return { success: true };
@@ -402,6 +335,8 @@ console.log('After assigning heats:', leaderboardResults);
     throw error;
   }
 });
+
+
 
 ipcMain.handle(
   'transferBoatBetweenHeats',
@@ -596,6 +531,8 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
     );
+
+
 
     results.forEach(
       (result: {

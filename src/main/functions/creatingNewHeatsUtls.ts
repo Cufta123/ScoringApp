@@ -1,6 +1,8 @@
-
-
-export function assignBoatsToNewHeatsZigZag(leaderboardResults: string | any[], nextHeatNames: string | any[], raceNumber: number) {
+export function assignBoatsToNewHeatsZigZag(
+  leaderboardResults: string | any[],
+  nextHeatNames: string | any[],
+  raceNumber: number,
+) {
   const numHeats = nextHeatNames.length;
   const numBoats = leaderboardResults.length;
   const baseParticipantsPerHeat = Math.floor(numBoats / numHeats);
@@ -90,7 +92,9 @@ export function assignBoatsToNewHeatsZigZag(leaderboardResults: string | any[], 
   return assignments;
 }
 
-export function findLatestHeatsBySuffix(existingHeats: { heat_name: string; heat_id: number }[]) {
+export function findLatestHeatsBySuffix(
+  existingHeats: { heat_name: string; heat_id: number }[],
+) {
   const latestHeats = existingHeats.reduce(
     (
       acc: Record<
@@ -126,7 +130,10 @@ export function findLatestHeatsBySuffix(existingHeats: { heat_name: string; heat
     .filter((heat) => heat !== null); // Filter out null values
 }
 
-export function checkRaceCountForLatestHeats(lastHeats: { heat_name: string; heat_id: number }[], db: any) {
+export function checkRaceCountForLatestHeats(
+  lastHeats: { heat_name: string; heat_id: number }[],
+  db: any,
+) {
   const raceCountQuery = db.prepare(
     `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`,
   );
@@ -145,7 +152,9 @@ export function checkRaceCountForLatestHeats(lastHeats: { heat_name: string; hea
   }
 }
 
-export function generateNextHeatNames(latestHeats: { heat_name: string; heat_id: number }[]) {
+export function generateNextHeatNames(
+  latestHeats: { heat_name: string; heat_id: number }[],
+) {
   const heatMap = latestHeats.reduce(
     (
       acc: Record<

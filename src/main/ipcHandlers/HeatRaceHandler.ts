@@ -1,8 +1,14 @@
 /* eslint-disable camelcase */
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';
-import { calculateBoatScores } from '../functions/calculateBoatScores';
-import { assignBoatsToNewHeatsZigZag, checkRaceCountForLatestHeats, findLatestHeatsBySuffix, generateNextHeatNames } from '../functions/creatingNewHeatsUtls';
+import calculateBoatScores from '../functions/calculateBoatScores';
+
+import {
+  assignBoatsToNewHeatsZigZag,
+  checkRaceCountForLatestHeats,
+  findLatestHeatsBySuffix,
+  generateNextHeatNames,
+} from '../functions/creatingNewHeatsUtls';
 
 console.log('HeatRaceHandler.ts loaded');
 
@@ -12,18 +18,6 @@ const isEventLocked = (event_id: any) => {
   const result = checkQuery.get(event_id);
   return result.is_locked === 1;
 };
-
-export function getScores(event_id: any, boat_id: any) {
-  const scoresQuery = db.prepare(`
-    SELECT points
-    FROM Scores
-    JOIN Races ON Scores.race_id = Races.race_id
-    JOIN Heats ON Races.heat_id = Heats.heat_id
-    WHERE Heats.event_id = ? AND Scores.boat_id = ?
-    ORDER BY points DESC
-  `);
-  return scoresQuery.all(event_id, boat_id).map((row: { points: any; }) => row.points);
-}
 
 ipcMain.handle('readAllHeats', async (event, event_id) => {
   try {
@@ -208,12 +202,11 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
     const pointsMap = new Map<number, any[]>();
     const temporaryTable = calculateBoatScores(results, event_id, pointsMap);
 
-
-// Update the leaderboard with the sorted results
-temporaryTable.forEach((boat) => {
-  updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
-});
-  }  catch (error) {
+    // Update the leaderboard with the sorted results
+    temporaryTable.forEach((boat) => {
+      updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
+    });
+  } catch (error) {
     console.error(
       'Error updating event leaderboard:',
       (error as Error).message,
@@ -241,10 +234,10 @@ ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
     );
     const pointsMap = new Map<number, any[]>();
     const temporaryTable = calculateBoatScores(results, event_id, pointsMap);
-// Update the leaderboard with the sorted results
-temporaryTable.forEach((boat) => {
-  updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
-});
+    // Update the leaderboard with the sorted results
+    temporaryTable.forEach((boat) => {
+      updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
+    });
 
     console.log('Global leaderboard updated successfully.');
     return { success: true };
@@ -317,12 +310,17 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     }
 
     // Assign boats to new heats
-    const assignments = assignBoatsToNewHeatsZigZag(leaderboardResults, nextHeatNames, raceNumber);
+    const assignments = assignBoatsToNewHeatsZigZag(
+      leaderboardResults,
+      nextHeatNames,
+      raceNumber,
+    );
 
     assignments.forEach(({ heatId, boatId }) => {
-      db.prepare(
-        'INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)'
-      ).run(heatIds[heatId], boatId);
+      db.prepare('INSERT INTO Heat_Boat (heat_id, boat_id) VALUES (?, ?)').run(
+        heatIds[heatId],
+        boatId,
+      );
     });
 
     console.log('New heats created based on leaderboard.');
@@ -335,8 +333,6 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
-
-
 
 ipcMain.handle(
   'transferBoatBetweenHeats',
@@ -531,8 +527,6 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
     );
-
-
 
     results.forEach(
       (result: {

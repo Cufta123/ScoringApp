@@ -1,3 +1,4 @@
+/* eslint-disable global-require */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import MenuBuilder from './menu';
@@ -6,6 +7,8 @@ import AppUpdater from './AppUpdater';
 import './ipcHandlers/SailorHandler';
 import './ipcHandlers/EventHandler';
 import './ipcHandlers/HeatRaceHandler';
+
+if (require('electron-squirrel-startup')) app.quit();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -103,3 +106,4 @@ app
     });
   })
   .catch(console.log);
+

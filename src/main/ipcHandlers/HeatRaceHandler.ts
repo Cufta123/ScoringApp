@@ -9,6 +9,7 @@ import {
   findLatestHeatsBySuffix,
   generateNextHeatNames,
 } from '../functions/creatingNewHeatsUtls';
+import calculateFinalBoatScores from '../functions/calculateFinalBoatScores';
 
 console.log('HeatRaceHandler.ts loaded');
 
@@ -522,28 +523,25 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id);
 
+    const groupTables = calculateFinalBoatScores(results, event_id);
+
     const updateQuery = db.prepare(
-      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
+      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group, place)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group,  place = excluded.place`,
     );
 
-    results.forEach(
-      (result: {
-        heat_name: string;
-        boat_id: any;
-        total_points_final: any;
-      }) => {
-        const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
+    groupTables.forEach((table, groupName) => {
+      table.forEach((boat) => {
         updateQuery.run(
-          result.boat_id,
-          result.total_points_final,
+          boat.boat_id,
+          boat.totalPoints,
           event_id,
-          placementGroup,
+          groupName,
+          boat.place,
         );
-      },
-    );
-
+      });
+    });
     console.log('Final leaderboard updated successfully.');
     return { success: true };
   } catch (error) {
@@ -554,6 +552,7 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
     throw error;
   }
 });
+
 ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
   try {
     const query = `

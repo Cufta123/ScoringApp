@@ -1,5 +1,6 @@
 {
   "name": "electron-react-boilerplate",
+  "version": "1.0.0",
   "description": "A foundation for scalable desktop apps",
   "keywords": [
     "electron",
@@ -42,14 +43,15 @@
     "postinstall": "electron-builder install-app-deps",
     "lint": "cross-env NODE_ENV=development eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "cross-env NODE_ENV=development eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "package": "ts-node ./.erb/scripts/clean.js dist && npm run build && electron-builder build --publish never && npm run build:dll",
+    "package": "electron-forge package",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "prestart": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.main.dev.ts",
-    "start": "ts-node ./.erb/scripts/check-port-in-use.js && npm run prestart && npm run start:renderer",
+    "start": "electron-forge start",
     "start:main": "concurrently -k \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --watch --config ./.erb/configs/webpack.config.main.dev.ts\" \"electronmon .\"",
     "start:preload": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.preload.dev.ts",
     "start:renderer": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack serve --config ./.erb/configs/webpack.config.renderer.dev.ts",
-    "test": "jest"
+    "test": "jest",
+    "make": "electron-forge make"
   },
   "browserslist": [
     "extends browserslist-config-erb"
@@ -106,6 +108,7 @@
     "better-sqlite3": "^11.3.0",
     "electron-debug": "^3.2.0",
     "electron-log": "^4.4.8",
+    "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.1.4",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
@@ -121,6 +124,14 @@
     "react-world-flags": "^1.6.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.6.1",
+    "@electron-forge/maker-deb": "^7.6.1",
+    "@electron-forge/maker-rpm": "^7.6.1",
+    "@electron-forge/maker-squirrel": "^7.6.1",
+    "@electron-forge/maker-zip": "^7.6.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.6.1",
+    "@electron-forge/plugin-fuses": "^7.6.1",
+    "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^3.3.0",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.11",
     "@svgr/webpack": "^8.1.0",
@@ -144,7 +155,6 @@
     "css-minimizer-webpack-plugin": "^5.0.1",
     "detect-port": "^1.5.1",
     "electron": "^31.3.0",
-    "electron-builder": "^24.13.3",
     "electron-devtools-installer": "^3.2.0",
     "electron-rebuild": "^3.2.9",
     "electronmon": "^2.0.2",

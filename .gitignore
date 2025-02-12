@@ -30,3 +30,5 @@ npm-debug.log.*
 
 #ignore databse
 public/Database/data/scoring_app.db-wal
+
+out/

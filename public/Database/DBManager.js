@@ -1,21 +1,28 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // Define the directory and filename for the database
-const dataDir = path.join(__dirname, '..', '..', 'public', 'Database', 'data');
+const appDataDir = path.join(
+  os.homedir(),
+  'AppData',
+  'Local',
+  'ScoringApp',
+  'data',
+);
 const dbFilename = 'scoring_app.db';
-const dbPath = path.join(dataDir, dbFilename);
+const dbPath = path.join(appDataDir, dbFilename);
 
-console.log(`Database directory: ${dataDir}`);
+console.log(`Database directory: ${appDataDir}`);
 console.log(`Database path: ${dbPath}`);
 
 // Ensure the data directory exists
-if (!fs.existsSync(dataDir)) {
-  console.log(`Data directory does not exist. Creating ${dataDir}`);
-  fs.mkdirSync(dataDir);
+if (!fs.existsSync(appDataDir)) {
+  console.log(`Data directory does not exist. Creating ${appDataDir}`);
+  fs.mkdirSync(appDataDir);
 } else {
-  console.log(`Data directory already exists: ${dataDir}`);
+  console.log(`Data directory already exists: ${appDataDir}`);
 }
 
 // Initialize the database
@@ -164,6 +171,7 @@ const initializeSchema = () => {
   total_points_final INTEGER NOT NULL,
   event_id INTEGER NOT NULL,
   placement_group TEXT NOT NULL,
+  place INTEGER,
   PRIMARY KEY (boat_id, event_id),
   FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
   FOREIGN KEY (event_id) REFERENCES Events(event_id)

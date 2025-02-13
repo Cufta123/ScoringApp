@@ -9,6 +9,7 @@ import {
   findLatestHeatsBySuffix,
   generateNextHeatNames,
 } from '../functions/creatingNewHeatsUtls';
+import calculateFinalBoatScores from '../functions/calculateFinalBoatScores';
 
 console.log('HeatRaceHandler.ts loaded');
 
@@ -511,7 +512,7 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
   }
   try {
     const query = `
-      SELECT boat_id, heat_name, SUM(points) as total_points_final
+      SELECT boat_id, heat_name, SUM(points) as total_points_final, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
       JOIN Heats ON Races.heat_id = Heats.heat_id
@@ -523,28 +524,28 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
     const results = readQuery.all(event_id);
 
     const updateQuery = db.prepare(
-      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group`,
+      `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group, place)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group, place = excluded.place`,
+    );
+    const pointsMap = new Map<number, any[]>();
+    const temporaryTable = calculateFinalBoatScores(
+      results,
+      event_id,
+      pointsMap,
     );
 
-    results.forEach(
-      (result: {
-        heat_name: string;
-        boat_id: any;
-        total_points_final: any;
-      }) => {
-        const placementGroup = result.heat_name.split(' ')[1]; // Extract the group name (e.g., Gold, Silver)
-        updateQuery.run(
-          result.boat_id,
-          result.total_points_final,
-          event_id,
-          placementGroup,
-        );
-      },
-    );
+    temporaryTable.forEach((boat) => {
+      console.log('Updating FinalLeaderboard with:', boat);
+      updateQuery.run(
+        boat.boat_id,
+        boat.totalPoints,
+        event_id,
+        boat.placement_group,
+        boat.place,
+      );
+    });
 
-    console.log('Final leaderboard updated successfully.');
     return { success: true };
   } catch (error) {
     console.error(
@@ -562,6 +563,7 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
         fl.total_points_final,
         fl.event_id,
         fl.placement_group,
+        fl.place,
         b.sail_number AS boat_number,
         b.model AS boat_type,
         s.name,
@@ -578,7 +580,7 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
       LEFT JOIN Scores sc ON r.race_id = sc.race_id AND sc.boat_id = b.boat_id
       WHERE fl.event_id = ? AND h.event_id = ? AND h.heat_type = 'Final'
       GROUP BY fl.boat_id
-      ORDER BY fl.placement_group, fl.total_points_final ASC
+      ORDER BY fl.placement_group, fl.place ASC
     `;
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id, event_id);

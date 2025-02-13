@@ -10,8 +10,6 @@ function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
-  const [editingCell, setEditingCell] = useState(null); // Tracks the row and cell being edited
-  const [newValue, setNewValue] = useState(''); // Stores the new value for the cell being edited
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
@@ -229,15 +227,13 @@ function LeaderboardComponent({ eventId }) {
         throw new Error('Leaderboard data is not initialized');
       }
 
-      // Recalculate total points before saving
+      // Recalculate total points before saving for each entry.
       const updatedLeaderboard = editableLeaderboard.map((entry) => {
-        // Calculate total points based on updated races
         const totalPointsEvent = entry.races.reduce(
           (acc, race) => acc + parseInt(race, 10),
           0,
         );
-        const totalPointsFinal = totalPointsEvent; // Use the same logic for final points if needed
-
+        const totalPointsFinal = totalPointsEvent; // Use same logic if needed.
         return {
           ...entry,
           total_points_event: totalPointsEvent,
@@ -245,41 +241,49 @@ function LeaderboardComponent({ eventId }) {
         };
       });
 
-      // Update changes to the database
-      for (const entry of updatedLeaderboard) {
+      // Build an array of update promises.
+      const updatePromises = [];
+
+      updatedLeaderboard.forEach((entry) => {
         const originalEntry = leaderboard.find(
           (e) => e.boat_id === entry.boat_id,
         );
-        if (!originalEntry) continue;
+        if (!originalEntry) return;
 
-        // Save race data changes to the database
-        for (let i = 0; i < entry.races.length; i++) {
+        for (let i = 0; i < entry.races.length; i += 1) {
           if (entry.races[i] !== originalEntry.races[i]) {
-            const race_id = entry.race_ids[i]; // Get the correct race_id
-            const heat_id = entry.heat_id; // Get the heat_id
+            const race_id = entry.race_ids[i]; // Get the correct race_id.
+            const { heat_id } = entry; // Get the heat_id.
             if (!race_id) {
               console.error('Race ID is missing for entry:', entry);
-              continue;
+              return;
             }
-            const newPosition = parseInt(entry.races[i], 10); // Ensure new_position is a number
+            const newPosition = parseInt(entry.races[i], 10);
             console.log(
               `Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}`,
             );
-            await window.electron.sqlite.heatRaceDB.updateRaceResult(
-              eventId, // Pass event_id
-              race_id,
-              entry.boat_id,
-              newPosition, // Pass new_position as a number
-              shiftPositions, // Use the checkbox state to determine if positions should be shifted
-              heat_id, // Pass heat_id
+            // Push the promise from the update operation.
+            updatePromises.push(
+              window.electron.sqlite.heatRaceDB.updateRaceResult(
+                eventId,
+                race_id,
+                entry.boat_id,
+                newPosition,
+                shiftPositions,
+                heat_id,
+              ),
             );
           }
         }
-      }
+      });
 
+      // Wait for all database update operations to complete in parallel.
+      await Promise.all(updatePromises);
+
+      // Update the event leaderboard in the database.
       await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(eventId);
 
-      // Refresh the leaderboard with the updated data after saving
+      // Refresh the leaderboard with updated data.
       const results = finalSeriesStarted
         ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
         : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
@@ -287,7 +291,7 @@ function LeaderboardComponent({ eventId }) {
       const leaderboardWithRaces = results.map((entry) => ({
         ...entry,
         races: entry.race_positions ? entry.race_positions.split(',') : [],
-        race_ids: entry.race_ids ? entry.race_ids.split(',') : [], // Ensure race_ids are included
+        race_ids: entry.race_ids ? entry.race_ids.split(',') : [],
       }));
 
       leaderboardWithRaces.sort((a, b) =>
@@ -297,8 +301,8 @@ function LeaderboardComponent({ eventId }) {
       );
 
       setLeaderboard(leaderboardWithRaces);
-      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing
-      setEditMode(false); // Exit edit mode after saving
+      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing.
+      setEditMode(false); // Exit edit mode after saving.
     } catch (error) {
       console.error('Error saving leaderboard:', error.message);
     }

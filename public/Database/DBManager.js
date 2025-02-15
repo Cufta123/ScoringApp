@@ -254,5 +254,5 @@ const checkEventsTable = () => {
 // Initialize the database schema and check for the Events table
 initializeSchema();
 checkEventsTable();
-
+console.log(`Database path: ${dbPath}`);
 module.exports = { db };

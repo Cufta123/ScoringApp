@@ -1,25 +1,150 @@
+/* eslint-disable camelcase */
+import { db } from '../../../public/Database/DBManager';
 export function assignBoatsToNewHeats(
   leaderboardResults: { boat_id: number }[],
   nextHeatNames: string[],
   raceNumber: number,
+  event_id: number,
+  latestHeats: { heat_name: string; heat_id: number }[],
 ) {
-  // The number of new heats
+  console.log(`Race Number: ${raceNumber}`);
+
+  console.log('Latest Heats:', latestHeats);
+
+  const latestHeatIds = latestHeats.map((heat) => heat.heat_id);
+
+  // Fetch old heats, their boats, and scores from the database
+  const oldHeatsQuery = db.prepare(`
+    SELECT h.heat_id, h.heat_name, b.boat_id, b.sail_number, s.name, s.surname, sc.points
+    FROM Heats h
+    JOIN Heat_Boat hb ON h.heat_id = hb.heat_id
+    JOIN Boats b ON hb.boat_id = b.boat_id
+    JOIN Sailors s ON b.sailor_id = s.sailor_id
+    JOIN Scores sc ON sc.boat_id = b.boat_id AND sc.race_id IN (SELECT race_id FROM Races WHERE heat_id = h.heat_id)
+    WHERE h.event_id = ? AND h.heat_type = 'Qualifying' AND h.heat_id IN (${latestHeatIds.join(',')})
+  `);
+  const oldHeats = oldHeatsQuery.all(event_id);
+
+  // Create a dictionary to hold the boats grouped by their heat names
+  const groupedByHeatName: Record<
+    string,
+    {
+      boat_id: number;
+      sail_number: number;
+      name: string;
+      surname: string;
+      points: number;
+    }[]
+  > = {};
+
+  // Populate the dictionary
+  oldHeats.forEach(
+    (heat: {
+      heat_name: string | number;
+      boat_id: any;
+      sail_number: any;
+      name: any;
+      surname: any;
+      points: any;
+    }) => {
+      if (!groupedByHeatName[heat.heat_name]) {
+        groupedByHeatName[heat.heat_name] = [];
+      }
+      groupedByHeatName[heat.heat_name].push({
+        boat_id: heat.boat_id,
+        sail_number: heat.sail_number,
+        name: heat.name,
+        surname: heat.surname,
+        points: heat.points,
+      });
+    },
+  );
+
+  // Sort the boats within each heat by their points
+  Object.keys(groupedByHeatName).forEach((heatName) => {
+    groupedByHeatName[heatName].sort((a, b) => a.points - b.points);
+  });
+
+  console.log('Grouped by Heat Name:', groupedByHeatName);
+
+  // Create tables with just boat_id and points
+  const tables = Object.keys(groupedByHeatName).map((heatName) => {
+    return {
+      heatName,
+      boats: groupedByHeatName[heatName].map((boat) => ({
+        boat_id: boat.boat_id,
+        points: boat.points,
+      })),
+    };
+  });
+
+  // Log the tables with full details
+  console.log('Tables:', JSON.stringify(tables, null, 2));
+
+  // Number of new heats
   const numHeats = nextHeatNames.length;
+  // According to the official rules, for old Heat A, finishing positions go A, B, C, D... in a cycle;
+  // for old Heat B, finishing positions go B, C, D, A... in a cycle; etc.
 
-  // This array will hold the final assignments:
-  // each element is { heatId: number, boatId: number }
-  const assignments = [];
+  // 1) Sort old heat names in alphabetical order so that "Heat Axx" is index 0, "Heat Bxx" is index 1, etc.
+  const sortedOldHeatNames = Object.keys(groupedByHeatName).sort((a, b) => {
+    // A simple approach: parse out the single-letter label (A, B, C, D, etc.) after "Heat "
+    // and compare them. (This works if your heat labels are single letters.)
+    const matchA = a.match(/Heat ([A-Z]+)/);
+    const matchB = b.match(/Heat ([A-Z]+)/);
+    if (!matchA || !matchB) return a.localeCompare(b); // fallback
+    return matchA[1].localeCompare(matchB[1]);
+  });
+  console.log(
+    'Sorted old heat names in alphabetical order:',
+    sortedOldHeatNames,
+  );
 
-  // Distribute each boat to a new heat using the modulo pattern.
-  // We assume `leaderboardResults` is sorted by finishing position,
-  // so index i => finishing position i+1 in the previous race.
-  for (let i = 0; i < leaderboardResults.length; i += 1) {
-    const boatId = leaderboardResults[i].boat_id;
-    // Use modulo to decide which new heat this boat goes to
-    const newHeatIndex = i % numHeats;
-    assignments.push({ heatId: newHeatIndex, boatId });
-  }
+  // We'll build a final array of assignments
+  // each element is { heatId: number, boatId: number, boatName: string }
+  const assignments: {
+    heatId: number;
+    boatId: number;
+    boatName: string;
+  }[] = [];
 
+  // 2) For each old heat in alphabetical order, assign finishing positions to new heats
+  sortedOldHeatNames.forEach((oldHeatName, oldHeatIndex) => {
+    console.log(
+      `\nProcessing old heat: "${oldHeatName}" (index ${oldHeatIndex})`,
+    );
+
+    const boats = groupedByHeatName[oldHeatName];
+
+    boats.forEach((boat, positionIndex) => {
+      // Finishing position is 1-based
+      const finishingPos = positionIndex + 1;
+
+      // Heat movement rule:
+      // newHeatIndex = (oldHeatIndex + (finishingPos - 1)) mod numHeats
+      const newHeatIndex =
+        (((oldHeatIndex - (finishingPos - 1)) % numHeats) + numHeats) %
+        numHeats;
+      const boatName = `${boat.name} ${boat.surname}`;
+
+      console.log(
+        `\tBoat: "${boatName}" (boat_id: ${
+          boat.boat_id
+        }), finishing position: ${finishingPos}, → newHeatIndex: ${newHeatIndex}, newHeatName: "${
+          nextHeatNames[newHeatIndex]
+        }"`,
+      );
+
+      // Push the assignment
+      assignments.push({
+        heatId: newHeatIndex,
+        boatId: boat.boat_id,
+        boatName,
+      });
+    });
+  });
+
+  console.log('\nFinal assignments:', JSON.stringify(assignments, null, 2));
   return assignments;
 }
 

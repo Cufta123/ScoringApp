@@ -283,7 +283,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Find the latest heats by suffix
     const latestHeats = findLatestHeatsBySuffix(existingHeats);
-
+    console.log('Latest Heats in the heatRaceHandler:', latestHeats);
     // Check race count for the latest heats
     checkRaceCountForLatestHeats(latestHeats, db);
 
@@ -315,6 +315,8 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
       leaderboardResults,
       nextHeatNames,
       raceNumber,
+      event_id,
+      latestHeats,
     );
 
     assignments.forEach(({ heatId, boatId }) => {

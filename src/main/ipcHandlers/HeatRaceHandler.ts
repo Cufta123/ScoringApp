@@ -4,7 +4,7 @@ import { db } from '../../../public/Database/DBManager';
 import calculateBoatScores from '../functions/calculateBoatScores';
 
 import {
-  assignBoatsToNewHeatsZigZag,
+  assignBoatsToNewHeats,
   checkRaceCountForLatestHeats,
   findLatestHeatsBySuffix,
   generateNextHeatNames,
@@ -311,7 +311,7 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     }
 
     // Assign boats to new heats
-    const assignments = assignBoatsToNewHeatsZigZag(
+    const assignments = assignBoatsToNewHeats(
       leaderboardResults,
       nextHeatNames,
       raceNumber,

@@ -1,11 +1,15 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const { app } = require('electron');
 
-// Define the directory and filename for the database
-const dataDir = path.join(__dirname, '..', '..', 'public', 'Database', 'data');
-const dbFilename = 'scoring_app.db';
-const dbPath = path.join(dataDir, dbFilename);
+// Define the path for the database file
+const dbPath = app.isPackaged
+  ? path.join(app.getPath('userData'), 'scoring_app.db')
+  : path.join(__dirname, 'public', 'Database', 'data', 'scoring_app.db');
+
+// Define the directory that will contain the database file
+const dataDir = path.dirname(dbPath);
 
 console.log(`Database directory: ${dataDir}`);
 console.log(`Database path: ${dbPath}`);
@@ -13,7 +17,7 @@ console.log(`Database path: ${dbPath}`);
 // Ensure the data directory exists
 if (!fs.existsSync(dataDir)) {
   console.log(`Data directory does not exist. Creating ${dataDir}`);
-  fs.mkdirSync(dataDir);
+  fs.mkdirSync(dataDir, { recursive: true });
 } else {
   console.log(`Data directory already exists: ${dataDir}`);
 }
@@ -72,21 +76,21 @@ const initializeSchema = () => {
   `;
 
   const createCategoriesTable = `
-  CREATE TABLE IF NOT EXISTS Categories (
-    category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_name TEXT NOT NULL
-  );
-  INSERT INTO Categories (category_id, category_name) VALUES (1, 'KADET')
-  ON CONFLICT(category_id) DO NOTHING;
-  INSERT INTO Categories (category_id, category_name) VALUES (2, 'JUNIOR')
-  ON CONFLICT(category_id) DO NOTHING;
-  INSERT INTO Categories (category_id, category_name) VALUES (3, 'SENIOR')
-  ON CONFLICT(category_id) DO NOTHING;
-  INSERT INTO Categories (category_id, category_name) VALUES (4, 'JUNIOR')
-  ON CONFLICT(category_id) DO NOTHING;
-  INSERT INTO Categories (category_id, category_name) VALUES (5, 'MASTER')
-  ON CONFLICT(category_id) DO NOTHING;
-`;
+    CREATE TABLE IF NOT EXISTS Categories (
+      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_name TEXT NOT NULL
+    );
+    INSERT INTO Categories (category_id, category_name) VALUES (1, 'KADET')
+    ON CONFLICT(category_id) DO NOTHING;
+    INSERT INTO Categories (category_id, category_name) VALUES (2, 'JUNIOR')
+    ON CONFLICT(category_id) DO NOTHING;
+    INSERT INTO Categories (category_id, category_name) VALUES (3, 'SENIOR')
+    ON CONFLICT(category_id) DO NOTHING;
+    INSERT INTO Categories (category_id, category_name) VALUES (4, 'JUNIOR')
+    ON CONFLICT(category_id) DO NOTHING;
+    INSERT INTO Categories (category_id, category_name) VALUES (5, 'MASTER')
+    ON CONFLICT(category_id) DO NOTHING;
+  `;
 
   const createBoatEventTable = `
     CREATE TABLE IF NOT EXISTS Boat_Event (
@@ -96,79 +100,80 @@ const initializeSchema = () => {
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
       FOREIGN KEY (event_id) REFERENCES Events(event_id)
     );
-    `;
+  `;
 
   const createHeatsTable = `
-  CREATE TABLE IF NOT EXISTS Heats (
-    heat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL,
-    heat_name TEXT NOT NULL,
-    heat_type TEXT NOT NULL, -- 'Qualifying' or 'Final'
-    FOREIGN KEY (event_id) REFERENCES Events(event_id)
-  );
-`;
+    CREATE TABLE IF NOT EXISTS Heats (
+      heat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      heat_name TEXT NOT NULL,
+      heat_type TEXT NOT NULL, -- 'Qualifying' or 'Final'
+      FOREIGN KEY (event_id) REFERENCES Events(event_id)
+    );
+  `;
 
   const createRacesTable = `
-  CREATE TABLE IF NOT EXISTS Races (
-    race_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    heat_id INTEGER NOT NULL,
-    race_number INTEGER NOT NULL,
-    FOREIGN KEY (heat_id) REFERENCES Heats(heat_id)
-  );
-`;
+    CREATE TABLE IF NOT EXISTS Races (
+      race_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      heat_id INTEGER NOT NULL,
+      race_number INTEGER NOT NULL,
+      FOREIGN KEY (heat_id) REFERENCES Heats(heat_id)
+    );
+  `;
 
   const createScoresTable = `
-  CREATE TABLE IF NOT EXISTS Scores (
-    score_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    race_id INTEGER NOT NULL,
-    boat_id INTEGER NOT NULL,
-    position INTEGER NOT NULL,
-    points INTEGER NOT NULL,
-    status TEXT NOT NULL, -- 'DNF', 'RET', 'NSC', 'OCS', 'DNS', 'DNC', 'WTH', 'UFD', 'BFD', 'DSQ', 'DNE'
-    FOREIGN KEY (race_id) REFERENCES Races(race_id),
-    FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
-  );
-`;
+    CREATE TABLE IF NOT EXISTS Scores (
+      score_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      race_id INTEGER NOT NULL,
+      boat_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      points INTEGER NOT NULL,
+      status TEXT NOT NULL, -- 'DNF', 'RET', 'NSC', 'OCS', 'DNS', 'DNC', 'WTH', 'UFD', 'BFD', 'DSQ', 'DNE'
+      FOREIGN KEY (race_id) REFERENCES Races(race_id),
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+    );
+  `;
+
   const createHeatBoatTable = `
-  CREATE TABLE IF NOT EXISTS Heat_Boat (
-    heat_id INTEGER,
-    boat_id INTEGER,
-    FOREIGN KEY (heat_id) REFERENCES Heats(heat_id),
-    FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
-  );
-`;
+    CREATE TABLE IF NOT EXISTS Heat_Boat (
+      heat_id INTEGER,
+      boat_id INTEGER,
+      FOREIGN KEY (heat_id) REFERENCES Heats(heat_id),
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+    );
+  `;
 
   const createLiderboardTable = `
-  CREATE TABLE IF NOT EXISTS Leaderboard (
-  boat_id INTEGER,
-  total_points_event INTEGER NOT NULL,
-  event_id INTEGER NOT NULL,
-  place INTEGER,
-  PRIMARY KEY (boat_id, event_id),
-  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
-  FOREIGN KEY (event_id) REFERENCES Events(event_id)
-);
-`;
+    CREATE TABLE IF NOT EXISTS Leaderboard (
+      boat_id INTEGER,
+      total_points_event INTEGER NOT NULL,
+      event_id INTEGER NOT NULL,
+      place INTEGER,
+      PRIMARY KEY (boat_id, event_id),
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
+      FOREIGN KEY (event_id) REFERENCES Events(event_id)
+    );
+  `;
 
   const createGlobalLeaderboardTable = `
-  CREATE TABLE IF NOT EXISTS GlobalLeaderboard (
-  boat_id INTEGER PRIMARY KEY,
-  total_points_global INTEGER NOT NULL,
-  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
-);
-`;
+    CREATE TABLE IF NOT EXISTS GlobalLeaderboard (
+      boat_id INTEGER PRIMARY KEY,
+      total_points_global INTEGER NOT NULL,
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
+    );
+  `;
 
   const createFinalLeaderboardTable = `
-  CREATE TABLE IF NOT EXISTS FinalLeaderboard (
-  boat_id INTEGER,
-  total_points_final INTEGER NOT NULL,
-  event_id INTEGER NOT NULL,
-  placement_group TEXT NOT NULL,
-  PRIMARY KEY (boat_id, event_id),
-  FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
-  FOREIGN KEY (event_id) REFERENCES Events(event_id)
-);
-`;
+    CREATE TABLE IF NOT EXISTS FinalLeaderboard (
+      boat_id INTEGER,
+      total_points_final INTEGER NOT NULL,
+      event_id INTEGER NOT NULL,
+      placement_group TEXT NOT NULL,
+      PRIMARY KEY (boat_id, event_id),
+      FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
+      FOREIGN KEY (event_id) REFERENCES Events(event_id)
+    );
+  `;
 
   try {
     console.log('Creating Events table...');
@@ -246,10 +251,8 @@ const checkEventsTable = () => {
   }
 };
 
-// Initialize the database schema
+// Initialize the database schema and check for the Events table
 initializeSchema();
-
-// Check if the Events table exists
 checkEventsTable();
 
 module.exports = { db };

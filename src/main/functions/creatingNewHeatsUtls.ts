@@ -1,92 +1,23 @@
-export function assignBoatsToNewHeatsZigZag(
-  leaderboardResults: string | any[],
-  nextHeatNames: string | any[],
+export function assignBoatsToNewHeats(
+  leaderboardResults: { boat_id: number }[],
+  nextHeatNames: string[],
   raceNumber: number,
 ) {
+  // The number of new heats
   const numHeats = nextHeatNames.length;
-  const numBoats = leaderboardResults.length;
-  const baseParticipantsPerHeat = Math.floor(numBoats / numHeats);
-  const extraParticipants = numBoats % numHeats;
-  const participantsPerHeat = new Array(numHeats).fill(baseParticipantsPerHeat);
 
-  for (let i = 0; i < extraParticipants; i += 1) {
-    participantsPerHeat[i] += 1;
-  }
-
+  // This array will hold the final assignments:
+  // each element is { heatId: number, boatId: number }
   const assignments = [];
 
-  if (raceNumber === 1) {
-    let heatIndex = 0;
-    for (let i = 0; i < leaderboardResults.length; i += 1) {
-      const boatId = leaderboardResults[i].boat_id;
-      assignments.push({ heatId: heatIndex, boatId });
-      heatIndex = (heatIndex + 1) % numHeats;
-    }
-  } else {
-    let direction = 1;
-    let heatIndex = 0;
-    let repeatedBoundary = false;
-    const remainingSpots = [...participantsPerHeat];
-
-    const findAvailableHeat = () => {
-      for (let j = 0; j < numHeats; j++) {
-        if (remainingSpots[j] > 0) {
-          return j;
-        }
-      }
-      return heatIndex;
-    };
-
-    for (let i = 0; i < leaderboardResults.length; i += 1) {
-      const boatId = leaderboardResults[i].boat_id;
-      assignments.push({ heatId: heatIndex, boatId });
-      remainingSpots[heatIndex] -= 1;
-
-      if (i === leaderboardResults.length - 1) break;
-
-      let candidate;
-
-      if (heatIndex === numHeats - 1 && direction === 1) {
-        if (!repeatedBoundary && remainingSpots[heatIndex] > 0) {
-          candidate = heatIndex;
-          repeatedBoundary = true;
-        } else {
-          repeatedBoundary = false;
-          direction = -1;
-          candidate = heatIndex + direction;
-        }
-      } else if (heatIndex === 0 && direction === -1) {
-        if (!repeatedBoundary && remainingSpots[heatIndex] > 0) {
-          candidate = heatIndex;
-          repeatedBoundary = true;
-        } else {
-          repeatedBoundary = false;
-          direction = 1;
-          candidate = heatIndex + direction;
-        }
-      } else {
-        candidate = heatIndex + direction;
-      }
-
-      if (
-        candidate < 0 ||
-        candidate >= numHeats ||
-        remainingSpots[candidate] === 0
-      ) {
-        direction = -direction;
-        candidate = heatIndex + direction;
-        if (
-          candidate < 0 ||
-          candidate >= numHeats ||
-          remainingSpots[candidate] === 0
-        ) {
-          candidate = findAvailableHeat();
-        }
-        repeatedBoundary = false;
-      }
-
-      heatIndex = candidate;
-    }
+  // Distribute each boat to a new heat using the modulo pattern.
+  // We assume `leaderboardResults` is sorted by finishing position,
+  // so index i => finishing position i+1 in the previous race.
+  for (let i = 0; i < leaderboardResults.length; i += 1) {
+    const boatId = leaderboardResults[i].boat_id;
+    // Use modulo to decide which new heat this boat goes to
+    const newHeatIndex = i % numHeats;
+    assignments.push({ heatId: newHeatIndex, boatId });
   }
 
   return assignments;

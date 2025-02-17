@@ -170,6 +170,7 @@ const initializeSchema = () => {
       total_points_final INTEGER NOT NULL,
       event_id INTEGER NOT NULL,
       placement_group TEXT NOT NULL,
+      place INTEGER,
       PRIMARY KEY (boat_id, event_id),
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id),
       FOREIGN KEY (event_id) REFERENCES Events(event_id)

@@ -230,6 +230,20 @@ const initializeSchema = () => {
     db.exec(createFinalLeaderboardTable);
     console.log('FinalLeaderboard table created or already exists.');
 
+    // Migration step to add the 'place' column if it doesn't exist
+    const columnCheck = db
+      .prepare('PRAGMA table_info(FinalLeaderboard);')
+      .all();
+    const placeColumnExists = columnCheck.some(
+      (column) => column.name === 'place',
+    );
+
+    if (!placeColumnExists) {
+      console.log("Adding 'place' column to FinalLeaderboard table...");
+      db.exec('ALTER TABLE FinalLeaderboard ADD COLUMN place INTEGER;');
+      console.log("'place' column added to FinalLeaderboard table.");
+    }
+
     console.log('Database schema initialized successfully.');
   } catch (error) {
     console.error('Error initializing database schema:', error);

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable prettier/prettier */
 import React, { useState, useEffect } from 'react';
 import Flag from 'react-world-flags';
@@ -25,7 +26,9 @@ function GlobalLeaderboardComponent() {
         }));
 
         // Sort the leaderboard by total_points in descending order
-        mappedLeaderboard.sort((a, b) => a.total_points_global - b.total_points_global);
+        mappedLeaderboard.sort(
+          (a, b) => a.total_points_global - b.total_points_global,
+        );
 
         setLeaderboard(mappedLeaderboard);
       } catch (error) {
@@ -113,13 +116,13 @@ function GlobalLeaderboardComponent() {
               <td>{entry.surname}</td>
               <td>{entry.boat_number}</td>
               <td>{entry.boat_type}</td>
-               <td>
-                    <Flag
-                      code={getFlagCode(entry.country)}
-                      style={{ width: '30px', marginRight: '5px' }}
-                    />
-                    {entry.country}
-                  </td>
+              <td>
+                <Flag
+                  code={getFlagCode(entry.country)}
+                  style={{ width: '30px', marginRight: '5px' }}
+                />
+                {entry.country}
+              </td>
               <td>{entry.total_points_global}</td>
             </tr>
           ))}

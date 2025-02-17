@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+/* eslint-disable no-alert */
 import React, { useState, useEffect, useCallback } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -97,10 +99,6 @@ function EventPage() {
 
   const handleAddSailor = () => {
     fetchBoatsWithSailors();
-  };
-
-  const handleBackClick = () => {
-    navigate('/');
   };
 
   const handleHeatRaceClick = () => {

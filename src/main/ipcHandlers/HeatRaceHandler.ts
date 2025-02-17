@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';

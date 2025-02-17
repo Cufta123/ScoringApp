@@ -1,3 +1,5 @@
+/* eslint-disable no-alert */
+/* eslint-disable no-console */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
@@ -235,7 +237,7 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
       await handleCreateHeats();
     } catch (error) {
       console.error('Error recreating heats:', error);
-      console.error('Error recreating heats. Please try again later.');
+      alert('Error recreating heats. Please try again later.');
     }
   };
 

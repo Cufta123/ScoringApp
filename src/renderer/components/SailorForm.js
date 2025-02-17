@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+/* eslint-disable no-alert */
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -88,7 +90,6 @@ function SailorForm({ onAddSailor, eventId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
 
     if (raceHappened) {
       toast.error(

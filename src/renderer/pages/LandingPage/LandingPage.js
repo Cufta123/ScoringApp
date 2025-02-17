@@ -1,14 +1,14 @@
+/* eslint-disable no-console */
 /* eslint-disable prettier/prettier */
 // src/pages/LandingPage/LandingPage.js
-import React, { useState, } from 'react';
+import React, { useState } from 'react';
 import EventForm from '../../components/EventForm';
 import GlobalLeaderboardComponent from '../../components/GlobalLeaderboard';
-
 
 function LandingPage() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  console.log("LandingPage component rendered");
+  console.log('LandingPage component rendered');
 
   const handleOpenLeaderboard = () => {
     setShowLeaderboard(true);

@@ -265,16 +265,6 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     throw new Error('Cannot insert heat for locked event.');
   }
   try {
-    // Read the current leaderboard for the specific event
-    const leaderboardQuery = `
-      SELECT boat_id, total_points_event
-      FROM Leaderboard
-      WHERE event_id = ?
-      ORDER BY place ASC
-    `;
-    const readLeaderboardQuery = db.prepare(leaderboardQuery);
-    const leaderboardResults = readLeaderboardQuery.all(event_id);
-
     // Read the existing heats for the event
     const existingHeatsQuery = db.prepare(
       `SELECT heat_name, heat_id FROM Heats WHERE event_id = ?`,
@@ -312,7 +302,6 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
 
     // Assign boats to new heats
     const assignments = assignBoatsToNewHeats(
-      leaderboardResults,
       nextHeatNames,
       raceNumber,
       event_id,

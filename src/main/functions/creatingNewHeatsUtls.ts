@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import { db } from '../../../public/Database/DBManager';
+
 export function assignBoatsToNewHeats(
-  leaderboardResults: { boat_id: number }[],
   nextHeatNames: string[],
   raceNumber: number,
   event_id: number,
@@ -105,7 +105,6 @@ export function assignBoatsToNewHeats(
   const assignments: {
     heatId: number;
     boatId: number;
-    boatName: string;
   }[] = [];
 
   // 2) For each old heat in alphabetical order, assign finishing positions to new heats
@@ -139,7 +138,6 @@ export function assignBoatsToNewHeats(
       assignments.push({
         heatId: newHeatIndex,
         boatId: boat.boat_id,
-        boatName,
       });
     });
   });
@@ -188,9 +186,9 @@ export function findLatestHeatsBySuffix(
 
 export function checkRaceCountForLatestHeats(
   lastHeats: { heat_name: string; heat_id: number }[],
-  db: any,
+  database: any,
 ) {
-  const raceCountQuery = db.prepare(
+  const raceCountQuery = database.prepare(
     `SELECT COUNT(*) as race_count FROM Races WHERE heat_id = ?`,
   );
 

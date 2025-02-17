@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
+import assignBoatsToNewHeatsZigZag from '../../main/functions/creatingNewHeatsZigZag';
 
 function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heats, setHeats] = useState([]);
@@ -175,8 +176,8 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
       }
 
       eventBoats.sort((a, b) => {
-        if (a.country < b.country) return -1;
-        if (a.country > b.country) return 1;
+        if (a.boat_country < b.boat_country) return -1;
+        if (a.boat_country > b.boat_country) return 1;
         return a.sail_number - b.sail_number;
       });
 
@@ -193,43 +194,23 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
         );
       }
       await Promise.all(heatPromises);
-
-      const FetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+      // Fetch the newly created heats from the DB
+      const fetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
         event.event_id,
       );
 
-      // Calculate the number of boats per heat
-      const boatsPerHeat = Math.floor(eventBoats.length / numHeats);
-      const extraBoats = eventBoats.length % numHeats;
+      console.log('fetchedHeats:', fetchedHeats);
+      console.log('eventBoats:', eventBoats);
 
-      const heatBoatPromises = [];
-      let boatIndex = 0;
+      // Use the zigzag function to determine assignments.
+      // The function now returns objects with the actual heat_id.
+      const assignments = assignBoatsToNewHeatsZigZag(eventBoats, fetchedHeats);
+      console.log('assignments:', assignments);
 
-      // Assign boats to heats in A, B, C, D, A, B, C, D... pattern
-      for (let i = 0; i < eventBoats.length - extraBoats; i += 1) {
-        const heatIndex = i % numHeats;
-        const heat = FetchedHeats[heatIndex];
-        heatBoatPromises.push(
-          window.electron.sqlite.heatRaceDB.insertHeatBoat(
-            heat.heat_id,
-            eventBoats[boatIndex].boat_id,
-          ),
-        );
-        boatIndex += 1;
-      }
-
-      // Assign extra boats to heats
-      for (let i = 0; i < extraBoats; i += 1) {
-        const heat = FetchedHeats[i];
-        heatBoatPromises.push(
-          window.electron.sqlite.heatRaceDB.insertHeatBoat(
-            heat.heat_id,
-            eventBoats[boatIndex].boat_id,
-          ),
-        );
-        boatIndex += 1;
-      }
-
+      // Insert each boat into its assigned heat using the actual heat id
+      const heatBoatPromises = assignments.map(({ heatId, boatId }) => {
+        return window.electron.sqlite.heatRaceDB.insertHeatBoat(heatId, boatId);
+      });
       await Promise.all(heatBoatPromises);
 
       alert('Heats created successfully!');

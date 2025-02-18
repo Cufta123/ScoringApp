@@ -183,7 +183,8 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
     throw new Error('Cannot insert heat for locked event.');
   }
   try {
-    const query = `
+    // 1. Get summary results for each boat in the event.
+    const summaryQuery = `
       SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
@@ -192,19 +193,34 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
       GROUP BY boat_id
       ORDER BY total_points_event ASC
     `;
-    const readQuery = db.prepare(query);
-    const results = readQuery.all(event_id);
+    const summaryResults = db.prepare(summaryQuery).all(event_id);
 
+    // 2. Fetch all raw scores for the event. (sorted as needed)
+    const scoresQuery = db.prepare(`
+      SELECT s.boat_id, s.points, r.race_number
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ?
+      ORDER BY s.points DESC, r.race_number DESC
+    `);
+    const rawScores = scoresQuery.all(event_id);
+
+    // 3. Calculate the temporary leaderboard from the raw data.
+    // The calculateBoatScores function now becomes pure, using summaryResults and rawScores.
+    const setFinalSeriesStarted = false;
+    const temporaryTable = calculateBoatScores(
+      summaryResults,
+      rawScores,
+      setFinalSeriesStarted,
+    );
+
+    // 4. Update the Leaderboard table.
     const updateQuery = db.prepare(
       `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
        VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event, place = excluded.place`,
     );
-
-    const pointsMap = new Map<number, any[]>();
-    const temporaryTable = calculateBoatScores(results, event_id, pointsMap);
-
-    // Update the leaderboard with the sorted results
     temporaryTable.forEach((boat) => {
       updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
     });
@@ -234,8 +250,12 @@ ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
        VALUES (?, ?)
        ON CONFLICT(boat_id) DO UPDATE SET total_points_global = total_points_global + excluded.total_points_global`,
     );
-    const pointsMap = new Map<number, any[]>();
-    const temporaryTable = calculateBoatScores(results, event_id, pointsMap);
+    const setFinalSeriesStarted = false;
+    const temporaryTable = calculateBoatScores(
+      results,
+      event_id,
+      setFinalSeriesStarted,
+    );
     // Update the leaderboard with the sorted results
     temporaryTable.forEach((boat) => {
       updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
@@ -580,6 +600,45 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
     return results;
   } catch (error) {
     console.error('Error reading final leaderboard:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('getSummaryResults', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
+      FROM Scores
+      JOIN Races ON Scores.race_id = Races.race_id
+      JOIN Heats ON Races.heat_id = Heats.heat_id
+      WHERE Heats.event_id = ?
+      GROUP BY boat_id
+      ORDER BY total_points_event ASC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+    return results;
+  } catch (error) {
+    console.error('Error reading boat scores ordered by points:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('getScoresResult', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT s.boat_id, s.points, r.race_number
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ?
+      ORDER BY s.points DESC, r.race_number DESC
+    `;
+    const readQuery = db.prepare(query);
+    const results = readQuery.all(event_id);
+    return results;
+  } catch (error) {
+    console.error('Error reading boat scores ordered by race number:', error);
     throw error;
   }
 });

@@ -2,14 +2,14 @@
 /* eslint-disable no-console */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import Flag from 'react-world-flags';
-import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 import assignBoatsToNewHeatsZigZag from '../../main/functions/creatingNewHeatsZigZag';
+import HeatTables from './heatComponents/HeatTables';
+import handleStartFinalSeries from '../../main/functions/handleStartFinalSeries';
 
 function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
-  const [selectedHeatId, setSelectedHeatId] = useState(null);
+
   const [heatsCreated, setHeatsCreated] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
   const [displayLastHeats, setDisplayLastHeats] = useState(true);
@@ -63,100 +63,6 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
   useEffect(() => {
     checkFinalSeriesStarted();
   }, [checkFinalSeriesStarted]);
-
-  const handleStartFinalSeries = async () => {
-    if (finalSeriesStarted) {
-      return;
-    }
-    try {
-      const allHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
-        event.event_id,
-      );
-      const qualifyingHeats = allHeats.filter(
-        (heat) => heat.heat_type === 'Qualifying',
-      );
-      const numFinalHeats = new Set(
-        qualifyingHeats.map((heat) => heat.heat_name.match(/Heat ([A-Z])/)[1]),
-      ).size;
-
-      // Fetch leaderboard to rank boats
-      const leaderboard =
-        await window.electron.sqlite.heatRaceDB.readLeaderboard(event.event_id);
-
-      // Fetch race scores for each boat
-      const boatScores = await Promise.all(
-        leaderboard.map(async (boat) => {
-          const scores = await window.electron.sqlite.heatRaceDB.readAllScores(
-            boat.boat_id,
-          );
-          return {
-            boat_id: boat.boat_id,
-            scores: scores.map((score) => score.position).sort((a, b) => a - b),
-          };
-        }),
-      );
-      // Adjust scores by excluding the second worst score if applicable
-      const adjustedLeaderboard = boatScores.map((boat) => {
-        const { scores } = boat;
-        let totalPoints = scores.reduce((acc, score) => acc + score, 0);
-
-        if (scores.length > 5 && scores.length < 8) {
-          // Exclude the second worst score
-          totalPoints -= scores[scores.length - 2];
-        }
-
-        return {
-          boat_id: boat.boat_id,
-          totalPoints,
-        };
-      });
-
-      // Sort boats by adjusted total points
-      adjustedLeaderboard.sort((a, b) => a.totalPoints - b.totalPoints);
-      // Determine fleet sizes
-      const boatsPerFleet = Math.floor(
-        adjustedLeaderboard.length / numFinalHeats,
-      );
-      const extraBoats = adjustedLeaderboard.length % numFinalHeats;
-
-      const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
-      const fleetPromises = [];
-
-      let boatIndex = 0;
-      for (let i = 0; i < numFinalHeats; i += 1) {
-        const fleetName = fleetNames[i] || `Fleet ${i + 1}`;
-        const heatName = `Heat ${fleetName}`;
-        const heatType = 'Final';
-
-        // Insert new heat for the final series
-        const { lastInsertRowid: newHeatId } =
-          await window.electron.sqlite.heatRaceDB.insertHeat(
-            event.event_id,
-            heatName,
-            heatType,
-          );
-
-        const boatsInThisFleet = boatsPerFleet + (i < extraBoats ? 1 : 0);
-        for (let j = 0; j < boatsInThisFleet; j += 1) {
-          fleetPromises.push(
-            window.electron.sqlite.heatRaceDB.insertHeatBoat(
-              newHeatId,
-              leaderboard[boatIndex].boat_id,
-            ),
-          );
-          boatIndex += 1;
-        }
-      }
-
-      await Promise.all(fleetPromises);
-      setFinalSeriesStarted(true); // Set final series started to true
-      alert('Final Series started successfully!');
-      handleDisplayHeats(); // Refresh the heats display
-    } catch (error) {
-      console.error('Error starting final series:', error);
-      alert('Error starting final series. Please try again later.');
-    }
-  };
 
   const handleCreateHeats = async () => {
     if (raceHappened || finalSeriesStarted) {
@@ -246,13 +152,6 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
     handleDisplayHeats();
   }, [event, handleDisplayHeats]);
 
-  const handleHeatClick = (heat) => {
-    if (clickable) {
-      setSelectedHeatId(heat.heat_id);
-      onHeatSelect(heat);
-    }
-  };
-
   const toggleDisplayMode = () => {
     setDisplayLastHeats((prevMode) => !prevMode);
   };
@@ -290,80 +189,6 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
 
   const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
 
-  const getFlagCode = (iocCode) => {
-    return iocToFlagCodeMap[iocCode] || iocCode;
-  };
-
-  const handleBoatTransfer = async (boat, fromHeatId, toHeatId) => {
-    if (raceHappened || finalSeriesStarted) {
-      alert('Cannot transfer boats after a race has happened.');
-      return;
-    }
-
-    try {
-      await window.electron.sqlite.heatRaceDB.transferBoatBetweenHeats(
-        fromHeatId,
-        toHeatId,
-        boat.boat_id,
-      );
-      alert('Boat transferred successfully!');
-      handleDisplayHeats(); // Refresh the heats display
-    } catch (error) {
-      console.error('Error transferring boat:', error);
-      alert('Error transferring boat. Please try again later.');
-    }
-  };
-
-  const handleDragStart = (e, boat, fromHeatId) => {
-    const { nativeEvent } = e;
-    nativeEvent.dataTransfer.setData(
-      'application/json',
-      JSON.stringify({ boat, fromHeatId }),
-    );
-  };
-  const handleDrop = async (e, toHeatId) => {
-    e.preventDefault();
-    const data = JSON.parse(e.dataTransfer.getData('application/json'));
-    const { boat, fromHeatId } = data;
-    await handleBoatTransfer(boat, fromHeatId, toHeatId);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const heatsContainerStyle = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    padding: '10px',
-  };
-
-  const heatColumnStyle = {
-    backgroundColor: '#f0f0f0',
-    border: '2px solid #ccc',
-    borderRadius: '5px',
-    padding: '10px',
-    maxWidth: '400px', // Set max width
-    flex: '1 1 30%', // Ensure only 4 columns per row with uniform spacing
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    cursor: clickable ? 'pointer' : 'default',
-  };
-  const selectedHeatColumnStyle = {
-    ...heatColumnStyle,
-    border: '2px solid #007bff', // Blue border to highlight the selected heat
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // Add shadow for more emphasis
-  };
-  const boatNumberColumnStyle = {
-    ...heatColumnStyle,
-    maxWidth: '100px', // Shorter width for boat number
-  };
-
-  const sailorNameColumnStyle = {
-    ...heatColumnStyle,
-    maxWidth: '400px', // Wider width for sailor name
-  };
-
   return (
     <div>
       <div>
@@ -397,70 +222,28 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
         {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
       </button>
       {!finalSeriesStarted && (
-        <button type="button" onClick={handleStartFinalSeries}>
+        <button
+          type="button"
+          onClick={() =>
+            handleStartFinalSeries({
+              event,
+              setFinalSeriesStarted,
+              handleDisplayHeats,
+            })
+          }
+        >
           Start Final Series
         </button>
       )}
       {heatsToDisplay.length > 0 && (
-        <div style={heatsContainerStyle} className="heats-container">
-          {heatsToDisplay.map((heat) => (
-            <div
-              key={heat.heat_id}
-              style={
-                heat.heat_id === selectedHeatId
-                  ? selectedHeatColumnStyle
-                  : heatColumnStyle
-              }
-              className="heat-column"
-              onClick={() => handleHeatClick(heat)}
-              role="button"
-              tabIndex={0}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleHeatClick(heat);
-                }
-              }}
-              onDrop={(e) => handleDrop(e, heat.heat_id)}
-              onDragOver={handleDragOver}
-            >
-              <h4>
-                {heat.heat_name} (Race {heat.raceNumber})
-              </h4>
-              <table>
-                <thead>
-                  <tr>
-                    <th style={sailorNameColumnStyle}>Sailor Name</th>
-                    <th>Country</th>
-                    <th style={boatNumberColumnStyle}>Boat Number</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {heat.boats.map((boat) => (
-                    <tr
-                      key={boat.boat_id}
-                      draggable={!raceHappened && !finalSeriesStarted}
-                      onDragStart={(e) =>
-                        handleDragStart(e, boat, heat.heat_id)
-                      }
-                    >
-                      <td style={sailorNameColumnStyle}>
-                        {boat.name} {boat.surname}
-                      </td>
-                      <td>
-                        <Flag
-                          code={getFlagCode(boat.country)}
-                          style={{ width: '30px', marginRight: '5px' }}
-                        />
-                        {boat.country}
-                      </td>
-                      <td style={boatNumberColumnStyle}>{boat.sail_number}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
+        <HeatTables
+          heatsToDisplay={heatsToDisplay}
+          raceHappened={raceHappened}
+          finalSeriesStarted={finalSeriesStarted}
+          onHeatSelect={onHeatSelect}
+          clickable={clickable}
+          handleDisplayHeats={handleDisplayHeats}
+        />
       )}
     </div>
   );

@@ -39,7 +39,9 @@ export type Channels =
   | 'readFinalLeaderboard'
   | 'lockEvent'
   | 'unlockEvent'
-  | 'updateRaceResult';
+  | 'updateRaceResult'
+  | 'getSummaryResults'
+  | 'getScoresResult';
 
 const electronHandler = {
   ipcRenderer: {
@@ -453,7 +455,7 @@ const electronHandler = {
         boat_id: string,
         new_position: string,
         shift_positions: boolean,
-        heat_id: string
+        heat_id: string,
       ) {
         try {
           return await ipcRenderer.invoke(
@@ -463,7 +465,7 @@ const electronHandler = {
             boat_id,
             new_position,
             shift_positions,
-            heat_id
+            heat_id,
           );
         } catch (error) {
           console.error('Error invoking updateRaceResult IPC:', error);
@@ -475,6 +477,22 @@ const electronHandler = {
           return await ipcRenderer.invoke('readFinalLeaderboard', event_id);
         } catch (error) {
           console.error('Error invoking readFinalLeaderboard IPC:', error);
+          return false;
+        }
+      },
+      async getSummaryResults(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('getSummaryResults', event_id);
+        } catch (error) {
+          console.error('Error invoking getSummaryResults IPC:', error);
+          return false;
+        }
+      },
+      async getScoresResult(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('getScoresResult', event_id);
+        } catch (error) {
+          console.error('Error invoking getScoresResult IPC:', error);
           return false;
         }
       },

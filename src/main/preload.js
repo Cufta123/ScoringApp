@@ -1,5 +1,4 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const { read } = require('fs');
 const sailorDB = require('../../public/Database/SailorsManager');
 const eventDB = require('../../public/Database/EventManager');
 const heatRaceDB = require('../../public/Database/HeatRaceManager');
@@ -58,6 +57,8 @@ const electronHandler = {
     updateFinalLeaderboard: heatRaceDB.updateFinalLeaderboard,
     readFinalLeaderboard: heatRaceDB.readFinalLeaderboard,
     updateRaceResult: heatRaceDB.updateRaceResult,
+    getSummaryResults: heatRaceDB.getSummaryResults,
+    getScoresResult: heatRaceDB.getScoresResult,
   },
 };
 

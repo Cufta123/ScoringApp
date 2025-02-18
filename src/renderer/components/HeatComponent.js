@@ -6,7 +6,13 @@ import assignBoatsToNewHeatsZigZag from '../../main/functions/creatingNewHeatsZi
 import HeatTables from './heatComponents/HeatTables';
 import handleStartFinalSeries from '../../main/functions/handleStartFinalSeries';
 
-function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
+function HeatComponent({
+  event,
+  onHeatSelect = () => {},
+  clickable,
+  selectedHeatId,
+  handleStartScoring,
+}) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
 
@@ -243,6 +249,8 @@ function HeatComponent({ event, onHeatSelect = () => {}, clickable }) {
           onHeatSelect={onHeatSelect}
           clickable={clickable}
           handleDisplayHeats={handleDisplayHeats}
+          selectedHeatId={selectedHeatId}
+          handleStartScoring={handleStartScoring}
         />
       )}
     </div>

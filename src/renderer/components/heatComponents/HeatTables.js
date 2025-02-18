@@ -9,9 +9,9 @@ export default function HeatTables({
   clickable,
   onHeatSelect,
   handleDisplayHeats,
+  selectedHeatId,
+  handleStartScoring,
 }) {
-  const [selectedHeatId, setSelectedHeatId] = useState(null);
-
   const handleBoatTransfer = async (boat, fromHeatId, toHeatId) => {
     if (raceHappened || finalSeriesStarted) {
       alert('Cannot transfer boats after a race has happened.');
@@ -41,7 +41,6 @@ export default function HeatTables({
 
   const handleHeatClick = (heat) => {
     if (clickable) {
-      setSelectedHeatId(heat.heat_id);
       onHeatSelect(heat);
     }
   };
@@ -123,6 +122,11 @@ export default function HeatTables({
               sailorNameColumnStyle={sailorNameColumnStyle}
             />
           </table>
+          {heat.heat_id === selectedHeatId && (
+            <button type="button" onClick={handleStartScoring}>
+              Start Scoring
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -151,4 +155,6 @@ HeatTables.propTypes = {
   clickable: PropTypes.bool.isRequired,
   onHeatSelect: PropTypes.func.isRequired,
   handleDisplayHeats: PropTypes.func.isRequired,
+  selectedHeatId: PropTypes.number, // This may be null if no heat is selected
+  handleStartScoring: PropTypes.func,
 };

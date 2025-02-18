@@ -16,6 +16,7 @@ function HeatRacePage() {
   const [isScoring, setIsScoring] = useState(false);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [heats, setHeats] = useState([]);
+  const [allHeatsEqual, setAllHeatsEqual] = useState(false); // New state
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -32,6 +33,16 @@ function HeatRacePage() {
       fetchEvent();
     }
   }, [eventData, event]);
+
+  // Check if all heats have the same number of races and update state
+  useEffect(() => {
+    if (event && event.event_id) {
+      (async () => {
+        const equal = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+        setAllHeatsEqual(equal);
+      })();
+    }
+  }, [heats, event]);
 
   const handleHeatSelect = (heat) => {
     setSelectedHeat(heat);
@@ -56,7 +67,7 @@ function HeatRacePage() {
         if (match) {
           const [_, base, suffix] = match;
           const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-          acc[base] = acc[base] || { suffix: -1, heat: null }; // Initialize suffix to -1 for heats without a number
+          acc[base] = acc[base] || { suffix: -1, heat: null };
           if (numericSuffix > acc[base].suffix) {
             acc[base] = { suffix: numericSuffix, heat };
           }
@@ -67,15 +78,25 @@ function HeatRacePage() {
       // Extract only the latest heats
       const lastHeats = Object.values(latestHeats).map((entry) => entry.heat);
 
-      // Check race count for the latest heats
+      // Check race count for the latest heats and ensure races are not null
       const raceCounts = await Promise.all(
         lastHeats.map(async (heat) => {
           const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
             heat.heat_id,
           );
+          // If the races array is null or undefined, return null as a flag
+          if (!races) {
+            return null;
+          }
           return races.length;
         }),
       );
+      console.log('race counts', raceCounts);
+
+      // If any of the races arrays is null or if race count is 0, consider the check failed.
+      if (raceCounts.includes(null) || raceCounts[0] === 0) {
+        return false;
+      }
 
       // Ensure all latest heats have the same number of races
       return raceCounts.every((count) => count === raceCounts[0]);
@@ -133,10 +154,8 @@ function HeatRacePage() {
 
     if (!finalSeriesStarted) {
       // Check if all heats have the same number of races before updating the local leaderboard
-      const allHeatsEqual = await doAllHeatsHaveSameNumberOfRaces(
-        event.event_id,
-      );
-      if (allHeatsEqual) {
+      const allEqual = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+      if (allEqual) {
         // Update the event leaderboard
         await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
           event.event_id,
@@ -187,6 +206,25 @@ function HeatRacePage() {
     }
   };
 
+  // New function: Warn user before starting final series
+  const handleStartFinalSeries = async () => {
+    const confirmed = window.confirm(
+      'Starting the final series will lock in the current heats and you will not be able to create new heats based on the leaderboard. Do you want to proceed?',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      // Call any database or business logic to start the final series.
+      // For example, you might update event state, create final heats, etc.
+      // await window.electron.sqlite.heatRaceDB.startFinalSeries(event.event_id);
+      setFinalSeriesStarted(true);
+      console.log('Final series started.');
+    } catch (error) {
+      console.error('Error starting final series:', error.message);
+    }
+  };
+
   useEffect(() => {
     console.log('HeatComponent Props:', heats);
   }, [heats]);
@@ -225,19 +263,25 @@ function HeatRacePage() {
             heats={heats}
             onHeatSelect={handleHeatSelect}
             clickable
+            selectedHeatId={selectedHeat ? selectedHeat.heat_id : null}
+            handleStartScoring={handleStartScoring}
           />
-          {selectedHeat && (
-            <button type="button" onClick={handleStartScoring}>
-              Start Scoring
-            </button>
-          )}
-          {!finalSeriesStarted && (
+
+          {/* Render the "Create New Heats" button only if final series hasn't started AND
+              all heats have the same non-zero number of races */}
+          {!finalSeriesStarted && allHeatsEqual && (
             <button
               type="button"
               onClick={handleCreateNewHeatsBasedOnLeaderboard}
-              disabled={finalSeriesStarted}
             >
-              Create New Heats Based on Leaderboard
+              Create New Heats
+            </button>
+          )}
+
+          {/* Render the "Start Final Series" button if final series hasn't started */}
+          {!finalSeriesStarted && (
+            <button type="button" onClick={handleStartFinalSeries}>
+              Start Final Series
             </button>
           )}
         </>

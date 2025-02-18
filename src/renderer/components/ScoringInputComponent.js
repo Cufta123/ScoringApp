@@ -1,5 +1,5 @@
 /* eslint-disable no-alert */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 
 function ScoringInputComponent({ heat, onSubmit }) {
@@ -12,6 +12,8 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
 
+  const inputRef = useRef(null);
+
   useEffect(() => {
     const fetchBoats = async () => {
       try {
@@ -23,7 +25,6 @@ function ScoringInputComponent({ heat, onSubmit }) {
         console.error('Error fetching boats:', error);
       }
     };
-
     fetchBoats();
   }, [heat.heat_id]);
 
@@ -35,7 +36,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
       .filter((n) => !Number.isNaN(n));
 
     const uniqueNumbers = [...new Set(inputNumbers)];
-    setTemporaryBoats(uniqueNumbers); // Temporarily track boats
+    setTemporaryBoats(uniqueNumbers);
     setInputValue(input);
   };
 
@@ -43,7 +44,11 @@ function ScoringInputComponent({ heat, onSubmit }) {
     if (!temporaryBoats.includes(sailNumber)) {
       const updatedTemporaryBoats = [...temporaryBoats, sailNumber];
       setTemporaryBoats(updatedTemporaryBoats);
-      setInputValue(updatedTemporaryBoats.join(' ')); // Reflect in the input field
+      setInputValue(updatedTemporaryBoats.join(' '));
+      // Refocus the input so it remains interactive.
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 

@@ -6,6 +6,10 @@ import Flag from 'react-world-flags';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
+import {
+  HandleSave,
+  HandleRaceChange,
+} from '../../main/functions/editingLeaderboard';
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -13,6 +17,7 @@ function LeaderboardComponent({ eventId }) {
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
+
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
 
   const checkFinalSeriesStarted = useCallback(async () => {
@@ -145,193 +150,6 @@ function LeaderboardComponent({ eventId }) {
     setEditMode(!editMode);
   };
 
-  const handleRaceChange = (boatId, raceIndex, newHandleRaceChangeValue) => {
-    if (
-      !Number.isNaN(Number(newHandleRaceChangeValue)) &&
-      newHandleRaceChangeValue >= 0
-    ) {
-      const updatedLeaderboard = editableLeaderboard.map((entry) => {
-        if (entry.boat_id === boatId) {
-          const oldPosition = parseInt(entry.races[raceIndex], 10);
-          const newPosition = parseInt(newHandleRaceChangeValue, 10);
-          const heatId =
-            entry.heat_ids && entry.heat_ids[raceIndex]
-              ? entry.heat_ids[raceIndex]
-              : null;
-
-          // Update the position of the selected boat
-          entry.races[raceIndex] = newPosition;
-
-          if (shiftPositions) {
-            // Shift positions of other boats in the same race within the same heat
-            editableLeaderboard.forEach((otherEntry) => {
-              if (
-                otherEntry.boat_id !== boatId &&
-                otherEntry.races[raceIndex] !== undefined
-              ) {
-                const otherPosition = parseInt(otherEntry.races[raceIndex], 10);
-                if (
-                  oldPosition > newPosition &&
-                  otherPosition >= newPosition &&
-                  otherPosition < oldPosition
-                ) {
-                  otherEntry.races[raceIndex] = otherPosition + 1;
-                } else if (
-                  oldPosition < newPosition &&
-                  otherPosition <= newPosition &&
-                  otherPosition > oldPosition
-                ) {
-                  otherEntry.races[raceIndex] = otherPosition - 1;
-                }
-              }
-            });
-          }
-
-          const totalPointsEvent = entry.races.reduce(
-            (acc, race) => acc + parseInt(race, 10),
-            0,
-          );
-          const totalPointsFinal = totalPointsEvent;
-
-          return {
-            ...entry,
-            total_points_event: totalPointsEvent,
-            total_points_final: totalPointsFinal,
-            heat_id: heatId, // Include heat_id in the entry
-          };
-        }
-        return entry;
-      });
-
-      // Recalculate total points for all boats after shifting positions
-      const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
-        const totalPointsEvent = entry.races.reduce(
-          (acc, race) => acc + parseInt(race, 10),
-          0,
-        );
-        const totalPointsFinal = totalPointsEvent;
-
-        return {
-          ...entry,
-          total_points_event: totalPointsEvent,
-          total_points_final: totalPointsFinal,
-        };
-      });
-
-      setEditableLeaderboard(recalculatedLeaderboard);
-    }
-  };
-  const handleSave = async () => {
-    console.log('Updated leaderboard:', editableLeaderboard);
-    try {
-      if (!editableLeaderboard || !leaderboard) {
-        throw new Error('Leaderboard data is not initialized');
-      }
-
-      // Recalculate total points before saving for each entry.
-      const updatedLeaderboard = editableLeaderboard.map((entry) => {
-        const totalPointsEvent = entry.races.reduce(
-          (acc, race) => acc + parseInt(race, 10),
-          0,
-        );
-        const totalPointsFinal = totalPointsEvent; // Use same logic if needed.
-        return {
-          ...entry,
-          total_points_event: totalPointsEvent,
-          total_points_final: totalPointsFinal,
-        };
-      });
-
-      // Build an array of update promises.
-      const updatePromises = [];
-
-      updatedLeaderboard.forEach((entry) => {
-        const originalEntry = leaderboard.find(
-          (e) => e.boat_id === entry.boat_id,
-        );
-        if (!originalEntry) return;
-
-        for (let i = 0; i < entry.races.length; i += 1) {
-          if (entry.races[i] !== originalEntry.races[i]) {
-            const race_id = entry.race_ids[i]; // Get the correct race_id.
-            const { heat_id } = entry; // Get the heat_id.
-            if (!race_id) {
-              console.error('Race ID is missing for entry:', entry);
-              return;
-            }
-            const newPosition = parseInt(entry.races[i], 10);
-            console.log(
-              `Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}`,
-            );
-            // Push the promise from the update operation.
-            updatePromises.push(
-              window.electron.sqlite.heatRaceDB.updateRaceResult(
-                eventId,
-                race_id,
-                entry.boat_id,
-                newPosition,
-                shiftPositions,
-                heat_id,
-              ),
-            );
-          }
-        }
-      });
-
-      // Wait for all database update operations to complete in parallel.
-      await Promise.all(updatePromises);
-
-      // Update the event leaderboard in the database.
-      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(eventId);
-
-      // Refresh the leaderboard with updated data.
-      const results = finalSeriesStarted
-        ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
-        : await window.electron.sqlite.heatRaceDB.readLeaderboard(eventId);
-
-      const leaderboardWithRaces = results.map((entry) => ({
-        ...entry,
-        races: entry.race_positions ? entry.race_positions.split(',') : [],
-        race_ids: entry.race_ids ? entry.race_ids.split(',') : [],
-      }));
-
-      leaderboardWithRaces.sort((a, b) =>
-        finalSeriesStarted
-          ? a.total_points_final - b.total_points_final
-          : a.total_points_event - b.total_points_event,
-      );
-
-      setLeaderboard(leaderboardWithRaces);
-      setEditableLeaderboard(JSON.parse(JSON.stringify(leaderboardWithRaces))); // Clone for editing.
-      setEditMode(false); // Exit edit mode after saving.
-    } catch (error) {
-      console.error('Error saving leaderboard:', error.message);
-    }
-  };
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!leaderboard.length) {
-    return <div>No results available for this event.</div>;
-  }
-
-  const groupedLeaderboard =
-    editableLeaderboard?.reduce((acc, entry) => {
-      const group = entry.placement_group || 'General';
-      if (!acc[group]) {
-        acc[group] = [];
-      }
-      acc[group].push(entry);
-      return acc;
-    }, {}) || {};
-
-  const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
-  const sortedGroups = Object.keys(groupedLeaderboard).sort(
-    (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
-  );
-
   const exportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Leaderboard');
@@ -387,6 +205,29 @@ function LeaderboardComponent({ eventId }) {
     saveAs(blob, 'leaderboard.xlsx');
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!leaderboard.length) {
+    return <div>No results available for this event.</div>;
+  }
+
+  const groupedLeaderboard =
+    editableLeaderboard?.reduce((acc, entry) => {
+      const group = entry.placement_group || 'General';
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push(entry);
+      return acc;
+    }, {}) || {};
+
+  const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
+  const sortedGroups = Object.keys(groupedLeaderboard).sort(
+    (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
+  );
+
   return (
     <div className="leaderboard">
       <h2>{finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h2>
@@ -401,7 +242,18 @@ function LeaderboardComponent({ eventId }) {
           <div>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() =>
+                HandleSave({
+                  eventId,
+                  leaderboard,
+                  editableLeaderboard,
+                  setLeaderboard,
+                  setEditableLeaderboard,
+                  setEditMode,
+                  shiftPositions,
+                  finalSeriesStarted,
+                })
+              }
               style={{ marginLeft: '10px' }}
             >
               Save Changes
@@ -471,10 +323,14 @@ function LeaderboardComponent({ eventId }) {
                               : race
                           } // Remove parentheses for editing
                           onChange={(e) =>
-                            handleRaceChange(
-                              entry.boat_id,
-                              raceIndex,
-                              e.target.value,
+                            setEditableLeaderboard(
+                              HandleRaceChange({
+                                boatId: entry.boat_id,
+                                raceIndex,
+                                newHandleRaceChangeValue: e.target.value,
+                                editableLeaderboard,
+                                shiftPositions,
+                              }),
                             )
                           }
                           style={{ width: '50px' }}

@@ -59,6 +59,7 @@ const electronHandler = {
     updateRaceResult: heatRaceDB.updateRaceResult,
     getSummaryResults: heatRaceDB.getSummaryResults,
     getScoresResult: heatRaceDB.getScoresResult,
+    getRaceMapping: heatRaceDB.getRaceMapping,
   },
 };
 

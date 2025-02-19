@@ -34,15 +34,16 @@ function HeatRacePage() {
     }
   }, [eventData, event]);
 
-  // Check if all heats have the same number of races and update state
-  useEffect(() => {
-    if (event && event.event_id) {
-      (async () => {
-        const equal = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
-        setAllHeatsEqual(equal);
-      })();
+  const updateHeats = async () => {
+    try {
+      const allHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+        event.event_id,
+      );
+      setHeats(allHeats);
+    } catch (error) {
+      console.error('Error updating heats:', error.message);
     }
-  }, [heats, event]);
+  };
 
   const handleHeatSelect = (heat) => {
     setSelectedHeat(heat);
@@ -108,6 +109,16 @@ function HeatRacePage() {
       return false;
     }
   };
+
+  // Check if all heats have the same number of races and update state
+  useEffect(() => {
+    if (event && event.event_id) {
+      (async () => {
+        const equal = await doAllHeatsHaveSameNumberOfRaces(event.event_id);
+        setAllHeatsEqual(equal);
+      })();
+    }
+  }, [heats, event]);
 
   const handleSubmitScores = async (placeNumbers) => {
     console.log('Submitted place numbers:', placeNumbers);
@@ -176,6 +187,8 @@ function HeatRacePage() {
 
     // Update the selected heat with the new race number
     setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
+
+    updateHeats();
   };
 
   const handleCreateNewHeatsBasedOnLeaderboard = async () => {
@@ -203,25 +216,6 @@ function HeatRacePage() {
         'Error creating new heats based on leaderboard:',
         error.message,
       );
-    }
-  };
-
-  // New function: Warn user before starting final series
-  const handleStartFinalSeries = async () => {
-    const confirmed = window.confirm(
-      'Starting the final series will lock in the current heats and you will not be able to create new heats based on the leaderboard. Do you want to proceed?',
-    );
-    if (!confirmed) {
-      return;
-    }
-    try {
-      // Call any database or business logic to start the final series.
-      // For example, you might update event state, create final heats, etc.
-      // await window.electron.sqlite.heatRaceDB.startFinalSeries(event.event_id);
-      setFinalSeriesStarted(true);
-      console.log('Final series started.');
-    } catch (error) {
-      console.error('Error starting final series:', error.message);
     }
   };
 
@@ -275,13 +269,6 @@ function HeatRacePage() {
               onClick={handleCreateNewHeatsBasedOnLeaderboard}
             >
               Create New Heats
-            </button>
-          )}
-
-          {/* Render the "Start Final Series" button if final series hasn't started */}
-          {!finalSeriesStarted && (
-            <button type="button" onClick={handleStartFinalSeries}>
-              Start Final Series
             </button>
           )}
         </>

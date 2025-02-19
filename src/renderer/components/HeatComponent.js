@@ -1,3 +1,4 @@
+/* eslint-disable react/require-default-props */
 /* eslint-disable no-alert */
 /* eslint-disable no-console */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,8 +11,8 @@ function HeatComponent({
   event,
   onHeatSelect = () => {},
   clickable,
-  selectedHeatId,
-  handleStartScoring,
+  selectedHeatId = null,
+  handleStartScoring = () => {},
 }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
@@ -264,6 +265,8 @@ HeatComponent.propTypes = {
   }).isRequired,
   onHeatSelect: PropTypes.func,
   clickable: PropTypes.bool.isRequired,
+  selectedHeatId: PropTypes.number,
+  handleStartScoring: PropTypes.func,
 };
 
 export default HeatComponent;

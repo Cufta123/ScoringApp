@@ -377,13 +377,21 @@ ipcMain.handle(
 
 ipcMain.handle(
   'updateRaceResult',
-  async (event, event_id, race_id, boat_id, new_position, shift_positions) => {
+  async (
+    event,
+    event_id,
+    race_id,
+    boat_id,
+    new_position,
+    shift_positions,
+    heat_id,
+  ) => {
     try {
       console.log(
-        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}`,
+        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}, heat_id: ${heat_id}`,
       );
 
-      // Step 1: Get the current race result
+      // Step 1: Get the current race result.
       const currentResult = db
         .prepare(
           `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`,
@@ -399,56 +407,88 @@ ipcMain.handle(
 
       const currentPosition = currentResult.position;
 
-      // Step 2: Update the race result in the Scores table
+      // Step 2: Update both position and points in the Scores table for the specific heat.
       const updateQuery = db.prepare(
-        `UPDATE Scores SET position = ? WHERE race_id = ? AND boat_id = ?`,
+        `UPDATE Scores SET position = ?, points = ? WHERE race_id = ? AND boat_id = ?`,
       );
-      updateQuery.run(new_position, race_id, boat_id);
+      updateQuery.run(new_position, new_position, race_id, boat_id);
 
-      // Step 3: Optionally shift positions if needed
+      // Step 3: Optionally shift positions if needed, but only for boats in the same heat.
       if (shift_positions) {
         if (currentPosition > new_position) {
-          // Boat moved up, shift others down
-          const shiftQuery = db.prepare(
-            `UPDATE Scores SET position = position + 1 WHERE race_id = ? AND position >= ? AND position < ? AND boat_id != ?`,
+          // Boat moved up, shift others down.
+          const affectedBoats = db
+            .prepare(
+              `SELECT boat_id, position FROM Scores
+               WHERE race_id = ?
+                 AND position >= ?
+                 AND position < ?
+                 AND boat_id != ?
+                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+            )
+            .all(race_id, new_position, currentPosition, boat_id, heat_id);
+
+          console.log(
+            'Shifting down boats (moved up scenario). Affected boats:',
+            affectedBoats,
           );
-          shiftQuery.run(race_id, new_position, currentPosition, boat_id);
+
+          const shiftQuery = db.prepare(
+            `UPDATE Scores
+             SET position = position + 1
+             WHERE race_id = ?
+               AND position >= ?
+               AND position < ?
+               AND boat_id != ?
+               AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+          );
+          const result = shiftQuery.run(
+            race_id,
+            new_position,
+            currentPosition,
+            boat_id,
+            heat_id,
+          );
+          console.log(`Shift down complete. Rows updated: ${result.changes}`);
         } else if (currentPosition < new_position) {
-          // Boat moved down, shift others up
-          const shiftQuery = db.prepare(
-            `UPDATE Scores SET position = position - 1 WHERE race_id = ? AND position <= ? AND position > ? AND boat_id != ?`,
+          // Boat moved down, shift others up.
+          const affectedBoats = db
+            .prepare(
+              `SELECT boat_id, position FROM Scores
+               WHERE race_id = ?
+                 AND position <= ?
+                 AND position > ?
+                 AND boat_id != ?
+                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+            )
+            .all(race_id, new_position, currentPosition, boat_id, heat_id);
+
+          console.log(
+            'Shifting up boats (moved down scenario). Affected boats:',
+            affectedBoats,
           );
-          shiftQuery.run(race_id, new_position, currentPosition, boat_id);
+
+          const shiftQuery = db.prepare(
+            `UPDATE Scores
+             SET position = position - 1
+             WHERE race_id = ?
+               AND position <= ?
+               AND position > ?
+               AND boat_id != ?
+               AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+          );
+          const result = shiftQuery.run(
+            race_id,
+            new_position,
+            currentPosition,
+            boat_id,
+            heat_id,
+          );
+          console.log(`Shift up complete. Rows updated: ${result.changes}`);
         }
       }
 
-      // Step 4: Recalculate the total points for the affected boat
-      // Get all races for this boat in the event
-      const races = db
-        .prepare(
-          `SELECT position FROM Scores WHERE boat_id = ? AND race_id IN (SELECT race_id FROM Races WHERE heat_id IN (SELECT heat_id FROM Heats WHERE event_id = ?))`,
-        )
-        .all(boat_id, event_id);
-
-      const totalPointsEvent = races.reduce(
-        (acc: any, race: { position: any }) => acc + race.position,
-        0,
-      );
-
-      // Step 5: Update the total points in the Leaderboard (or FinalLeaderboard) table
-      const leaderboardUpdateQuery = db.prepare(
-        `UPDATE Leaderboard SET total_points_event = ? WHERE boat_id = ? AND event_id = ?`,
-      );
-      leaderboardUpdateQuery.run(totalPointsEvent, boat_id, event_id);
-
-      // If final series is started, update the FinalLeaderboard table
-      const finalLeaderboardUpdateQuery = db.prepare(
-        `UPDATE FinalLeaderboard SET total_points_final = ? WHERE boat_id = ? AND event_id = ?`,
-      );
-      finalLeaderboardUpdateQuery.run(totalPointsEvent, boat_id, event_id);
-
-      // Call updateEventLeaderboard to recalculate scores and exclude the worst ones
-
+      // Step 4: Leaderboard update will occur later via updateEventLeaderboard.
       return { success: true };
     } catch (err) {
       console.error('Error updating race result:', (err as Error).message);
@@ -456,6 +496,33 @@ ipcMain.handle(
     }
   },
 );
+
+ipcMain.handle('getRaceMapping', async (event, event_id) => {
+  try {
+    const query = `
+      SELECT r.race_id, h.heat_id
+      FROM Races r
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ?
+    `;
+    const rows = db.prepare(query).all(event_id);
+    // Build a mapping object where keys are race_id and values are heat_id.
+    const mapping: { [key: string]: string } = {};
+    rows.forEach(
+      (row: {
+        race_id: string | number;
+        heat_id: { toString: () => string };
+      }) => {
+        mapping[row.race_id] = row.heat_id.toString();
+      },
+    );
+    console.log('Generated race mapping:', mapping);
+    return mapping;
+  } catch (error) {
+    console.error('Error getting race mapping:', (error as Error).message);
+    throw error;
+  }
+});
 
 ipcMain.handle('readLeaderboard', async (event, event_id) => {
   try {
@@ -484,7 +551,6 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
     `;
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id, event_id);
-    console.log('Raw results from readLeaderboard:', results);
     return results;
   } catch (error) {
     console.error('Error reading leaderboard:', error);
@@ -596,7 +662,6 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
     `;
     const readQuery = db.prepare(query);
     const results = readQuery.all(event_id, event_id);
-    console.log('Final leaderboard results:', results);
     return results;
   } catch (error) {
     console.error('Error reading final leaderboard:', error);

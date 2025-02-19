@@ -41,7 +41,8 @@ export type Channels =
   | 'unlockEvent'
   | 'updateRaceResult'
   | 'getSummaryResults'
-  | 'getScoresResult';
+  | 'getScoresResult'
+  | 'getRaceMapping';
 
 const electronHandler = {
   ipcRenderer: {
@@ -493,6 +494,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('getScoresResult', event_id);
         } catch (error) {
           console.error('Error invoking getScoresResult IPC:', error);
+          return false;
+        }
+      },
+      async getRaceMapping(event_id: any) {
+        try {
+          return await ipcRenderer.invoke('getRaceMapping', event_id);
+        } catch (error) {
+          console.error('Error invoking getRaceMapping IPC:', error);
           return false;
         }
       },

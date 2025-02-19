@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import HeatRows from './HeatRows';
 
@@ -122,11 +122,12 @@ export default function HeatTables({
               sailorNameColumnStyle={sailorNameColumnStyle}
             />
           </table>
-          {heat.heat_id === selectedHeatId && (
-            <button type="button" onClick={handleStartScoring}>
-              Start Scoring
-            </button>
-          )}
+          {heat.heat_id === selectedHeatId &&
+            (heat.raceNumber === 0 || finalSeriesStarted) && (
+              <button type="button" onClick={handleStartScoring}>
+                Start Scoring
+              </button>
+            )}
         </div>
       ))}
     </div>

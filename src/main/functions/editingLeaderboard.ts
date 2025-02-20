@@ -1,4 +1,5 @@
 /* eslint-disable camelcase */
+/* eslint-disable camelcase */
 interface LeaderboardEntry {
   boat_id: any;
   races: string[];
@@ -18,116 +19,144 @@ export function HandleRaceChange({
   editableLeaderboard: LeaderboardEntry[];
   shiftPositions: boolean;
 }) {
-  console.log('HandleRaceChange called', {
-    boatId,
-    raceIndex,
-    newHandleRaceChangeValue,
-  });
+  console.log('--- HandleRaceChange called ---');
+  console.log({ boatId, raceIndex, newHandleRaceChangeValue });
+
   if (
     !Number.isNaN(Number(newHandleRaceChangeValue)) &&
     Number(newHandleRaceChangeValue) >= 0
   ) {
-    const updatedLeaderboard = editableLeaderboard.map(
-      (entry: {
-        boat_id: any;
-        races: any[];
-        heat_ids: { [x: string]: any };
-      }) => {
-        if (entry.boat_id === boatId) {
-          console.log('Updating entry for boat', boatId, entry);
-          const oldPosition = parseInt(entry.races[raceIndex], 10);
-          const newPosition = parseInt(newHandleRaceChangeValue, 10);
-          const heatId =
-            entry.heat_ids && entry.heat_ids[raceIndex]
-              ? entry.heat_ids[raceIndex]
-              : null;
+    const updatedLeaderboard = editableLeaderboard.map((entry) => {
+      if (entry.boat_id === boatId) {
+        console.log(`>>> Updating entry for boat ${boatId}`);
+        console.log('Current entry:', entry);
+        const oldPosition = parseInt(entry.races[raceIndex], 10);
+        const newPosition = parseInt(newHandleRaceChangeValue, 10);
+        const heatId =
+          entry.heat_ids && entry.heat_ids[raceIndex]
+            ? entry.heat_ids[raceIndex]
+            : null;
 
-          // Update the position of the selected boat
-          entry.races[raceIndex] = newPosition;
+        // Log the leaderboard for the current heat BEFORE making any changes.
+        const heatLeaderboardBefore = editableLeaderboard
+          .filter((e) => e.heat_ids && e.heat_ids[raceIndex] === heatId)
+          .map((e) => ({
+            boat_id: e.boat_id,
+            position: parseInt(e.races[raceIndex], 10),
+          }))
+          .sort((a, b) => a.position - b.position);
+        console.log(
+          `--- Heat ${heatId} (Race ${raceIndex + 1}) leaderboard BEFORE update:`,
+          heatLeaderboardBefore,
+        );
+
+        // Update the position of the selected boat.
+        entry.races[raceIndex] = newPosition.toString();
+        console.log(
+          `Boat ${boatId} position updated from ${oldPosition} to ${newPosition}`,
+        );
+
+        if (shiftPositions) {
+          console.log('=== Starting shift process for other boats ===');
           console.log(
-            `Boat ${boatId} position updated from ${oldPosition} to ${newPosition}`,
+            `Shift mode: ${
+              oldPosition > newPosition
+                ? 'Shifting Others Down (boat moved up)'
+                : 'Shifting Others Up (boat moved down)'
+            }`,
           );
+          const currentHeatId = heatId; // Use the same heat id for clarity.
 
-          if (shiftPositions) {
-            console.log('Shifting positions for other boats in the same race');
-            // Shift positions of other boats in the same race within the same heat
-            editableLeaderboard.forEach(
-              (otherEntry: { boat_id: any; races: { [x: string]: any } }) => {
-                if (
-                  otherEntry.boat_id !== boatId &&
-                  otherEntry.races[raceIndex] !== undefined
-                ) {
-                  const otherPosition = parseInt(
-                    otherEntry.races[raceIndex],
-                    10,
-                  );
-                  if (
-                    oldPosition > newPosition &&
-                    otherPosition >= newPosition &&
-                    otherPosition < oldPosition
-                  ) {
-                    otherEntry.races[raceIndex] = otherPosition + 1;
-                    console.log(
-                      `Boat ${otherEntry.boat_id} shifted from ${otherPosition} to ${otherPosition + 1}`,
-                    );
-                  } else if (
-                    oldPosition < newPosition &&
-                    otherPosition <= newPosition &&
-                    otherPosition > oldPosition
-                  ) {
-                    otherEntry.races[raceIndex] = otherPosition - 1;
-                    console.log(
-                      `Boat ${otherEntry.boat_id} shifted from ${otherPosition} to ${otherPosition - 1}`,
-                    );
-                  }
-                }
-              },
-            );
-          }
-
-          const totalPointsEvent = entry.races.reduce(
-            (acc: number, race: string) => acc + parseInt(race, 10),
-            0,
-          );
-          const totalPointsFinal = totalPointsEvent;
-
-          console.log('Updated points for boat', boatId, {
-            totalPointsEvent,
-            totalPointsFinal,
+          // Process and log shifts for each affected boat.
+          editableLeaderboard.forEach((otherEntry) => {
+            if (
+              otherEntry.boat_id !== boatId &&
+              otherEntry.races[raceIndex] !== undefined &&
+              otherEntry.heat_ids &&
+              otherEntry.heat_ids[raceIndex] === currentHeatId
+            ) {
+              const otherPosition = parseInt(otherEntry.races[raceIndex], 10);
+              // Boat moved up: shift boats between newPosition and oldPosition up by +1.
+              if (
+                oldPosition > newPosition &&
+                otherPosition >= newPosition &&
+                otherPosition < oldPosition
+              ) {
+                console.log(
+                  `>> Affected boat ${otherEntry.boat_id}: position ${otherPosition} will shift to ${
+                    otherPosition + 1
+                  } (moved up scenario)`,
+                );
+                otherEntry.races[raceIndex] = (otherPosition + 1).toString();
+              }
+              // Boat moved down: shift boats between oldPosition and newPosition down by -1.
+              else if (
+                oldPosition < newPosition &&
+                otherPosition <= newPosition &&
+                otherPosition > oldPosition
+              ) {
+                console.log(
+                  `>> Affected boat ${otherEntry.boat_id}: position ${otherPosition} will shift to ${
+                    otherPosition - 1
+                  } (moved down scenario)`,
+                );
+                otherEntry.races[raceIndex] = otherPosition - 1;
+              }
+            }
           });
+          console.log('=== Shift process completed ===');
 
-          return {
-            ...entry,
-            total_points_event: totalPointsEvent,
-            total_points_final: totalPointsFinal,
-            heat_id: heatId, // Include heat_id in the entry
-          };
+          // Log the updated leaderboard for the heat AFTER shifting.
+          const heatLeaderboardAfter = editableLeaderboard
+            .filter(
+              (e) => e.heat_ids && e.heat_ids[raceIndex] === currentHeatId,
+            )
+            .map((e) => ({
+              boat_id: e.boat_id,
+              position: parseInt(e.races[raceIndex], 10),
+            }))
+            .sort((a, b) => a.position - b.position);
+          console.log(
+            `--- Heat ${currentHeatId} (Race ${raceIndex + 1}) leaderboard AFTER update:`,
+            heatLeaderboardAfter,
+          );
         }
-        return entry;
-      },
-    );
 
-    // Recalculate total points for all boats after shifting positions
-    const recalculatedLeaderboard = updatedLeaderboard.map(
-      (entry: { races: any[] }) => {
         const totalPointsEvent = entry.races.reduce(
           (acc: number, race: string) => acc + parseInt(race, 10),
           0,
         );
         const totalPointsFinal = totalPointsEvent;
-
+        console.log('>>> New totals for boat', boatId, {
+          totalPointsEvent,
+          totalPointsFinal,
+        });
         return {
           ...entry,
           total_points_event: totalPointsEvent,
           total_points_final: totalPointsFinal,
+          heat_id: heatId, // Include heat_id in the entry.
         };
-      },
-    );
+      }
+      return entry;
+    });
 
-    console.log(
-      'HandleRaceChange updated leaderboard',
-      recalculatedLeaderboard,
-    );
+    // Recalculate total points for all boats after shifting positions.
+    const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
+      const totalPointsEvent = entry.races.reduce(
+        (acc: number, race: string) => acc + parseInt(race, 10),
+        0,
+      );
+      const totalPointsFinal = totalPointsEvent;
+      return {
+        ...entry,
+        total_points_event: totalPointsEvent,
+        total_points_final: totalPointsFinal,
+      };
+    });
+
+    console.log('=== HandleRaceChange updated leaderboard ===');
+    console.log(JSON.stringify(recalculatedLeaderboard, null, 2));
     return recalculatedLeaderboard;
   }
 }

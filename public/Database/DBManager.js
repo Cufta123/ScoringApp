@@ -33,6 +33,7 @@ console.log('Database initialized.');
 const initializeSchema = () => {
   console.log('Initializing database schema...');
 
+  // Table creation statements
   const createEventsTable = `
     CREATE TABLE IF NOT EXISTS Events (
       event_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +44,6 @@ const initializeSchema = () => {
       is_locked INTEGER DEFAULT 0
     );
   `;
-
   const createSailorsTable = `
     CREATE TABLE IF NOT EXISTS Sailors (
       sailor_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +56,6 @@ const initializeSchema = () => {
       FOREIGN KEY (club_id) REFERENCES Clubs(club_id)
     );
   `;
-
   const createBoatsTable = `
     CREATE TABLE IF NOT EXISTS Boats (
       boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +66,6 @@ const initializeSchema = () => {
       FOREIGN KEY (sailor_id) REFERENCES Sailors(sailor_id)
     );
   `;
-
   const createClubsTable = `
     CREATE TABLE IF NOT EXISTS Clubs (
       club_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,24 +73,26 @@ const initializeSchema = () => {
       country TEXT NOT NULL
     );
   `;
-
   const createCategoriesTable = `
-    CREATE TABLE IF NOT EXISTS Categories (
-      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      category_name TEXT NOT NULL
-    );
-    INSERT INTO Categories (category_id, category_name) VALUES (1, 'KADET')
-    ON CONFLICT(category_id) DO NOTHING;
-    INSERT INTO Categories (category_id, category_name) VALUES (2, 'JUNIOR')
-    ON CONFLICT(category_id) DO NOTHING;
-    INSERT INTO Categories (category_id, category_name) VALUES (3, 'SENIOR')
-    ON CONFLICT(category_id) DO NOTHING;
-    INSERT INTO Categories (category_id, category_name) VALUES (4, 'JUNIOR')
-    ON CONFLICT(category_id) DO NOTHING;
-    INSERT INTO Categories (category_id, category_name) VALUES (5, 'MASTER')
-    ON CONFLICT(category_id) DO NOTHING;
-  `;
-
+  CREATE TABLE IF NOT EXISTS Categories (
+    category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_name TEXT NOT NULL
+  );
+  INSERT INTO Categories (category_id, category_name) VALUES (1, 'Youth')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (2, 'Open')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (3, 'Master M')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (4, 'Grand Master GM')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (5, 'Great Grand Master GGM')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (6, 'Legend L')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+  INSERT INTO Categories (category_id, category_name) VALUES (7, 'Fantastic Legend FL')
+    ON CONFLICT(category_id) DO UPDATE SET category_name = excluded.category_name;
+`;
   const createBoatEventTable = `
     CREATE TABLE IF NOT EXISTS Boat_Event (
       boat_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,7 +102,6 @@ const initializeSchema = () => {
       FOREIGN KEY (event_id) REFERENCES Events(event_id)
     );
   `;
-
   const createHeatsTable = `
     CREATE TABLE IF NOT EXISTS Heats (
       heat_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,7 +111,6 @@ const initializeSchema = () => {
       FOREIGN KEY (event_id) REFERENCES Events(event_id)
     );
   `;
-
   const createRacesTable = `
     CREATE TABLE IF NOT EXISTS Races (
       race_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,7 +119,6 @@ const initializeSchema = () => {
       FOREIGN KEY (heat_id) REFERENCES Heats(heat_id)
     );
   `;
-
   const createScoresTable = `
     CREATE TABLE IF NOT EXISTS Scores (
       score_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,7 +131,6 @@ const initializeSchema = () => {
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
     );
   `;
-
   const createHeatBoatTable = `
     CREATE TABLE IF NOT EXISTS Heat_Boat (
       heat_id INTEGER,
@@ -143,7 +139,6 @@ const initializeSchema = () => {
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
     );
   `;
-
   const createLiderboardTable = `
     CREATE TABLE IF NOT EXISTS Leaderboard (
       boat_id INTEGER,
@@ -155,7 +150,6 @@ const initializeSchema = () => {
       FOREIGN KEY (event_id) REFERENCES Events(event_id)
     );
   `;
-
   const createGlobalLeaderboardTable = `
     CREATE TABLE IF NOT EXISTS GlobalLeaderboard (
       boat_id INTEGER PRIMARY KEY,
@@ -163,7 +157,6 @@ const initializeSchema = () => {
       FOREIGN KEY (boat_id) REFERENCES Boats(boat_id)
     );
   `;
-
   const createFinalLeaderboardTable = `
     CREATE TABLE IF NOT EXISTS FinalLeaderboard (
       boat_id INTEGER,
@@ -177,68 +170,112 @@ const initializeSchema = () => {
     );
   `;
 
+  // Expected column names for each table
+  const expectedSchemas = {
+    Events: [
+      'event_id',
+      'event_name',
+      'event_location',
+      'start_date',
+      'end_date',
+      'is_locked',
+    ],
+    Sailors: [
+      'sailor_id',
+      'name',
+      'surname',
+      'birthday',
+      'category_id',
+      'club_id',
+    ],
+    Boats: ['boat_id', 'sail_number', 'country', 'model', 'sailor_id'],
+    Clubs: ['club_id', 'club_name', 'country'],
+    Categories: ['category_id', 'category_name'],
+    Boat_Event: ['boat_event_id', 'boat_id', 'event_id'],
+    Heats: ['heat_id', 'event_id', 'heat_name', 'heat_type'],
+    Races: ['race_id', 'heat_id', 'race_number'],
+    Scores: ['score_id', 'race_id', 'boat_id', 'position', 'points', 'status'],
+    Heat_Boat: ['heat_id', 'boat_id'],
+    Leaderboard: ['boat_id', 'total_points_event', 'event_id', 'place'],
+    GlobalLeaderboard: ['boat_id', 'total_points_global'],
+    FinalLeaderboard: [
+      'boat_id',
+      'total_points_final',
+      'event_id',
+      'placement_group',
+      'place',
+    ],
+  };
+
+  // Mapping of table names to their creation statements
+  const tableStatements = {
+    Events: createEventsTable,
+    Sailors: createSailorsTable,
+    Boats: createBoatsTable,
+    Clubs: createClubsTable,
+    Categories: createCategoriesTable,
+    Boat_Event: createBoatEventTable,
+    Heats: createHeatsTable,
+    Races: createRacesTable,
+    Scores: createScoresTable,
+    Heat_Boat: createHeatBoatTable,
+    Leaderboard: createLiderboardTable,
+    GlobalLeaderboard: createGlobalLeaderboardTable,
+    FinalLeaderboard: createFinalLeaderboardTable,
+  };
+
+  // Helper function to check the table structure and recreate if necessary
+  const checkAndRecreateTable = (tableName, createSQL, expectedCols) => {
+    const currentInfo = db.prepare(`PRAGMA table_info(${tableName});`).all();
+    const currentCols = currentInfo.map((col) => col.name).sort();
+    const expectedSorted = expectedCols.slice().sort();
+    if (JSON.stringify(currentCols) !== JSON.stringify(expectedSorted)) {
+      console.log(
+        `Schema mismatch for ${tableName}. Dropping and recreating the table...`,
+      );
+      db.exec(`DROP TABLE IF EXISTS ${tableName};`);
+      db.exec(createSQL);
+      console.log(`${tableName} table recreated.`);
+    } else {
+      console.log(`${tableName} schema matches expected.`);
+    }
+  };
+
   try {
-    console.log('Creating Events table...');
-    db.exec(createEventsTable);
-    console.log('Events table created or already exists.');
+    // Ensure tables are created in order to satisfy FK constraints
+    const tableOrder = [
+      'Events',
+      'Sailors',
+      'Boats',
+      'Clubs',
+      'Categories',
+      'Boat_Event',
+      'Heats',
+      'Races',
+      'Scores',
+      'Heat_Boat',
+      'Leaderboard',
+      'GlobalLeaderboard',
+      'FinalLeaderboard',
+    ];
 
-    console.log('Creating Sailors table...');
-    db.exec(createSailorsTable);
-    console.log('Sailors table created or already exists.');
+    tableOrder.forEach((tableName) => {
+      // First, attempt to create the table if it doesn't exist
+      db.exec(tableStatements[tableName]);
+      // Then, check if its structure matches expectation; if not, drop and recreate.
+      checkAndRecreateTable(
+        tableName,
+        tableStatements[tableName],
+        expectedSchemas[tableName],
+      );
+    });
 
-    console.log('Creating Boats table...');
-    db.exec(createBoatsTable);
-    console.log('Boats table created or already exists.');
-
-    console.log('Creating Clubs table...');
-    db.exec(createClubsTable);
-    console.log('Clubs table created or already exists.');
-
-    console.log('Creating Categories table...');
-    db.exec(createCategoriesTable);
-    console.log('Categories table created or already exists.');
-
-    console.log('Creating Boat_Event table...');
-    db.exec(createBoatEventTable);
-    console.log('Boat_Event table created or already exists.');
-
-    console.log('Creating Heats table...');
-    db.exec(createHeatsTable);
-    console.log('Heats table created or already exists.');
-
-    console.log('Creating Races table...');
-    db.exec(createRacesTable);
-    console.log('Races table created or already exists.');
-
-    console.log('Creating Scores table...');
-    db.exec(createScoresTable);
-    console.log('Scores table created or already exists.');
-
-    console.log('Creating Heat_Boat table...');
-    db.exec(createHeatBoatTable);
-    console.log('Heat_Boat table created or already exists.');
-
-    console.log('Creating Leaderboard table...');
-    db.exec(createLiderboardTable);
-    console.log('Leaderboard table created or already exists.');
-
-    console.log('Creating GlobalLeaderboard table...');
-    db.exec(createGlobalLeaderboardTable);
-    console.log('GlobalLeaderboard table created or already exists.');
-
-    console.log('Creating FinalLeaderboard table...');
-    db.exec(createFinalLeaderboardTable);
-    console.log('FinalLeaderboard table created or already exists.');
-
-    // Migration step to add the 'place' column if it doesn't exist
-    const columnCheck = db
+    // Special migration step: ensure the 'place' column exists in FinalLeaderboard
+    const finalLeaderboardInfo = db
       .prepare('PRAGMA table_info(FinalLeaderboard);')
       .all();
-    const placeColumnExists = columnCheck.some(
-      (column) => column.name === 'place',
-    );
-
-    if (!placeColumnExists) {
+    const hasPlace = finalLeaderboardInfo.some((col) => col.name === 'place');
+    if (!hasPlace) {
       console.log("Adding 'place' column to FinalLeaderboard table...");
       db.exec('ALTER TABLE FinalLeaderboard ADD COLUMN place INTEGER;');
       console.log("'place' column added to FinalLeaderboard table.");

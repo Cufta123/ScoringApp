@@ -5,8 +5,6 @@ import 'font-awesome/css/font-awesome.min.css';
 import Flag from 'react-world-flags';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 
-const categoryOptions = ['KADET', 'SENIOR', 'JUNIOR', 'MASTER', 'CADET'];
-
 function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [sortCriteria, setSortCriteria] = useState('name');
   const [editingSailorId, setEditingSailorId] = useState(null);
@@ -51,6 +49,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       originalName: sailor.name,
       originalSurname: sailor.surname,
       originalClubName: sailor.club,
+      birthday: sailor.birthday, // added birthday for editing
     });
   };
 
@@ -58,11 +57,12 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
     const sailorData = {
       originalName: editedSailor.originalName,
       originalSurname: editedSailor.originalSurname,
+      originalClubName: editedSailor.originalClubName,
       name: editedSailor.name,
       surname: editedSailor.surname,
+      birthday: editedSailor.birthday, // pass birthday here
       category_name: editedSailor.category,
       club_name: editedSailor.club,
-      originalClubName: editedSailor.originalClubName,
       boat_id: editedSailor.boat_id,
       sail_number: editedSailor.sail_number,
       country: editedSailor.country,
@@ -158,6 +158,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                 <th>Model</th>
                 <th>Skipper</th>
                 <th>Club</th>
+                <th>Date of birth</th>
                 <th>Category</th>
                 <th>Actions</th>
               </tr>
@@ -247,25 +248,18 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                   </td>
                   <td>
                     {editingSailorId === sailor.boat_id ? (
-                      <select
-                        name="category"
-                        value={editedSailor.category}
+                      <input
+                        type="date"
+                        name="birthday"
+                        value={editedSailor.birthday}
                         onChange={handleInputChange}
                         className="editable-input"
-                      >
-                        {categories.map((category) => (
-                          <option
-                            key={category.category_id}
-                            value={category.category_name}
-                          >
-                            {category.category_name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     ) : (
-                      sailor.category
+                      sailor.birthday
                     )}
                   </td>
+                  <td>{sailor.category}</td>
                   <td>
                     <div className="icon-container">
                       {editingSailorId === sailor.boat_id ? (
@@ -342,6 +336,7 @@ SailorList.propTypes = {
       surname: PropTypes.string.isRequired,
       club: PropTypes.string.isRequired,
       category: PropTypes.string.isRequired,
+      birthday: PropTypes.string.isRequired,
     }),
   ).isRequired,
   onRemoveBoat: PropTypes.func.isRequired,

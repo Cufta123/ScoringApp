@@ -81,11 +81,14 @@ function SailorForm({ onAddSailor, eventId }) {
     const currentYear = new Date().getFullYear();
     const age = currentYear - birthYear;
 
-    if (age <= 12) return 1; // Kadet
-    if (age <= 18) return 2; // Junior
-    if (age <= 35) return 3; // Senior
-    if (age <= 50) return 4; // Master
-    return 5; // Grand Master
+    if (age <= 26) return 1; // Youth (U26)
+    if (age >= 27 && age <= 54) return 2; // Senior (27-54)
+    if (age >= 55 && age <= 65) return 3; // Master M (55-65)
+    if (age >= 66 && age <= 70) return 4; // Grand Master GM (66-70)
+    if (age >= 71 && age <= 75) return 5; // Great Grand Master GGM (71-75)
+    if (age >= 76 && age <= 80) return 6; // Legend L (76-80)
+    if (age >= 81) return 7; // Fantastic Legend FL (81+)
+    return null; // Age does not match any category
   };
 
   const handleSubmit = async (e) => {

@@ -2,6 +2,22 @@
 import { ipcMain } from 'electron';
 import { db } from '../../../public/Database/DBManager';
 
+const calculateCategory = (birthday: string): number => {
+  const birthYear = new Date(birthday).getFullYear();
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - birthYear;
+  console.log('Age:', age);
+
+  if (age <= 26) return 1; // Youth (U26)
+  if (age >= 27 && age <= 54) return 2; // Senior (27-54)
+  if (age >= 55 && age <= 65) return 3; // Master M (55-65)
+  if (age >= 66 && age <= 70) return 4; // Grand Master GM (66-70)
+  if (age >= 71 && age <= 75) return 5; // Great Grand Master GGM (71-75)
+  if (age >= 76 && age <= 80) return 6; // Legend L (76-80)
+  if (age >= 81) return 7; // Fantastic Legend FL (81+)
+  return 1; // Default return value
+};
+
 interface SqliteError extends Error {
   code: string;
 }
@@ -98,16 +114,17 @@ ipcMain.handle('readAllBoats', () => {
     const rows = db
       .prepare(
         `SELECT
-      b.boat_id, b.sail_number, b.country AS boat_country, b.model,
-      s.name, s.surname,
-      c.club_name, c.country AS club_country,
-      cat.category_name
-    FROM Boats b
-    JOIN Sailors s ON b.sailor_id = s.sailor_id
-    JOIN Clubs c ON s.club_id = c.club_id
-    JOIN Categories cat ON s.category_id = cat.category_id`,
+          b.boat_id, b.sail_number, b.country AS boat_country, b.model,
+          s.name, s.surname, s.birthday,
+          c.club_name, c.country AS club_country,
+          cat.category_name
+        FROM Boats b
+        JOIN Sailors s ON b.sailor_id = s.sailor_id
+        JOIN Clubs c ON s.club_id = c.club_id
+        JOIN Categories cat ON s.category_id = cat.category_id`,
       )
       .all();
+    console.log('Boats:', rows);
     return rows;
   } catch (error) {
     log(`Error reading boats: ${error}`);
@@ -118,18 +135,18 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
   const {
     originalName,
     originalSurname,
+    originalClubName,
     name,
     surname,
-    category_name,
+    birthday, // new: birthday from the edited sailorData
     club_name,
-    originalClubName,
     boat_id,
     sail_number,
     country,
     model,
   } = sailorData;
 
-  console.log('Received sailorData:', sailorData); // Log the received data
+  console.log('Received sailorData:', sailorData);
 
   try {
     // Fetch sailor_id based on original name and surname
@@ -140,12 +157,19 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
       throw new Error(`Sailor not found: ${originalName} ${originalSurname}`);
     const { sailor_id } = sailor;
 
-    // Fetch category_id based on category_name
+    // Fetch category_id based on birthday
+    const category_id = calculateCategory(birthday);
+    if (category_id === null)
+      throw new Error(`Invalid category for birthday: ${birthday}`);
+
+    // Verify that the category_id exists in the Categories table
     const category = db
-      .prepare('SELECT category_id FROM Categories WHERE category_name = ?')
-      .get(category_name);
-    if (!category) throw new Error(`Category not found: ${category_name}`);
-    const { category_id } = category;
+      .prepare('SELECT category_id FROM Categories WHERE category_id = ?')
+      .get(category_id);
+    if (!category)
+      throw new Error(
+        `Category ID ${category_id} does not exist in the Categories table`,
+      );
 
     // Fetch club_id based on original club name
     let club = db
@@ -169,12 +193,12 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
       }
     }
 
-    // Update sailor information
+    // Update sailor information including birthday and category
     const sailorResult = db
       .prepare(
-        'UPDATE Sailors SET name = ?, surname = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
+        'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
       )
-      .run(name, surname, category_id, club_id, sailor_id);
+      .run(name, surname, birthday, category_id, club_id, sailor_id);
     console.log('Sailor update result:', sailorResult);
 
     // Update boat information

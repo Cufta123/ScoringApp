@@ -58,8 +58,7 @@ HeatRows.propTypes = {
         name: PropTypes.string.isRequired,
         surname: PropTypes.string.isRequired,
         country: PropTypes.string.isRequired,
-        sail_number: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-          .isRequired,
+        sail_number: PropTypes.string.isRequired,
       }),
     ).isRequired,
   }).isRequired,

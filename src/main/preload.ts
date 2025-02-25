@@ -77,7 +77,6 @@ const electronHandler = {
         name: string,
         surname: string,
         birthday: string,
-        category_id: string,
         club_id: string,
       ) {
         try {
@@ -87,7 +86,7 @@ const electronHandler = {
             name,
             surname,
             birthday,
-            category_id,
+
             club_id,
           );
         } catch (error) {

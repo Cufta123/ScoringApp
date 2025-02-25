@@ -330,7 +330,7 @@ SailorList.propTypes = {
     PropTypes.shape({
       boat_id: PropTypes.number.isRequired,
       country: PropTypes.string.isRequired,
-      sail_number: PropTypes.number.isRequired,
+      sail_number: PropTypes.string.isRequired,
       model: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
       surname: PropTypes.string.isRequired,

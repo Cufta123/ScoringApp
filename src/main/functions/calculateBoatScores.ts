@@ -134,13 +134,14 @@ export default function calculateBoatScores(
   Object.keys(grouped).forEach((totalPointsKey) => {
     const group = grouped[Number(totalPointsKey)];
     if (group.length > 1) {
+      console.group(`Tie-breaking Group for Total Points ${totalPointsKey}`);
       // For tie-breaking, compare the scores from boatScoresByRace (assumed ordered by race_number descending)
       group.sort((a, b) => {
         const scoresA = boatScoresByRace.get(a.boat_id) || [];
         const scoresB = boatScoresByRace.get(b.boat_id) || [];
         const maxLength = Math.max(scoresA.length, scoresB.length);
         // Compare from the last race backward.
-        for (let i = 1; i <= maxLength; i++) {
+        for (let i = 1; i <= maxLength; i += 1) {
           const scoreA = scoresA[scoresA.length - i] ?? Number.MAX_SAFE_INTEGER;
           const scoreB = scoresB[scoresB.length - i] ?? Number.MAX_SAFE_INTEGER;
           if (scoreA !== scoreB) return scoreA - scoreB;
@@ -152,7 +153,11 @@ export default function calculateBoatScores(
         group,
       );
       // Update the places for the boats in this group.
-      group.forEach((entry, idx) => (entry.place = idx + 1));
+      group.forEach((entry, idx) => {
+        entry.place = idx + 1;
+      });
+      console.log('Updated Tie-break Places:', group);
+      console.groupEnd();
       grouped[Number(totalPointsKey)] = group;
     }
   });

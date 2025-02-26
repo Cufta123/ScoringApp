@@ -10,7 +10,6 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [editingSailorId, setEditingSailorId] = useState(null);
   const [editedSailor, setEditedSailor] = useState({});
   const [isExpanded, setIsExpanded] = useState(true);
-  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     const savedIsExpanded = localStorage.getItem('isExpanded');
@@ -29,19 +28,6 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
     return 0;
   });
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const result = await window.electron.sqlite.sailorDB.readAllCategories();
-      if (result) {
-        setCategories(result);
-      } else {
-        console.error('Failed to fetch categories');
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
   const handleEditClick = (sailor) => {
     setEditingSailorId(sailor.boat_id);
     setEditedSailor({
@@ -49,7 +35,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       originalName: sailor.name,
       originalSurname: sailor.surname,
       originalClubName: sailor.club,
-      birthday: sailor.birthday, // added birthday for editing
+      birthday: sailor.birthday,
+      gender: sailor.gender, // new field
     });
   };
 
@@ -60,7 +47,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       originalClubName: editedSailor.originalClubName,
       name: editedSailor.name,
       surname: editedSailor.surname,
-      birthday: editedSailor.birthday, // pass birthday here
+      birthday: editedSailor.birthday,
+      gender: editedSailor.gender,
       category_name: editedSailor.category,
       club_name: editedSailor.club,
       boat_id: editedSailor.boat_id,
@@ -69,20 +57,16 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       model: editedSailor.model,
     };
 
-    console.log('Saving sailor and boat:', sailorData); // Log the data being sent
-
-    const result =
-      await window.electron.sqlite.sailorDB.updateSailor(sailorData);
-    if (result) {
-      console.log('Save successful:', result); // Log the result
-      // Reset editing state
-      setEditingSailorId(null);
-      setEditedSailor({});
-      // Refresh the list of sailors
+    console.log('Saving sailor and boat:', sailorData);
+    try {
+      const result =
+        await window.electron.sqlite.sailorDB.updateSailor(sailorData);
+      console.log('Update result:', result);
       onRefreshSailors();
-    } else {
-      console.error('Save failed');
-      // Handle error
+      setEditingSailorId(null);
+    } catch (error) {
+      console.error('Error updating sailor:', error);
+      window.alert(`Error updating sailor: ${error.message || error}`);
     }
   };
 
@@ -149,6 +133,9 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
             <option value="club">Club</option>
             <option value="sail_number">Sail Number</option>
             <option value="model">Boat Model</option>
+            <option value="country">Country</option>
+            <option value="birthday">Birthday</option>
+            <option value="category">Category</option>
           </select>
           <table>
             <thead>
@@ -157,6 +144,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                 <th>Sail Number</th>
                 <th>Model</th>
                 <th>Skipper</th>
+                <th>Gender</th>
                 <th>Club</th>
                 <th>Date of birth</th>
                 <th>Category</th>
@@ -231,6 +219,25 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                       </>
                     ) : (
                       `${sailor.name} ${sailor.surname}`
+                    )}
+                  </td>
+                  <td>
+                    {editingSailorId === sailor.boat_id ? (
+                      <select
+                        name="gender"
+                        value={editedSailor.gender}
+                        onChange={handleInputChange}
+                        className="editable-input"
+                      >
+                        <option value="" disabled>
+                          Select Gender
+                        </option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    ) : (
+                      sailor.gender
                     )}
                   </td>
                   <td>
@@ -334,6 +341,7 @@ SailorList.propTypes = {
       model: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
       surname: PropTypes.string.isRequired,
+      gender: PropTypes.string.isRequired, // new prop
       club: PropTypes.string.isRequired,
       category: PropTypes.string.isRequired,
       birthday: PropTypes.string.isRequired,

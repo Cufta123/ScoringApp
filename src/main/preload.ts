@@ -47,6 +47,9 @@ export type Channels =
 
 const electronHandler = {
   ipcRenderer: {
+    invoke(channel: Channels, ...args: unknown[]) {
+      return ipcRenderer.invoke(channel, ...args);
+    },
     sendMessage(channel: Channels, ...args: unknown[]) {
       ipcRenderer.send(channel, ...args);
     },
@@ -54,7 +57,6 @@ const electronHandler = {
       const subscription = (_event: IpcRendererEvent, ...args: unknown[]) =>
         func(...args);
       ipcRenderer.on(channel, subscription);
-
       return () => {
         ipcRenderer.removeListener(channel, subscription);
       };
@@ -99,6 +101,7 @@ const electronHandler = {
         name: string,
         surname: string,
         birthday: string,
+        gender: string,
         category_id: string,
         club_id: string,
       ) {
@@ -108,6 +111,7 @@ const electronHandler = {
             name,
             surname,
             birthday,
+            gender,
             category_id,
             club_id,
           );

@@ -104,7 +104,7 @@ ipcMain.handle('readBoatsByEvent', async (event, event_id) => {
         `
 SELECT
   b.boat_id, b.sail_number, b.country AS boat_country, b.model,
-  s.name, s.surname, s.birthday,
+  s.name, s.surname, s.birthday, s.gender,
   c.club_name, c.country AS club_country,
   cat.category_name
 FROM Boats b

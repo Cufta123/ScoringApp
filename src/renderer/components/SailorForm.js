@@ -25,6 +25,7 @@ function SailorForm({ onAddSailor, eventId }) {
   const [boats, setBoats] = useState([]);
   const [raceHappened, setRaceHappened] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [gender, setGender] = useState('');
 
   const fetchSailors = async () => {
     try {
@@ -147,7 +148,10 @@ function SailorForm({ onAddSailor, eventId }) {
       const allSailors = await window.electron.sqlite.sailorDB.readAllSailors();
       let sailor_id = allSailors.find(
         (s) =>
-          s.name === name && s.surname === surname && s.birthday === birthday,
+          s.name === name &&
+          s.surname === surname &&
+          s.birthday === birthday &&
+          s.gender === gender,
       )?.sailor_id;
 
       if (!sailor_id) {
@@ -157,11 +161,21 @@ function SailorForm({ onAddSailor, eventId }) {
               name,
               surname,
               birthday,
+              gender,
               category_id,
               club_id,
             );
           sailor_id = sailorResult.lastInsertRowid;
           console.log(`Sailor inserted with ID: ${sailor_id}`);
+          console.log(
+            'Sailor inserted:',
+            name,
+            surname,
+            birthday,
+            gender,
+            category_id,
+            club_id,
+          );
         } catch (error) {
           console.error('Error inserting sailor:', error);
           alert('There was an error inserting the sailor.');
@@ -255,6 +269,7 @@ function SailorForm({ onAddSailor, eventId }) {
         name,
         surname,
         birthday,
+        gender,
         club_id,
         selectedCountry,
         sailNumber,
@@ -263,6 +278,7 @@ function SailorForm({ onAddSailor, eventId }) {
       setName('');
       setSurname('');
       setBirthday('');
+      setGender('');
       setClub('');
       setSelectedCountry('');
       setSailNumber('');
@@ -393,6 +409,19 @@ function SailorForm({ onAddSailor, eventId }) {
               required
               style={formFieldStyle}
             />
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              required
+              style={formFieldStyle}
+            >
+              <option value="" disabled>
+                Select Gender
+              </option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
           <div style={formRowStyle}>
             <input

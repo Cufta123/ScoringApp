@@ -148,8 +148,9 @@ export async function exportToExcel(
     'Country',
     'Boat Number',
     'Boat Type',
-    ...(leaderboard[0]?.races?.map((_, index: number) => `Race ${index + 1}`) ||
-      []),
+    ...(leaderboard[0]?.races?.map(
+      (_: any, index: number) => `Race ${index + 1}`,
+    ) || []),
     'Total Points',
   ];
   worksheet.addRow(header);

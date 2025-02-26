@@ -1,5 +1,5 @@
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import AppUpdater from './AppUpdater';
@@ -29,7 +29,7 @@ const installExtensions = async () => {
   return installer
     .default(
       extensions.map((name) => installer[name]),
-      forceDownload
+      forceDownload,
     )
     .catch(console.log);
 };
@@ -87,6 +87,12 @@ const createWindow = async () => {
 
   new AppUpdater();
 };
+
+// Register the IPC handler for the file dialog
+ipcMain.handle('dialog:openFile', async (event, options) => {
+  // You can optionally pass mainWindow to show the dialog attached to it
+  return dialog.showOpenDialog(mainWindow!, options);
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

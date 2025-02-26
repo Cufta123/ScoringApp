@@ -38,7 +38,7 @@ ipcMain.handle('readAllSailors', () => {
       .prepare(
         `
 SELECT
-  s.sailor_id, s.name, s.surname, s.birthday, s.category_id, s.club_id,
+  s.sailor_id, s.name, s.surname, s.birthday,s.gender, s.category_id, s.club_id,
   b.sail_number, b.model,
   c.club_name, cat.category_name
 FROM Sailors s
@@ -115,7 +115,7 @@ ipcMain.handle('readAllBoats', () => {
       .prepare(
         `SELECT
           b.boat_id, b.sail_number, b.country AS boat_country, b.model,
-          s.name, s.surname, s.birthday,
+          s.name, s.surname, s.birthday, s.gender,
           c.club_name, c.country AS club_country,
           cat.category_name
         FROM Boats b
@@ -133,12 +133,11 @@ ipcMain.handle('readAllBoats', () => {
 });
 ipcMain.handle('updateSailor', async (event, sailorData) => {
   const {
-    originalName,
-    originalSurname,
     originalClubName,
     name,
     surname,
-    birthday, // new: birthday from the edited sailorData
+    birthday,
+    gender,
     club_name,
     boat_id,
     sail_number,
@@ -149,20 +148,19 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
   console.log('Received sailorData:', sailorData);
 
   try {
-    // Fetch sailor_id based on original name and surname
-    const sailor = db
-      .prepare('SELECT sailor_id FROM Sailors WHERE name = ? AND surname = ?')
-      .get(originalName, originalSurname);
-    if (!sailor)
-      throw new Error(`Sailor not found: ${originalName} ${originalSurname}`);
-    const { sailor_id } = sailor;
+    // Lookup sailor_id based on boat_id
+    const boat = db
+      .prepare('SELECT sailor_id FROM Boats WHERE boat_id = ?')
+      .get(boat_id);
+    if (!boat) throw new Error(`Boat not found with boat_id: ${boat_id}`);
+    const { sailor_id } = boat;
 
     // Fetch category_id based on birthday
     const category_id = calculateCategory(birthday);
     if (category_id === null)
       throw new Error(`Invalid category for birthday: ${birthday}`);
 
-    // Verify that the category_id exists in the Categories table
+    // Verify that the category exists
     const category = db
       .prepare('SELECT category_id FROM Categories WHERE category_id = ?')
       .get(category_id);
@@ -193,12 +191,12 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
       }
     }
 
-    // Update sailor information including birthday and category
+    // Update sailor information including gender
     const sailorResult = db
       .prepare(
-        'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
+        'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, gender = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
       )
-      .run(name, surname, birthday, category_id, club_id, sailor_id);
+      .run(name, surname, birthday, gender, category_id, club_id, sailor_id);
     console.log('Sailor update result:', sailorResult);
 
     // Update boat information
@@ -214,14 +212,15 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
       boatChanges: boatResult.changes,
     };
   } catch (error) {
-    log(`Error updating sailor or boat: ${error}`);
+    console.error(`Error updating sailor or boat: ${error}`);
+    // Rethrow so the renderer's catch block gets it
     throw error;
   }
 });
 
 ipcMain.handle(
   'insertSailor',
-  async (event, name, surname, birthday, category_id, club_id) => {
+  async (event, name, surname, birthday, gender, category_id, club_id) => {
     const maxRetries = 5;
     const delay = (ms: number) =>
       new Promise((resolve) => {
@@ -234,14 +233,14 @@ ipcMain.handle(
       try {
         // Log the received parameters
         log(
-          `Inserting sailor with parameters: ${name}, ${surname}, ${birthday}, ${category_id}, ${club_id}`,
+          `Inserting sailor with parameters: ${name}, ${surname}, ${birthday}, ${gender}, ${category_id}, ${club_id}`,
         );
 
         const result = db
           .prepare(
-            'INSERT INTO Sailors (name, surname, birthday, category_id, club_id) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO Sailors (name, surname, birthday, gender, category_id, club_id) VALUES (?, ?, ?, ?, ?, ?)',
           )
-          .run(name, surname, birthday, category_id, club_id);
+          .run(name, surname, birthday, gender, category_id, club_id);
         return { lastInsertRowid: result.lastInsertRowid };
       } catch (error) {
         const sqliteError = error as SqliteError;

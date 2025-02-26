@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -129,4 +130,72 @@ export default async function handlePrintNewHeats(
   } catch (error) {
     console.error(`Error exporting Excel file for heat :`, error);
   }
+}
+
+export async function exportToExcel(
+  leaderboard: any[],
+  finalSeriesStarted: boolean,
+  sortedGroups: string[],
+  groupedLeaderboard: { [x: string]: any[] },
+  eventId: string, // new parameter to include event name in the file name
+) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Leaderboard');
+  const eventName = await window.electron.sqlite.eventDB.getEventName(eventId);
+  const header = [
+    'Rank',
+    'Name',
+    'Country',
+    'Boat Number',
+    'Boat Type',
+    ...(leaderboard[0]?.races?.map((_, index: number) => `Race ${index + 1}`) ||
+      []),
+    'Total Points',
+  ];
+  worksheet.addRow(header);
+
+  if (finalSeriesStarted) {
+    sortedGroups.forEach((group) => {
+      // Write a group header row
+      worksheet.addRow([`${group} Group`]);
+      groupedLeaderboard[group]?.forEach((entry, index) => {
+        const row = [
+          index + 1,
+          `${entry.name} ${entry.surname}`,
+          entry.country,
+          entry.boat_number,
+          entry.boat_type,
+          ...entry.races,
+          entry.total_points_final,
+        ];
+        worksheet.addRow(row);
+      });
+    });
+  } else {
+    leaderboard.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        `${entry.name} ${entry.surname}`,
+        entry.country,
+        entry.boat_number,
+        entry.boat_type,
+        ...entry.races,
+        entry.total_points_event,
+      ];
+      worksheet.addRow(row);
+    });
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  // Compute race number using the length of races from the first leaderboard entry
+  const raceNumber =
+    leaderboard.length > 0 && leaderboard[0].races
+      ? leaderboard[0].races.length
+      : 'unknown';
+
+  saveAs(blob, `${eventName}_race_${raceNumber}.xlsx`);
 }

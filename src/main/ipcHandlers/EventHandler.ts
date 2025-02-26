@@ -34,6 +34,21 @@ ipcMain.handle('readAllEvents', async () => {
   }
 });
 
+ipcMain.handle('getEventName', async (event, event_id: number) => {
+  try {
+    const query = 'SELECT event_name FROM Events WHERE event_id = ?';
+    const stmt = db.prepare(query);
+    const result = stmt.get(event_id);
+    if (result) {
+      return result.event_name;
+    }
+    throw new Error(`Event with id ${event_id} not found`);
+  } catch (error) {
+    console.error('Error fetching event name:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle(
   'insertEvent',
   async (event, event_name, event_location, start_date, end_date) => {

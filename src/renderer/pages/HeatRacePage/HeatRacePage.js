@@ -3,9 +3,11 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+
 import HeatComponent from '../../components/HeatComponent';
 import ScoringInputComponent from '../../components/ScoringInputComponent';
 import './HeatRacePage.css';
+import handlePrintNewHeats from '../../../main/functions/printExcelFunctions';
 
 function HeatRacePage() {
   const location = useLocation();
@@ -34,7 +36,7 @@ function HeatRacePage() {
     }
   }, [eventData, event]);
 
-  const updateHeats = async () => {
+  const updateHeats = useCallback(async () => {
     try {
       const allHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
         event.event_id,
@@ -43,8 +45,12 @@ function HeatRacePage() {
     } catch (error) {
       console.error('Error updating heats:', error.message);
     }
-  };
-
+  }, [event.event_id]);
+  useEffect(() => {
+    if (event && event.event_id) {
+      updateHeats();
+    }
+  }, [event, updateHeats]);
   const handleHeatSelect = (heat) => {
     setSelectedHeat(heat);
   };
@@ -241,6 +247,8 @@ function HeatRacePage() {
     checkFinalSeriesStarted();
   }, [checkFinalSeriesStarted]);
 
+  console.log('Heats test', heats);
+
   return (
     <div>
       <button
@@ -269,6 +277,14 @@ function HeatRacePage() {
               onClick={handleCreateNewHeatsBasedOnLeaderboard}
             >
               Create New Heats
+            </button>
+          )}
+          {!finalSeriesStarted && (
+            <button
+              type="button"
+              onClick={() => handlePrintNewHeats(event, heats)}
+            >
+              Print new heats
             </button>
           )}
         </>

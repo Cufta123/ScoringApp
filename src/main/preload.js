@@ -27,6 +27,7 @@ const electronHandler = {
     readAllCategories: sailorDB.readAllCategories,
     readAllClubs: sailorDB.readAllClubs,
     readAllBoats: sailorDB.readAllBoats,
+    importCSV: sailorDB.importCSV,
   },
   eventDB: {
     readAllEvents: eventDB.readAllEvents,

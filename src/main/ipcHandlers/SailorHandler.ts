@@ -1,5 +1,7 @@
 /* eslint-disable camelcase */
 import { ipcMain } from 'electron';
+import { parse } from 'csv-parse/sync';
+import * as fs from 'fs/promises';
 import { db } from '../../../public/Database/DBManager';
 
 const calculateCategory = (birthday: string): number => {
@@ -31,6 +33,127 @@ ipcMain.on('ipc-example', async (event, arg) => {
   log(msgTemplate(arg));
   event.reply('ipc-example', msgTemplate('pongSailor'));
 });
+ipcMain.handle(
+  'importCSV',
+  async (event, args: { filePath: string; eventId: number }) => {
+    try {
+      const { filePath, eventId } = args;
+      // Read CSV file content
+      const csvData = await fs.readFile(filePath, 'utf8');
+      // Parse the CSV using delimiter ";" and skipping the header row.
+      const records = parse(csvData, {
+        delimiter: ';',
+        from_line: 2,
+        columns: [
+          'name',
+          'surname',
+          'birthday',
+          'sail',
+          'nation',
+          'boattype',
+          'gender',
+          'club',
+          'clubNation',
+        ],
+        skip_empty_lines: true,
+      });
+
+      // Check if each record has exactly 9 fields.
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        const keys = Object.keys(record);
+        if (keys.length !== 9) {
+          // Throw an error that will be caught by the renderer.
+          throw new Error(
+            `CSV format mismatch on row ${i + 2}: expected 9 columns, got ${keys.length}`,
+          );
+        }
+      }
+
+      let insertedCount = 0;
+      // Validate required fields (name, surname, birthday)
+      const validRecords = await Promise.all(
+        records.map(async (record: any) =>
+          record.name && record.surname && record.birthday ? record : null,
+        ),
+      );
+      const filteredRecords = validRecords.filter((record) => record !== null);
+
+      filteredRecords.forEach((record) => {
+        // Check if the boat (by sail number) already exists.
+        let boatRecord = db
+          .prepare('SELECT boat_id FROM Boats WHERE sail_number = ?')
+          .get(record.sail);
+
+        if (!boatRecord) {
+          // New record: insert new club (if needed), sailor and boat.
+          const category_id = calculateCategory(record.birthday);
+
+          // Lookup club by name; if not found, insert it using record.clubNation.
+          let clubRecord = db
+            .prepare('SELECT club_id FROM Clubs WHERE club_name = ?')
+            .get(record.club);
+          if (!clubRecord) {
+            const clubInsert = db
+              .prepare('INSERT INTO Clubs (club_name, country) VALUES (?, ?)')
+              .run(record.club, record.clubNation);
+            clubRecord = { club_id: clubInsert.lastInsertRowid };
+          }
+          const { club_id } = clubRecord;
+
+          // Insert new Sailor including gender.
+          const sailorInsert = db
+            .prepare(
+              'INSERT INTO Sailors (name, surname, birthday, gender, category_id, club_id) VALUES (?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              record.name,
+              record.surname,
+              record.birthday,
+              record.gender,
+              category_id,
+              club_id,
+            );
+          const sailor_id = sailorInsert.lastInsertRowid;
+
+          // Insert new Boat.
+          const boatInsert = db
+            .prepare(
+              'INSERT INTO Boats (sail_number, country, model, sailor_id) VALUES (?, ?, ?, ?)',
+            )
+            .run(record.sail, record.nation, record.boattype, sailor_id);
+          boatRecord = { boat_id: boatInsert.lastInsertRowid };
+          insertedCount += 1;
+        } else {
+          console.log(`Duplicate found: ${record.sail}`);
+        }
+
+        // Associate the boat (newly inserted or existing) with the event if not already associated.
+        const existingAssoc = db
+          .prepare(
+            'SELECT 1 FROM Boat_Event WHERE boat_id = ? AND event_id = ?',
+          )
+          .get(boatRecord.boat_id, eventId);
+        if (!existingAssoc) {
+          db.prepare(
+            'INSERT INTO Boat_Event (boat_id, event_id) VALUES (?, ?)',
+          ).run(boatRecord.boat_id, eventId);
+        }
+      });
+
+      const message = `Imported ${records.length} records; ${insertedCount} inserted, others associated with event.`;
+      console.log(message);
+      return {
+        success: true,
+        imported: records.length,
+        inserted: insertedCount,
+      };
+    } catch (error) {
+      console.error(`Error importing CSV: ${error}`);
+      throw error;
+    }
+  },
+);
 
 ipcMain.handle('readAllSailors', () => {
   try {

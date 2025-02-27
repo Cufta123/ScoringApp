@@ -43,7 +43,8 @@ export type Channels =
   | 'getSummaryResults'
   | 'getScoresResult'
   | 'getRaceMapping'
-  | 'getEventName';
+  | 'getEventName'
+  | 'importCSV';
 
 const electronHandler = {
   ipcRenderer: {
@@ -176,6 +177,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('readAllBoats');
         } catch (error) {
           console.error('Error invoking readAllBoats IPC:', error);
+          return false;
+        }
+      },
+      async importCSV(filePath: string) {
+        try {
+          return await ipcRenderer.invoke('importCSV', filePath);
+        } catch (error) {
+          console.error('Error invoking importCSV IPC:', error);
           return false;
         }
       },

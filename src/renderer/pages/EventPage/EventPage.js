@@ -9,7 +9,7 @@ import Navbar from '../../components/Navbar';
 import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
 import LeaderboardComponent from '../../components/Leaderboard';
-import extractSailorsFromCSV from '../../../main/functions/extractSailorsFromCSV';
+import CSVUpload from '../../components/CSVUpload';
 
 function EventPage() {
   const location = useLocation();
@@ -153,30 +153,6 @@ function EventPage() {
   const handleCloseLeaderboard = () => {
     setShowLeaderboard(false);
   };
-  const handleImportSailorsCSV = async () => {
-    try {
-      const result = await window.electron.ipcRenderer.invoke(
-        'dialog:openFile',
-        {
-          filters: [{ name: 'CSV Files', extensions: ['csv'] }],
-          properties: ['openFile'],
-        },
-      );
-      if (result.canceled) {
-        return;
-      }
-      const selectedFilePath = result.filePaths[0];
-      console.log('Selected CSV file:', selectedFilePath);
-
-      // Call extractSailorsFromCSV and log the extracted data
-      const csvData = await extractSailorsFromCSV(selectedFilePath);
-      console.log('CSV Data:', csvData);
-
-      // TODO: Process the CSV data as needed
-    } catch (error) {
-      console.error('Error opening file dialog:', error);
-    }
-  };
 
   const handleRemoveBoat = async (boatId) => {
     try {
@@ -301,9 +277,7 @@ function EventPage() {
           </form>
         </>
       )}
-      <button type="button" onClick={handleImportSailorsCSV}>
-        Import sailors from CSV
-      </button>
+      <CSVUpload eventId={event.event_id} />
 
       <h3>Boats and Sailors</h3>
       <SailorList

@@ -59,7 +59,7 @@ function CSVUpload({ eventId, onImportComplete }) {
         onClick={handleUpload}
         onMouseEnter={() => setShowPopup(true)}
         onMouseLeave={() => setShowPopup(false)}
-        style={{ padding: '10px 20px', margin: '0 10px' }}
+        style={{ padding: '10px 20px', marginRight: '10px' }}
       >
         Upload CSV
       </button>

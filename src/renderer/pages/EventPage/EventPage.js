@@ -290,7 +290,7 @@ function EventPage() {
         onImportComplete={fetchBoatsWithSailors}
       />
       <button type="button" onClick={handlePrintEventSailors}>
-        Print Event Sailors
+        Print Start List
       </button>
 
       <h3>Boats and Sailors</h3>

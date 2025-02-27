@@ -10,6 +10,7 @@ import './EventPage.css';
 import HeatComponent from '../../components/HeatComponent';
 import LeaderboardComponent from '../../components/Leaderboard';
 import CSVUpload from '../../components/CSVUpload';
+import { exportEventSailors } from '../../../main/functions/printExcelFunctions';
 
 function EventPage() {
   const location = useLocation();
@@ -235,6 +236,13 @@ function EventPage() {
     label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
   }));
 
+  const handlePrintEventSailors = async () => {
+    try {
+      await exportEventSailors(event, boats);
+    } catch (error) {
+      console.error('Error printing event sailors:', error);
+    }
+  };
   return (
     <div>
       <Navbar
@@ -277,7 +285,13 @@ function EventPage() {
           </form>
         </>
       )}
-      <CSVUpload eventId={event.event_id} />
+      <CSVUpload
+        eventId={event.event_id}
+        onImportComplete={fetchBoatsWithSailors}
+      />
+      <button type="button" onClick={handlePrintEventSailors}>
+        Print Event Sailors
+      </button>
 
       <h3>Boats and Sailors</h3>
       <SailorList
@@ -286,7 +300,6 @@ function EventPage() {
         onRefreshSailors={fetchBoatsWithSailors}
         raceHappened={raceHappened} // Pass raceHappened state to SailorList
       />
-      <HeatComponent event={event} clickable={false} />
       <button
         type="button"
         onClick={handleLockEventClick}

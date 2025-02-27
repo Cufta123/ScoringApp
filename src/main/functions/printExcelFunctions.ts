@@ -200,3 +200,60 @@ export async function exportToExcel(
 
   saveAs(blob, `${eventName}_race_${raceNumber}.xlsx`);
 }
+
+export async function exportEventSailors(event: any, sailors: any[]) {
+  console.log('Sailors to print (before filtering):', sailors);
+  if (!Array.isArray(sailors) || sailors.length === 0) {
+    alert('No sailors available to print.');
+    return;
+  }
+
+  // Sort sailors by Country, then by Club, then by Boat Number.
+  const sortedSailors = sailors.sort((a, b) => {
+    const countryA = (a.country || a.boat_country || '').toLowerCase();
+    const countryB = (b.country || b.boat_country || '').toLowerCase();
+    if (countryA < countryB) return -1;
+    if (countryA > countryB) return 1;
+
+    const clubA = (a.club || a.club_name || '').toLowerCase();
+    const clubB = (b.club || b.club_name || '').toLowerCase();
+    if (clubA < clubB) return -1;
+    if (clubA > clubB) return 1;
+
+    const boatNumA = a.sail_number ? a.sail_number.toString() : '';
+    const boatNumB = b.sail_number ? b.sail_number.toString() : '';
+    return boatNumA.localeCompare(boatNumB, undefined, { numeric: true });
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Event Sailors');
+
+  // Define columns for Name, Surname, Country, Boat Number, Club.
+  worksheet.columns = [
+    { key: 'name', header: 'Name', width: 20 },
+    { key: 'surname', header: 'Surname', width: 20 },
+    { key: 'country', header: 'Country', width: 20 },
+    { key: 'sail_number', header: 'Boat Number', width: 15 },
+    { key: 'club', header: 'Club', width: 20 },
+  ];
+
+  sortedSailors.forEach((sailor) => {
+    worksheet.addRow({
+      name: sailor.name || 'N/A',
+      surname: sailor.surname || 'N/A',
+      country: sailor.country || sailor.boat_country || 'N/A',
+      sail_number: sailor.sail_number || 'N/A',
+      club: sailor.club || sailor.club_name || 'N/A',
+    });
+  });
+
+  try {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    saveAs(blob, `${event.event_name}_sailors.xlsx`);
+  } catch (error) {
+    console.error('Error exporting Excel file for event sailors:', error);
+  }
+}

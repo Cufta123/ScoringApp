@@ -1,17 +1,17 @@
 /* eslint-disable no-console */
 /* eslint-disable no-alert */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import Navbar from '../../components/Navbar';
 import './EventPage.css';
-import HeatComponent from '../../components/HeatComponent';
-import LeaderboardComponent from '../../components/Leaderboard';
+
 import CSVUpload from '../../components/CSVUpload';
 import { exportEventSailors } from '../../../main/functions/printExcelFunctions';
 
+const LeaderboardComponent = lazy(() => import('../../components/Leaderboard'));
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -222,7 +222,9 @@ function EventPage() {
         <button type="button" onClick={handleCloseLeaderboard}>
           Back
         </button>
+        <Suspense fallback={<div>Loading Leaderboard...</div>}>
         <LeaderboardComponent eventId={event.event_id} />
+      </Suspense>
       </div>
     );
   }

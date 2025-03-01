@@ -62,8 +62,9 @@ button {
   background-color: #007bff;
   color: white;
   border: none;
+
   padding: 10px 20px;
-  margin: 10px 0;
+  margin: 5px;
   cursor: pointer;
   border-radius: 5px;
 }

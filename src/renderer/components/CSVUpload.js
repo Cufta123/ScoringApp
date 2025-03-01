@@ -59,7 +59,7 @@ function CSVUpload({ eventId, onImportComplete }) {
         onClick={handleUpload}
         onMouseEnter={() => setShowPopup(true)}
         onMouseLeave={() => setShowPopup(false)}
-        style={{ padding: '10px 20px', marginRight: '10px' }}
+        style={{ padding: '10px 20px' }}
       >
         Upload CSV
       </button>
@@ -71,9 +71,4 @@ CSVUpload.propTypes = {
   eventId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   onImportComplete: PropTypes.func,
 };
-
-CSVUpload.defaultProps = {
-  onImportComplete: () => {},
-};
-
 export default CSVUpload;

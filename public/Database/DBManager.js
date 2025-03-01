@@ -29,6 +29,59 @@ const db = new Database(dbPath); // Creates the database file when used
 db.pragma('journal_mode = WAL');
 console.log('Database initialized.');
 
+const migrateBoatsTable = () => {
+  try {
+    // Get column info for 'Boats'
+    const boatsInfo = db.prepare('PRAGMA table_info(Boats);').all();
+    const sailNumberColumn = boatsInfo.find(
+      (col) => col.name === 'sail_number',
+    );
+
+    // Check if the type is not TEXT
+    if (sailNumberColumn && sailNumberColumn.type.toUpperCase() !== 'TEXT') {
+      console.log(
+        "Migrating Boats table: Changing 'sail_number' column type to TEXT...",
+      );
+      db.exec('BEGIN TRANSACTION;');
+
+      // Rename the old Boats table
+      db.exec('ALTER TABLE Boats RENAME TO Boats_old;');
+
+      // Create the new Boats table with the updated schema
+      db.exec(`
+        CREATE TABLE Boats (
+          boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sail_number TEXT NOT NULL UNIQUE,
+          country TEXT NOT NULL,
+          model TEXT NOT NULL,
+          sailor_id INTEGER,
+          FOREIGN KEY (sailor_id) REFERENCES Sailors(sailor_id)
+        );
+      `);
+
+      // Copy data from the old table to the new one
+      db.exec(`
+        INSERT INTO Boats (boat_id, sail_number, country, model, sailor_id)
+        SELECT boat_id, sail_number, country, model, sailor_id
+        FROM Boats_old;
+      `);
+
+      // Drop the old Boats table
+      db.exec('DROP TABLE Boats_old;');
+      db.exec('COMMIT;');
+      console.log('Boats table migrated successfully.');
+    } else {
+      console.log('Boats table is up-to-date (sail_number is TEXT).');
+    }
+  } catch (error) {
+    db.exec('ROLLBACK;');
+    console.error('Error migrating Boats table:', error);
+  }
+};
+
+// Call the migration before initializing the schema
+migrateBoatsTable();
+
 // Function to initialize the database schema
 const initializeSchema = () => {
   console.log('Initializing database schema...');

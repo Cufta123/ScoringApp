@@ -225,19 +225,26 @@ function HeatComponent({
         )}
       </div>
 
-      <button type="button" onClick={toggleDisplayMode}>
-        {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
-      </button>
-      {!finalSeriesStarted && (
+      {raceHappened && (
+        <button type="button" onClick={toggleDisplayMode}>
+          {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
+        </button>
+      )}
+      {raceHappened && !finalSeriesStarted && (
         <button
           type="button"
-          onClick={() =>
-            handleStartFinalSeries({
-              event,
-              setFinalSeriesStarted,
-              handleDisplayHeats,
-            })
-          }
+          onClick={() => {
+            const confirmed = window.confirm(
+              'Are you sure you want to start the final series? This action cannot be undone.'
+            );
+            if (confirmed) {
+              handleStartFinalSeries({
+                event,
+                setFinalSeriesStarted,
+                handleDisplayHeats,
+              });
+            }
+          }}
         >
           Start Final Series
         </button>

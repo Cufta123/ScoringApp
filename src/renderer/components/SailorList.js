@@ -11,6 +11,18 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [editedSailor, setEditedSailor] = useState({});
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // Add a helper to format the date as dd/mm/yyyy
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    if (!Number.isNaN(date)) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    return dateStr;
+  };
+
   useEffect(() => {
     const savedIsExpanded = localStorage.getItem('isExpanded');
     if (savedIsExpanded !== null) {
@@ -263,7 +275,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                         className="editable-input"
                       />
                     ) : (
-                      sailor.birthday
+                      formatDate(sailor.birthday)
                     )}
                   </td>
                   <td>{sailor.category}</td>

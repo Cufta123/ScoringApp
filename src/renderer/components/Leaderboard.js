@@ -9,7 +9,11 @@ import {
   HandleRaceChange,
 } from '../../main/functions/editingLeaderboard';
 
-import { exportToExcel } from '../../main/functions/printExcelFunctions';
+import {
+  exportToExcel,
+  exportToPDF,
+  exportToHTML,
+} from '../../main/functions/printExcelFunctions';
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -17,6 +21,7 @@ function LeaderboardComponent({ eventId }) {
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
+  const [exportFormat, setExportFormat] = useState('excel'); // 'excel' | 'pdf' | 'html'
 
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
 
@@ -172,24 +177,55 @@ function LeaderboardComponent({ eventId }) {
   const sortedGroups = Object.keys(groupedLeaderboard).sort(
     (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
   );
-
+  const handleExport = async () => {
+    if (exportFormat === 'excel') {
+      await exportToExcel(
+        leaderboard,
+        finalSeriesStarted,
+        sortedGroups,
+        groupedLeaderboard,
+        eventId,
+      );
+    } else if (exportFormat === 'pdf') {
+      await exportToPDF(
+        leaderboard,
+        finalSeriesStarted,
+        sortedGroups,
+        groupedLeaderboard,
+        eventId,
+      );
+    } else if (exportFormat === 'html') {
+      exportToHTML(
+        leaderboard,
+        finalSeriesStarted,
+        sortedGroups,
+        groupedLeaderboard,
+        eventId,
+      );
+    }
+  };
   return (
     <div className="leaderboard">
       <h2>{finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h2>
-      <button
-        type="button"
-        onClick={() =>
-          exportToExcel(
-            leaderboard,
-            finalSeriesStarted,
-            sortedGroups,
-            groupedLeaderboard,
-            eventId,
-          )
-        }
-      >
-        Export to Excel
-      </button>
+      <div style={{ marginBottom: '10px' }}>
+        <label htmlFor="exportFormat">Export as: </label>
+        <select
+          id="exportFormat"
+          value={exportFormat}
+          onChange={(e) => setExportFormat(e.target.value)}
+        >
+          <option value="excel">Excel</option>
+          <option value="pdf">PDF</option>
+          <option value="html">HTML</option>
+        </select>
+        <button
+          type="button"
+          onClick={handleExport}
+          style={{ marginLeft: '10px' }}
+        >
+          Export
+        </button>
+      </div>
       <div>
         <button type="button" onClick={toggleEditMode}>
           {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}

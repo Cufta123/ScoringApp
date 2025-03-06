@@ -65,21 +65,21 @@ export function assignBoatsToNewHeats(
     groupedByHeatName[heatName].sort((a, b) => a.points - b.points);
   });
 
-  console.log('Grouped by Heat Name:', groupedByHeatName);
+  // console.log('Grouped by Heat Name:', groupedByHeatName);
 
   // Create tables with just boat_id and points
-  const tables = Object.keys(groupedByHeatName).map((heatName) => {
-    return {
-      heatName,
-      boats: groupedByHeatName[heatName].map((boat) => ({
-        boat_id: boat.boat_id,
-        points: boat.points,
-      })),
-    };
-  });
+  // const tables = Object.keys(groupedByHeatName).map((heatName) => {
+  // return {
+  //     heatName,
+  //     boats: groupedByHeatName[heatName].map((boat) => ({
+  //       boat_id: boat.boat_id,
+  //       points: boat.points,
+  //  })),
+  //  };
+  // });
 
   // Log the tables with full details
-  console.log('Tables:', JSON.stringify(tables, null, 2));
+  // console.log('Tables:', JSON.stringify(tables, null, 2));
 
   // Number of new heats
   const numHeats = nextHeatNames.length;
@@ -95,10 +95,10 @@ export function assignBoatsToNewHeats(
     if (!matchA || !matchB) return a.localeCompare(b); // fallback
     return matchA[1].localeCompare(matchB[1]);
   });
-  console.log(
-    'Sorted old heat names in alphabetical order:',
-    sortedOldHeatNames,
-  );
+  // console.log(
+  //  'Sorted old heat names in alphabetical order:',
+  //  sortedOldHeatNames,
+  // );
 
   // We'll build a final array of assignments
   // each element is { heatId: number, boatId: number, boatName: string }
@@ -109,9 +109,9 @@ export function assignBoatsToNewHeats(
 
   // 2) For each old heat in alphabetical order, assign finishing positions to new heats
   sortedOldHeatNames.forEach((oldHeatName, oldHeatIndex) => {
-    console.log(
-      `\nProcessing old heat: "${oldHeatName}" (index ${oldHeatIndex})`,
-    );
+    //  console.log(
+    //    `\nProcessing old heat: "${oldHeatName}" (index ${oldHeatIndex})`,
+    //  );
 
     const boats = groupedByHeatName[oldHeatName];
 
@@ -124,15 +124,15 @@ export function assignBoatsToNewHeats(
       const newHeatIndex =
         (((oldHeatIndex - (finishingPos - 1)) % numHeats) + numHeats) %
         numHeats;
-      const boatName = `${boat.name} ${boat.surname}`;
+      //   const boatName = `${boat.name} ${boat.surname}`;
 
-      console.log(
-        `\tBoat: "${boatName}" (boat_id: ${
-          boat.boat_id
-        }), finishing position: ${finishingPos}, → newHeatIndex: ${newHeatIndex}, newHeatName: "${
-          nextHeatNames[newHeatIndex]
-        }"`,
-      );
+      //  console.log(
+      //     `\tBoat: "${boatName}" (boat_id: ${
+      //       boat.boat_id
+      //    }), finishing position: ${finishingPos}, → newHeatIndex: ${newHeatIndex}, newHeatName: "${
+      //       nextHeatNames[newHeatIndex]
+      //      }"`,
+      //   );
 
       // Push the assignment
       assignments.push({
@@ -142,7 +142,7 @@ export function assignBoatsToNewHeats(
     });
   });
 
-  console.log('\nFinal assignments:', JSON.stringify(assignments, null, 2));
+  //  console.log('\nFinal assignments:', JSON.stringify(assignments, null, 2));
   return assignments;
 }
 

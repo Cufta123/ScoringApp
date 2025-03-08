@@ -6,8 +6,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import HeatComponent from '../../components/HeatComponent';
 import ScoringInputComponent from '../../components/ScoringInputComponent';
+import printNewHeats from '../../../main/functions/printNewHeats';
 import './HeatRacePage.css';
-import handlePrintNewHeats from '../../../main/functions/printExcelFunctions';
 
 function HeatRacePage() {
   const location = useLocation();
@@ -19,6 +19,7 @@ function HeatRacePage() {
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [heats, setHeats] = useState([]);
   const [allHeatsEqual, setAllHeatsEqual] = useState(false); // New state
+  const [exportFormat, setExportFormat] = useState('excel');
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -224,6 +225,13 @@ function HeatRacePage() {
       );
     }
   };
+  const handlePrintNewHeats = async () => {
+    try {
+      await printNewHeats(event, heats, exportFormat); // Use the selected export format
+    } catch (error) {
+      console.error('Error printing new heats:', error);
+    }
+  };
 
   useEffect(() => {
     console.log('HeatComponent Props:', heats);
@@ -280,12 +288,24 @@ function HeatRacePage() {
             </button>
           )}
           {!finalSeriesStarted && (
-            <button
-              type="button"
-              onClick={() => handlePrintNewHeats(event, heats)}
-            >
-              Print new heats
-            </button>
+            <>
+              <select
+                id="exportFormat"
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                style={{ maxWidth: '80px' }}
+              >
+                <option value="excel">Excel</option>
+                <option value="pdf">PDF</option>
+                <option value="html">HTML</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => handlePrintNewHeats(event, heats)}
+              >
+                Print new heats
+              </button>
+            </>
           )}
         </>
       ) : (

@@ -9,7 +9,7 @@ import Navbar from '../../components/Navbar';
 import './EventPage.css';
 
 import CSVUpload from '../../components/CSVUpload';
-import { exportEventSailors } from '../../../main/functions/printExcelFunctions';
+import printStartingList from '../../../main/functions/printStartingList';
 
 const LeaderboardComponent = lazy(() => import('../../components/Leaderboard'));
 function EventPage() {
@@ -30,6 +30,7 @@ function EventPage() {
   const [raceHappened, setRaceHappened] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isEventLocked, setIsEventLocked] = useState(event.is_locked === 1);
+  const [exportFormat, setExportFormat] = useState('excel');
 
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -223,8 +224,8 @@ function EventPage() {
           Back
         </button>
         <Suspense fallback={<div>Loading Leaderboard...</div>}>
-        <LeaderboardComponent eventId={event.event_id} />
-      </Suspense>
+          <LeaderboardComponent eventId={event.event_id} />
+        </Suspense>
       </div>
     );
   }
@@ -238,13 +239,14 @@ function EventPage() {
     label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
   }));
 
-  const handlePrintEventSailors = async () => {
+  const handlePrintStartingList = async () => {
     try {
-      await exportEventSailors(event, boats);
+      await printStartingList(event, boats, exportFormat);
     } catch (error) {
-      console.error('Error printing event sailors:', error);
+      console.error('Error printing starting list:', error);
     }
   };
+
   return (
     <div>
       <Navbar
@@ -291,8 +293,18 @@ function EventPage() {
         eventId={event.event_id}
         onImportComplete={fetchBoatsWithSailors}
       />
-      <button type="button" onClick={handlePrintEventSailors}>
-        Print Start List
+      <select
+        id="exportFormat"
+        value={exportFormat}
+        onChange={(e) => setExportFormat(e.target.value)}
+        style={{ maxWidth: '80px' }}
+      >
+        <option value="excel">Excel</option>
+        <option value="pdf">PDF</option>
+        <option value="html">HTML</option>
+      </select>
+      <button type="button" onClick={handlePrintStartingList}>
+        Print Starting List
       </button>
 
       <h3>Boats and Sailors</h3>

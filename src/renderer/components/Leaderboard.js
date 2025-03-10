@@ -8,8 +8,7 @@ import {
   HandleSave,
   HandleRaceChange,
 } from '../../main/functions/editingLeaderboard';
-
-import { exportToExcel } from '../../main/functions/printExcelFunctions';
+import printStartingList from '../../main/functions/printStartingList';
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -17,6 +16,7 @@ function LeaderboardComponent({ eventId }) {
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
+  const [exportFormat, setExportFormat] = useState('excel'); // 'excel' | 'pdf' | 'html'
 
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
 
@@ -172,24 +172,33 @@ function LeaderboardComponent({ eventId }) {
   const sortedGroups = Object.keys(groupedLeaderboard).sort(
     (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
   );
+  const handlePrintStartingList = async () => {
+    try {
+      await printStartingList(event, boats, exportFormat);
+    } catch (error) {
+      console.error('Error printing starting list:', error);
+    }
+  };
 
   return (
     <div className="leaderboard">
       <h2>{finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h2>
-      <button
-        type="button"
-        onClick={() =>
-          exportToExcel(
-            leaderboard,
-            finalSeriesStarted,
-            sortedGroups,
-            groupedLeaderboard,
-            eventId,
-          )
-        }
-      >
-        Export to Excel
-      </button>
+      <div style={{ marginBottom: '10px' }}>
+        <label htmlFor="exportFormat">Export as: </label>
+        <select
+          id="exportFormat"
+          value={exportFormat}
+          onChange={(e) => setExportFormat(e.target.value)}
+          style={{ maxWidth: '80px' }}
+        >
+          <option value="excel">Excel</option>
+          <option value="pdf">PDF</option>
+          <option value="html">HTML</option>
+        </select>
+        <button type="button" onClick={handlePrintStartingList}>
+          Print Starting List
+        </button>
+      </div>
       <div>
         <button type="button" onClick={toggleEditMode}>
           {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}

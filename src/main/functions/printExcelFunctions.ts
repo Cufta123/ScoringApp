@@ -1,6 +1,8 @@
 /* eslint-disable camelcase */
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { jsPDF as JsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const getLatestHeats = (heats: any[]) => {
   // Reduce heats to the latest (highest numeric suffix) for each base letter
@@ -255,5 +257,210 @@ export async function exportEventSailors(event: any, sailors: any[]) {
     saveAs(blob, `${event.event_name}_sailors.xlsx`);
   } catch (error) {
     console.error('Error exporting Excel file for event sailors:', error);
+  }
+}
+
+export async function exportToPDF(
+  leaderboard: any[],
+  finalSeriesStarted: boolean,
+  sortedGroups: string[],
+  groupedLeaderboard: { [group: string]: any[] },
+  eventId: string,
+) {
+  // Retrieve event name using your DB API
+  const eventName = await window.electron.sqlite.eventDB.getEventName(eventId);
+  const doc = new JsPDF();
+  let startY = 20;
+
+  // Header title for entire document
+  doc.setFontSize(16);
+  doc.text(
+    `${finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}`,
+    14,
+    10,
+  );
+
+  if (finalSeriesStarted) {
+    // For each group if finals have started
+    sortedGroups.forEach((group) => {
+      const groupEntries = groupedLeaderboard[group] || [];
+      // Determine the maximum number of races within this group
+      const maxRaceCount = Math.max(
+        ...groupEntries.map((entry) =>
+          entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
+        ),
+        0,
+      );
+
+      // Build a dynamic header with each race per column
+      const headerRow = [
+        'Rank',
+        'Name',
+        'Country',
+        'Boat Number',
+        'Boat Type',
+        ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
+        'Total Points',
+      ];
+
+      doc.setFontSize(14);
+      doc.text(`${group} Group`, 14, startY);
+      startY += 6;
+
+      const bodyData = groupEntries.map((entry, idx) => {
+        const row = [];
+        row.push((idx + 1).toString());
+        row.push(`${entry.name} ${entry.surname}`);
+        row.push(entry.country);
+        row.push(entry.boat_number.toString());
+        row.push(entry.boat_type);
+        // Add each race as separate column; fill missing races with empty strings
+        for (let i = 0; i < maxRaceCount; i +=1) {
+          row.push(
+            entry.races && entry.races[i] !== undefined
+              ? entry.races[i].toString()
+              : '',
+          );
+        }
+        row.push(entry.total_points_final.toString());
+        return row;
+      });
+
+      autoTable(doc, {
+        startY,
+        head: [headerRow],
+        body: bodyData,
+        theme: 'grid',
+      });
+
+      startY = (doc as any).lastAutoTable.finalY + 10;
+      if (startY > 270) {
+        doc.addPage();
+        startY = 20;
+      }
+    });
+  } else {
+    // For non-final series, work with the full leaderboard
+    const raceCount =
+      leaderboard.length > 0 && leaderboard[0].races
+        ? leaderboard[0].races.length
+        : 0;
+    const headerRow = [
+      'Rank',
+      'Name',
+      'Country',
+      'Boat Number',
+      'Boat Type',
+      ...Array.from({ length: raceCount }, (_, i) => `Race ${i + 1}`),
+      'Total Points',
+    ];
+
+    const bodyData = leaderboard.map((entry, idx) => {
+      const row = [];
+      row.push((idx + 1).toString());
+      row.push(`${entry.name} ${entry.surname}`);
+      row.push(entry.country);
+      row.push(entry.boat_number.toString());
+      row.push(entry.boat_type);
+      for (let i = 0; i < raceCount; i += 1) {
+        row.push(
+          entry.races && entry.races[i] !== undefined
+            ? entry.races[i].toString()
+            : '',
+        );
+      }
+      row.push(entry.total_points_event.toString());
+      return row;
+    });
+
+    autoTable(doc, {
+      startY,
+      head: [headerRow],
+      body: bodyData,
+      theme: 'grid',
+    });
+  }
+
+  doc.save(
+    `${eventName}_${finalSeriesStarted ? 'final' : 'race'}_leaderboard.pdf`,
+  );
+}
+/**
+ * Exports leaderboard data as an HTML view.
+ */
+export async function exportToHTML(
+  leaderboard: any[],
+  finalSeriesStarted: boolean,
+  sortedGroups: string[],
+  groupedLeaderboard: { [group: string]: any[] },
+  eventId: string,
+) {
+  const eventName = await window.electron.sqlite.eventDB.getEventName(eventId);
+  let html = `<html><head><title>${eventName} Leaderboard</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+  </style>
+  </head><body>`;
+
+  html += `<h1>${finalSeriesStarted ? 'Final Leaderboard' : 'Leaderboard'}</h1>`;
+
+  if (finalSeriesStarted) {
+    sortedGroups.forEach((group) => {
+      html += `<h2>${group} Group</h2>`;
+      html += `<table><thead><tr>
+      <th>Rank</th>
+      <th>Name</th>
+      <th>Country</th>
+      <th>Boat Number</th>
+      <th>Boat Type</th>
+      <th>Races</th>
+      <th>Total Points</th>
+      </tr></thead><tbody>`;
+      groupedLeaderboard[group]?.forEach((entry, index) => {
+        html += `<tr>
+        <td>${index + 1}</td>
+        <td>${entry.name} ${entry.surname}</td>
+        <td>${entry.country}</td>
+        <td>${entry.boat_number}</td>
+        <td>${entry.boat_type}</td>
+        <td>${entry.races ? entry.races.join(', ') : ''}</td>
+        <td>${entry.total_points_final}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    });
+  } else {
+    html += `<table><thead><tr>
+      <th>Rank</th>
+      <th>Name</th>
+      <th>Country</th>
+      <th>Boat Number</th>
+      <th>Boat Type</th>
+      <th>Races</th>
+      <th>Total Points</th>
+      </tr></thead><tbody>`;
+    leaderboard.forEach((entry, index) => {
+      html += `<tr>
+      <td>${index + 1}</td>
+      <td>${entry.name} ${entry.surname}</td>
+      <td>${entry.country}</td>
+      <td>${entry.boat_number}</td>
+      <td>${entry.boat_type}</td>
+      <td>${entry.races ? entry.races.join(', ') : ''}</td>
+      <td>${entry.total_points_event}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  html += `</body></html>`;
+
+  // Display in a new window
+  const newWindow = window.open('', '_blank');
+  if (newWindow) {
+    newWindow.document.write(html);
+    newWindow.document.close();
   }
 }

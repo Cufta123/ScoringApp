@@ -197,7 +197,7 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
 
     // 2. Fetch all raw scores for the event. (sorted as needed)
     const scoresQuery = db.prepare(`
-      SELECT s.boat_id, s.points, r.race_number
+      SELECT s.boat_id, s.points, r.race_number, h.heat_name, h.heat_id
       FROM Scores s
       JOIN Races r ON s.race_id = r.race_id
       JOIN Heats h ON r.heat_id = h.heat_id
@@ -205,6 +205,7 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
       ORDER BY s.points DESC, r.race_number DESC
     `);
     const rawScores = scoresQuery.all(event_id);
+    console.log('Raw scores:', rawScores);
 
     // 3. Calculate the temporary leaderboard from the raw data.
     // The calculateBoatScores function now becomes pure, using summaryResults and rawScores.

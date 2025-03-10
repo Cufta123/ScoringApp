@@ -227,7 +227,10 @@ function HeatRacePage() {
   };
   const handlePrintNewHeats = async () => {
     try {
-      await printNewHeats(event, heats, exportFormat); // Use the selected export format
+      const latestHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+        event.event_id,
+      );
+      await printNewHeats(event, latestHeats, exportFormat);
     } catch (error) {
       console.error('Error printing new heats:', error);
     }

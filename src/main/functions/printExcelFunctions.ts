@@ -35,7 +35,7 @@ export default async function handlePrintNewHeats(
 ) {
   console.log('Heats to print (before filtering):', heats);
   if (!Array.isArray(heats) || heats.length === 0) {
-    alert('No heats available to print.');
+    alert('No heats available to print. Try to reload page with CTRL+R.');
     return;
   }
 
@@ -315,7 +315,7 @@ export async function exportToPDF(
         row.push(entry.boat_number.toString());
         row.push(entry.boat_type);
         // Add each race as separate column; fill missing races with empty strings
-        for (let i = 0; i < maxRaceCount; i +=1) {
+        for (let i = 0; i < maxRaceCount; i += 1) {
           row.push(
             entry.races && entry.races[i] !== undefined
               ? entry.races[i].toString()

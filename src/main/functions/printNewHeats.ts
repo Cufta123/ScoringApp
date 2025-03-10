@@ -35,7 +35,7 @@ export default async function printNewHeats(
 ) {
   console.log('Heats to print (before filtering):', heats);
   if (!Array.isArray(heats) || heats.length === 0) {
-    alert('No heats available to print.');
+    alert('No heats available to print. Try to reload page with CTRL+R.');
     return;
   }
 

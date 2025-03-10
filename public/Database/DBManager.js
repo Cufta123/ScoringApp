@@ -29,58 +29,50 @@ const db = new Database(dbPath); // Creates the database file when used
 db.pragma('journal_mode = WAL');
 console.log('Database initialized.');
 
-const migrateBoatsTable = () => {
+const migrateSailorsTable = () => {
   try {
-    // Get column info for 'Boats'
-    const boatsInfo = db.prepare('PRAGMA table_info(Boats);').all();
-    const sailNumberColumn = boatsInfo.find(
-      (col) => col.name === 'sail_number',
-    );
+    // Get column info for 'Sailors'
+    const sailorsInfo = db.prepare('PRAGMA table_info(Sailors);').all();
+    const genderColumn = sailorsInfo.find((col) => col.name === 'gender');
 
-    // Check if the type is not TEXT
-    if (sailNumberColumn && sailNumberColumn.type.toUpperCase() !== 'TEXT') {
-      console.log(
-        "Migrating Boats table: Changing 'sail_number' column type to TEXT...",
-      );
-      db.exec('BEGIN TRANSACTION;');
-
-      // Rename the old Boats table
-      db.exec('ALTER TABLE Boats RENAME TO Boats_old;');
-
-      // Create the new Boats table with the updated schema
-      db.exec(`
-        CREATE TABLE Boats (
-          boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sail_number TEXT NOT NULL UNIQUE,
-          country TEXT NOT NULL,
-          model TEXT NOT NULL,
-          sailor_id INTEGER,
-          FOREIGN KEY (sailor_id) REFERENCES Sailors(sailor_id)
-        );
-      `);
-
-      // Copy data from the old table to the new one
-      db.exec(`
-        INSERT INTO Boats (boat_id, sail_number, country, model, sailor_id)
-        SELECT boat_id, sail_number, country, model, sailor_id
-        FROM Boats_old;
-      `);
-
-      // Drop the old Boats table
-      db.exec('DROP TABLE Boats_old;');
-      db.exec('COMMIT;');
-      console.log('Boats table migrated successfully.');
+    // If the gender column is missing, add it
+    if (!genderColumn) {
+      console.log("Migrating Sailors table: Adding 'gender' column...");
+      db.exec('ALTER TABLE Sailors ADD COLUMN gender TEXT;');
+      console.log("'gender' column added to Sailors table successfully.");
     } else {
-      console.log('Boats table is up-to-date (sail_number is TEXT).');
+      console.log("Sailors table already contains the 'gender' column.");
     }
   } catch (error) {
-    db.exec('ROLLBACK;');
-    console.error('Error migrating Boats table:', error);
+    console.error('Error migrating Sailors table:', error);
+  }
+};
+const checkSailNumberTypeAndDropDatabase = () => {
+  try {
+    // Count how many boats have sail_number stored as an integer
+    const result = db
+      .prepare(
+        `SELECT COUNT(*) as count FROM Boats WHERE typeof(sail_number) = 'integer'`,
+      )
+      .get();
+
+    if (result.count > 0) {
+      console.log('Integer sail_number found. Dropping whole database...');
+      db.close();
+      fs.unlinkSync(dbPath); // Deletes the entire database file
+      process.exit(0);
+    } else {
+      console.log('No integer-type sail_number entries found.');
+    }
+  } catch (error) {
+    console.error('Error checking sail_number type:', error);
   }
 };
 
-// Call the migration before initializing the schema
-migrateBoatsTable();
+checkSailNumberTypeAndDropDatabase();
+// Call the migrations before initializing the schema
+
+migrateSailorsTable();
 
 // Function to initialize the database schema
 const initializeSchema = () => {

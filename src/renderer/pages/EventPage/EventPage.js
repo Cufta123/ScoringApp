@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-alert */
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
@@ -11,7 +11,6 @@ import './EventPage.css';
 import CSVUpload from '../../components/CSVUpload';
 import printStartingList from '../../../main/functions/printStartingList';
 
-const LeaderboardComponent = lazy(() => import('../../components/Leaderboard'));
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,7 +27,6 @@ function EventPage() {
   const [selectedBoats, setSelectedBoats] = useState([]);
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isEventLocked, setIsEventLocked] = useState(event.is_locked === 1);
   const [exportFormat, setExportFormat] = useState('excel');
 
@@ -149,11 +147,7 @@ function EventPage() {
   };
 
   const handleOpenLeaderboard = () => {
-    setShowLeaderboard(true);
-  };
-
-  const handleCloseLeaderboard = () => {
-    setShowLeaderboard(false);
+    navigate('/leaderboard', { state: { eventId: event.event_id } });
   };
 
   const handleRemoveBoat = async (boatId) => {
@@ -215,19 +209,6 @@ function EventPage() {
 
   if (!event) {
     return null; // Render nothing if event is not available
-  }
-
-  if (showLeaderboard) {
-    return (
-      <div>
-        <button type="button" onClick={handleCloseLeaderboard}>
-          Back
-        </button>
-        <Suspense fallback={<div>Loading Leaderboard...</div>}>
-          <LeaderboardComponent eventId={event.event_id} />
-        </Suspense>
-      </div>
-    );
   }
 
   const availableBoats = allBoats.filter(

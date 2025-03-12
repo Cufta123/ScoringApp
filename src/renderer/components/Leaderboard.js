@@ -8,7 +8,7 @@ import {
   HandleSave,
   HandleRaceChange,
 } from '../../main/functions/editingLeaderboard';
-import printStartingList from '../../main/functions/printStartingList';
+import printLeaderboard from '../../main/functions/printLeaderboard';
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -172,11 +172,18 @@ function LeaderboardComponent({ eventId }) {
   const sortedGroups = Object.keys(groupedLeaderboard).sort(
     (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
   );
-  const handlePrintStartingList = async () => {
+  const handlePrintLeaderboard = async () => {
     try {
-      await printStartingList(event, boats, exportFormat);
+      await printLeaderboard(
+        leaderboard,
+        finalSeriesStarted,
+        sortedGroups,
+        groupedLeaderboard,
+        eventId,
+        exportFormat,
+      );
     } catch (error) {
-      console.error('Error printing starting list:', error);
+      console.error('Error printing leaderboard:', error);
     }
   };
 
@@ -195,8 +202,8 @@ function LeaderboardComponent({ eventId }) {
           <option value="pdf">PDF</option>
           <option value="html">HTML</option>
         </select>
-        <button type="button" onClick={handlePrintStartingList}>
-          Print Starting List
+        <button type="button" onClick={handlePrintLeaderboard}>
+          Print Leaderboard
         </button>
       </div>
       <div>
@@ -238,84 +245,97 @@ function LeaderboardComponent({ eventId }) {
           </div>
         )}
       </div>
-      {sortedGroups.map((group) => (
-        <div key={`group-${group}`}>
-          <h3>{group} Group</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Name</th>
-                <th>Country</th>
-                <th>Boat Number</th>
-                <th>Boat Type</th>
-                {leaderboard[0]?.races?.map((_, index) => (
-                  <th key={`header-race-${index}`}>Race {index + 1}</th>
-                )) || []}
-                <th>Total Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupedLeaderboard[group]?.map((entry, index) => (
-                <tr key={`boat-${entry.boat_id}-${index}`}>
-                  <td>{index + 1}</td>
-                  <td>
-                    {entry.name} {entry.surname}
-                  </td>
-                  <td>
-                    <Flag
-                      code={getFlagCode(entry.country)}
-                      style={{ width: '30px', marginRight: '5px' }}
-                    />
-                    {entry.country}
-                  </td>
-                  <td>{entry.boat_number}</td>
-                  <td>{entry.boat_type}</td>
-                  {entry.races?.map((race, raceIndex) => (
-                    <td
-                      key={`entry-race-${entry.boat_id}-${raceIndex}`}
-                      style={{
-                        cursor: editMode ? 'pointer' : 'default',
-                        backgroundColor: editMode ? '#f9f9f9' : 'transparent',
-                      }}
-                    >
-                      {editMode ? (
-                        <input
-                          type="number"
-                          value={
-                            typeof race === 'string'
-                              ? race.replace(/[()]/g, '')
-                              : race
-                          } // Remove parentheses for editing
-                          onChange={(e) =>
-                            setEditableLeaderboard(
-                              HandleRaceChange({
-                                boatId: entry.boat_id,
-                                raceIndex,
-                                newHandleRaceChangeValue: e.target.value,
-                                editableLeaderboard,
-                                shiftPositions,
-                              }),
-                            )
-                          }
-                          style={{ width: '50px' }}
-                        />
-                      ) : (
-                        race
-                      )}
-                    </td>
+      {sortedGroups.map((group) => {
+        const groupRacesCount = Math.max(
+          ...groupedLeaderboard[group].map((entry) => entry.races.length),
+        );
+
+        return (
+          <div key={`group-${group}`}>
+            <h3>{group} Group</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Name</th>
+                  <th>Country</th>
+                  <th>Boat Number</th>
+                  <th>Boat Type</th>
+                  {Array.from({ length: groupRacesCount }).map((_, index) => (
+                    <th key={`header-race-${index}`}>Race {index + 1}</th>
                   ))}
-                  <td>
-                    {finalSeriesStarted
-                      ? entry.total_points_combined // Use total_points_combined when final series has started
-                      : entry.total_points_event}
-                  </td>
+                  <th>Total Points</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+              </thead>
+              <tbody>
+                {groupedLeaderboard[group]?.map((entry, index) => (
+                  <tr key={`boat-${entry.boat_id}-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>
+                      {entry.name} {entry.surname}
+                    </td>
+                    <td>
+                      <Flag
+                        code={getFlagCode(entry.country)}
+                        style={{ width: '30px', marginRight: '5px' }}
+                      />
+                      {entry.country}
+                    </td>
+                    <td>{entry.boat_number}</td>
+                    <td>{entry.boat_type}</td>
+                    {Array.from({ length: groupRacesCount }).map(
+                      (_, raceIndex) => (
+                        <td
+                          key={`entry-race-${entry.boat_id}-${raceIndex}`}
+                          style={{
+                            cursor: editMode ? 'pointer' : 'default',
+                            backgroundColor: editMode
+                              ? '#f9f9f9'
+                              : 'transparent',
+                          }}
+                        >
+                          {editMode ? (
+                            <input
+                              type="number"
+                              value={
+                                typeof entry.races[raceIndex] === 'string'
+                                  ? entry.races[raceIndex]?.replace(
+                                      /[()]/g,
+                                      '',
+                                    ) || ''
+                                  : entry.races[raceIndex] || ''
+                              } // Remove parentheses for editing
+                              onChange={(e) =>
+                                setEditableLeaderboard(
+                                  HandleRaceChange({
+                                    boatId: entry.boat_id,
+                                    raceIndex,
+                                    newHandleRaceChangeValue: e.target.value,
+                                    editableLeaderboard,
+                                    shiftPositions,
+                                  }),
+                                )
+                              }
+                              style={{ width: '50px' }}
+                            />
+                          ) : (
+                            entry.races[raceIndex] || ''
+                          )}
+                        </td>
+                      ),
+                    )}
+                    <td>
+                      {finalSeriesStarted
+                        ? entry.total_points_combined // Use total_points_combined when final series has started
+                        : entry.total_points_event}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }

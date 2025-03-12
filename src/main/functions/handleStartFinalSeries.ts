@@ -117,6 +117,7 @@ export default async function handleStartFinalSeries({
     }
     await Promise.all(fleetBoatPromises);
 
+    console.log('Setting final series started to');
     setFinalSeriesStarted(true); // Final series is now started
     alert('Final Series started successfully!');
     handleDisplayHeats(); // Refresh the heats display

@@ -1,4 +1,3 @@
-/* eslint-disable no-alert */
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 
@@ -11,15 +10,16 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [penalties, setPenalties] = useState({});
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
-
   const inputRef = useRef(null);
 
+  // Fetch valid boats for current heat on mount or when heat changes.
   useEffect(() => {
     const fetchBoats = async () => {
       try {
         const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
           heat.heat_id,
         );
+        // Stores as string to ensure the same type in validBoats and in temporaryBoats.
         setValidBoats(boats.map((boat) => boat.sail_number));
       } catch (error) {
         console.error('Error fetching boats:', error);
@@ -28,13 +28,19 @@ function ScoringInputComponent({ heat, onSubmit }) {
     fetchBoats();
   }, [heat.heat_id]);
 
+  // Helper to update place numbers based on an ordered boats array.
+  const updatePlaces = (boats) => {
+    const newPlaceNumbers = {};
+    boats.forEach((boat, index) => {
+      newPlaceNumbers[boat] = index + 1;
+    });
+    setPlaceNumbers(newPlaceNumbers);
+  };
+
+  // Event Handlers
   const handleInputChange = (e) => {
     const input = e.target.value;
-    const inputNumbers = input
-      .split(' ')
-      .map(Number)
-      .filter((n) => !Number.isNaN(n));
-
+    const inputNumbers = input.split(' ').filter((s) => s.trim() !== '');
     const uniqueNumbers = [...new Set(inputNumbers)];
     setTemporaryBoats(uniqueNumbers);
     setInputValue(input);
@@ -42,9 +48,9 @@ function ScoringInputComponent({ heat, onSubmit }) {
 
   const handleBoatClick = (sailNumber) => {
     if (!temporaryBoats.includes(sailNumber)) {
-      const updatedTemporaryBoats = [...temporaryBoats, sailNumber];
-      setTemporaryBoats(updatedTemporaryBoats);
-      setInputValue(updatedTemporaryBoats.join(' '));
+      const updatedTemporary = [...temporaryBoats, sailNumber];
+      setTemporaryBoats(updatedTemporary);
+      setInputValue(updatedTemporary.join(' '));
       // Refocus the input so it remains interactive.
       if (inputRef.current) {
         inputRef.current.focus();
@@ -53,33 +59,24 @@ function ScoringInputComponent({ heat, onSubmit }) {
   };
 
   const handleAddBoats = () => {
+    // Validate and merge the temporary boats into the main boatNumbers list
     const validNewBoats = temporaryBoats.filter(
       (number) => !boatNumbers.includes(number) && validBoats.includes(number),
     );
-
+    const boatsWithoutPenalties = validNewBoats.filter(
+      (number) => !penalties[number],
+    );
     const boatsWithPenalties = validNewBoats.filter(
       (number) => penalties[number],
     );
 
-    const boatsWithoutPenalties = validNewBoats.filter(
-      (number) => !penalties[number],
-    );
-
+    // Merge new boats into boatNumbers list
     const updatedBoatNumbers = [...boatNumbers, ...boatsWithoutPenalties];
+    // Add penalized boats at the end if any
+    boatsWithPenalties.forEach((boat) => updatedBoatNumbers.push(boat));
+
+    // Compute new place numbers (boatsWithoutPenalties get places based on order)
     const updatedPlaceNumbers = { ...placeNumbers };
-
-    boatsWithoutPenalties.forEach((boat) => {
-      if (!updatedPlaceNumbers[boat]) {
-        updatedPlaceNumbers[boat] = updatedBoatNumbers.indexOf(boat) + 1;
-      }
-    });
-
-    boatsWithPenalties.forEach((boat) => {
-      updatedBoatNumbers.push(boat);
-      updatedPlaceNumbers[boat] = updatedBoatNumbers.length;
-    });
-
-    // Update place numbers for all boats
     updatedBoatNumbers.forEach((boat, index) => {
       if (!penalties[boat]) {
         updatedPlaceNumbers[boat] = index + 1;
@@ -92,22 +89,13 @@ function ScoringInputComponent({ heat, onSubmit }) {
     setInputValue(''); // Clear input field
   };
 
-  const updatePlaces = (boats) => {
-    const newPlaceNumbers = {};
-    boats.forEach((boat, index) => {
-      newPlaceNumbers[boat] = index + 1;
-    });
-    setPlaceNumbers(newPlaceNumbers);
-  };
-
   const handleRemoveBoat = (index) => {
     const updatedBoatNumbers = [...boatNumbers];
     const removedBoat = updatedBoatNumbers.splice(index, 1)[0];
-
     const updatedPlaceNumbers = { ...placeNumbers };
     delete updatedPlaceNumbers[removedBoat];
 
-    // Update place numbers for remaining boats
+    // Update place numbers for remaining boats (skip penalized ones)
     updatedBoatNumbers.forEach((boat, idx) => {
       if (!penalties[boat]) {
         updatedPlaceNumbers[boat] = idx + 1;
@@ -126,9 +114,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
     updatePlaces(updatedBoatNumbers);
   };
 
-  const handleDragStart = (index) => {
-    setDraggingIndex(index);
-  };
+  const handleDragStart = (index) => setDraggingIndex(index);
 
   const handleDragOver = (index) => (e) => {
     e.preventDefault();
@@ -144,44 +130,35 @@ function ScoringInputComponent({ heat, onSubmit }) {
   };
 
   const handlePenaltyChange = (boatNumber, penalty) => {
-    setPenalties((prevPenalties) => ({
-      ...prevPenalties,
+    setPenalties((prev) => ({
+      ...prev,
       [boatNumber]: penalty,
     }));
   };
 
   const handleSubmit = () => {
     const allBoats = [...new Set([...boatNumbers, ...validBoats])];
-    const boatsWithPenalties = allBoats.filter(
-      (boatNumber) => penalties[boatNumber],
-    );
-    const boatsWithoutPenalties = allBoats.filter(
-      (boatNumber) => !penalties[boatNumber],
-    );
+    const boatsWithPenalties = allBoats.filter((boat) => penalties[boat]);
+    const boatsWithoutPenalties = allBoats.filter((boat) => !penalties[boat]);
 
-    // Assign place numbers to boats without penalties
-    const boatPlaces = boatsWithoutPenalties.map((boatNumber, index) => {
-      const place = index + 1;
-      return {
-        boatNumber,
-        place,
-        status: 'FINISHED',
-      };
-    });
+    // Compute boat places for boats without penalties
+    const boatPlaces = boatsWithoutPenalties.map((boat, index) => ({
+      boatNumber: boat,
+      place: index + 1,
+      status: 'FINISHED',
+    }));
 
-    // Assign place numbers to boats with penalties
-    boatsWithPenalties.forEach((boatNumber) => {
-      const penalty = penalties[boatNumber];
-      const place = allBoats.length + 1;
+    // Append penalized boats with status
+    boatsWithPenalties.forEach((boat) => {
       boatPlaces.push({
-        boatNumber,
-        place,
-        status: penalty,
+        boatNumber: boat,
+        place: allBoats.length + 1,
+        status: penalties[boat],
       });
     });
 
     const allBoatsAccountedFor = allBoats.every(
-      (boatNumber) => placeNumbers[boatNumber] || penalties[boatNumber],
+      (boat) => placeNumbers[boat] || penalties[boat],
     );
 
     if (allBoatsAccountedFor) {
@@ -193,16 +170,15 @@ function ScoringInputComponent({ heat, onSubmit }) {
     }
   };
 
+  // Returns the place number for a boat to display in the table.
   const getPlaceNumber = (sailNumber) => {
-    if (penalties[sailNumber]) {
-      return penalties[sailNumber]; // Display penalty if it exists
-    }
-    if (temporaryBoats.includes(sailNumber)) {
-      // Display temporary place
-      return temporaryBoats.indexOf(sailNumber) + 1 + boatNumbers.length;
-    }
-    return placeNumbers[sailNumber] || ''; // Display final place
+    if (penalties[sailNumber]) return penalties[sailNumber];
+    if (temporaryBoats.includes(sailNumber))
+      return temporaryBoats.indexOf(sailNumber) + 1;
+    return placeNumbers[sailNumber] || '';
   };
+
+  // JSX
   return (
     <div
       style={{
@@ -290,6 +266,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
         <div>
           <input
             type="text"
+            ref={inputRef}
             value={inputValue}
             onChange={handleInputChange}
             placeholder="Enter boat number"
@@ -310,12 +287,12 @@ function ScoringInputComponent({ heat, onSubmit }) {
               {dropIndex === index && (
                 <div
                   style={{
-                    height: '2px', // Thinner line for a subtle look
-                    backgroundColor: '#007bff', // Blue color for visibility
-                    width: '30%', // Half the width of the list items
-                    marginLeft: '5px', // Align the line to the left
-                    borderRadius: '1px', // Rounded edges for better appearance
-                    alignContent: 'center', // Center the line
+                    height: '2px',
+                    backgroundColor: '#007bff',
+                    width: '30%',
+                    marginLeft: '5px',
+                    borderRadius: '1px',
+                    alignContent: 'center',
                   }}
                 />
               )}
@@ -353,8 +330,8 @@ function ScoringInputComponent({ heat, onSubmit }) {
               style={{
                 height: '5px',
                 backgroundColor: '#007bff',
-                marginLeft: '0', // Align the line to the left
-                width: '50%', // Half the width of the list items
+                marginLeft: '0',
+                width: '50%',
               }}
             />
           )}

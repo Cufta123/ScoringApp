@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-alert */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
@@ -16,20 +16,23 @@ function EventPage() {
   const navigate = useNavigate();
   const { event } = location.state || {};
 
+  // Redirect if event data is missing
   useEffect(() => {
     if (!event) {
-      navigate('/'); // Redirect to the landing page if event is not available
+      navigate('/');
     }
   }, [event, navigate]);
 
+  // Component state
   const [boats, setBoats] = useState([]);
   const [allBoats, setAllBoats] = useState([]);
   const [selectedBoats, setSelectedBoats] = useState([]);
   const [isSailorFormVisible, setIsSailorFormVisible] = useState(false);
   const [raceHappened, setRaceHappened] = useState(false);
-  const [isEventLocked, setIsEventLocked] = useState(event.is_locked === 1);
+  const [isEventLocked, setIsEventLocked] = useState(event?.is_locked === 1);
   const [exportFormat, setExportFormat] = useState('excel');
 
+  // Fetch functions
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
       const boatsWithSailors =
@@ -44,7 +47,12 @@ function EventPage() {
       }));
       setBoats(mappedBoats);
     } catch (error) {
-      alert('Error fetching boats with sailors. Please try again later.');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(
+        'An error occurred while fetching boat and sailor data. Details: ' +
+          errorMessage,
+      );
     }
   }, [event.event_id]);
 
@@ -83,6 +91,7 @@ function EventPage() {
     }
   }, [event.event_id]);
 
+  // Combined effect to fetch initial data
   useEffect(() => {
     if (event) {
       fetchBoatsWithSailors();
@@ -98,6 +107,36 @@ function EventPage() {
     fetchEventLockStatus,
   ]);
 
+  // Keep allBoats updated when boats change
+  useEffect(() => {
+    setAllBoats((prevBoats) =>
+      prevBoats.filter(
+        (boat) =>
+          !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+      ),
+    );
+  }, [boats]);
+
+  // Derived values
+  const availableBoats = useMemo(
+    () =>
+      allBoats.filter(
+        (boat) =>
+          !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
+      ),
+    [allBoats, boats],
+  );
+
+  const boatOptions = useMemo(
+    () =>
+      availableBoats.map((boat) => ({
+        value: boat.boat_id,
+        label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
+      })),
+    [availableBoats],
+  );
+
+  // Handlers
   const handleAddSailor = () => {
     fetchBoatsWithSailors();
   };
@@ -108,7 +147,9 @@ function EventPage() {
 
   const toggleSailorFormVisibility = () => {
     if (raceHappened) {
-      alert('No more sailors can be added as a race has already happened.');
+      alert(
+        'Registration error: A race has already been conducted, so new sailors cannot be added.',
+      );
       return;
     }
     setIsSailorFormVisible(!isSailorFormVisible);
@@ -118,7 +159,9 @@ function EventPage() {
     e.preventDefault();
 
     if (raceHappened) {
-      alert('No more boats can be added as a race has already happened.');
+      alert(
+        'Registration error: A race has already occurred, so you cannot add new boats.',
+      );
       return;
     }
 
@@ -139,6 +182,12 @@ function EventPage() {
       setSelectedBoats([]); // Clear the selected boats
     } catch (error) {
       console.error('Error associating boats with event:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(
+        'An error occurred while associating boats with the event. Details: ' +
+          errorMessage,
+      );
     }
   };
 
@@ -179,46 +228,40 @@ function EventPage() {
       if (isEventLocked) {
         await window.electron.sqlite.eventDB.unlockEvent(event.event_id);
         setIsEventLocked(false);
-        alert('Event unlocked successfully!');
+        alert(
+          'Success: The event has been unlocked. Registrations are now enabled.',
+        );
       } else {
         await window.electron.sqlite.eventDB.lockEvent(event.event_id);
         setIsEventLocked(true);
-        alert('Event locked successfully!');
+        alert(
+          'Success: The event has been locked. No further registrations are allowed.',
+        );
       }
     } catch (error) {
       console.error('Error locking/unlocking event:', error);
-      alert('Error locking/unlocking event. Please try again later.');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(
+        `An error occurred while updating the event lock status. Details: ${
+          errorMessage
+        }`,
+      );
     }
   };
+
   const handleLockEventClick = () => {
-    const userConfirmed = window.confirm('Do you want to lock the event?');
+    const userConfirmed = window.confirm(
+      'Warning: Locking the event will prevent any further registrations. Do you wish to continue?',
+    );
     if (userConfirmed) {
       handleLockEvent();
     }
   };
-  useEffect(() => {
-    // Ensure that the allBoats state is updated when boats state changes
-    setAllBoats((prevBoats) => {
-      const updatedBoats = prevBoats.filter(
-        (boat) =>
-          !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
-      );
-      return updatedBoats;
-    });
-  }, [boats]);
 
   if (!event) {
     return null; // Render nothing if event is not available
   }
-
-  const availableBoats = allBoats.filter(
-    (boat) => !boats.some((eventBoat) => eventBoat.boat_id === boat.boat_id),
-  );
-
-  const boatOptions = availableBoats.map((boat) => ({
-    value: boat.boat_id,
-    label: `${boat.boat_country} ${boat.sail_number} - ${boat.model} (Sailor: ${boat.name} ${boat.surname})`,
-  }));
 
   const handlePrintStartingList = async () => {
     try {
@@ -241,15 +284,17 @@ function EventPage() {
       {raceHappened || isEventLocked ? (
         <div className="warning">
           <p>
-            No more sailors or boats can be added as at least one race has
-            happened or the event is locked.
+            Registrations Disabled: A race has occurred or the event is
+            currently locked.
           </p>
         </div>
       ) : (
         <>
-          <h2>Add Sailors</h2>
+          <h2>Register New Sailors</h2>
           <button type="button" onClick={toggleSailorFormVisibility}>
-            {isSailorFormVisible ? 'Hide Sailor Form' : 'Show Sailor Form'}
+            {isSailorFormVisible
+              ? 'Close Registration Form'
+              : 'Open Registration Form'}
           </button>
           {isSailorFormVisible && (
             <SailorForm
@@ -257,7 +302,7 @@ function EventPage() {
               eventId={event.event_id}
             />
           )}
-          <h2>Add Existing Boat to Event</h2>
+          <h2>Associate Existing Boat With Event</h2>
           <form onSubmit={handleBoatSelection}>
             <Select
               isMulti
@@ -266,7 +311,7 @@ function EventPage() {
               options={boatOptions}
               closeMenuOnSelect={false}
             />
-            <button type="submit">Add Boats</button>
+            <button type="submit">Add Boat(s) to Event</button>
           </form>
         </>
       )}
@@ -285,10 +330,10 @@ function EventPage() {
         <option value="html">HTML</option>
       </select>
       <button type="button" onClick={handlePrintStartingList}>
-        Print Starting List
+        Generate Starting List Printout
       </button>
 
-      <h3>Boats and Sailors</h3>
+      <h3>Participating Boats &amp; Sailors</h3>
       <SailorList
         sailors={Array.isArray(boats) ? boats : []}
         onRemoveBoat={handleRemoveBoat}

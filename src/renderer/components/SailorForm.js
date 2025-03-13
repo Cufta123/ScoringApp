@@ -137,7 +137,9 @@ function SailorForm({ onAddSailor, eventId }) {
             }
           } else {
             console.error('Error inserting club:', error);
-            alert('There was an error inserting the club.');
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            alert(`There was an error inserting the club.${errorMessage}`);
             return; // Exit the function gracefully
           }
         }
@@ -178,7 +180,9 @@ function SailorForm({ onAddSailor, eventId }) {
           );
         } catch (error) {
           console.error('Error inserting sailor:', error);
-          alert('There was an error inserting the sailor.');
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          alert(`There was an error inserting the sailor.${errorMessage}`);
           return; // Exit the function gracefully
         }
       } else {
@@ -241,7 +245,9 @@ function SailorForm({ onAddSailor, eventId }) {
           console.log(`Boat inserted with ID: ${boat_id}`);
         } catch (error) {
           console.error('Error inserting boat:', error);
-          alert('There was an error inserting the boat.');
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          alert(`There was an error inserting the boat.${errorMessage}`);
           return; // Exit the function gracefully
         }
       }
@@ -288,8 +294,10 @@ function SailorForm({ onAddSailor, eventId }) {
       fetchBoats();
       onAddSailor();
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error('Unexpected error during submission:', error);
-      alert('An unexpected error occurred.');
+      alert(`An unexpected error occurred.${errorMessage}`);
     }
   };
   const getSuggestions = (value) => {

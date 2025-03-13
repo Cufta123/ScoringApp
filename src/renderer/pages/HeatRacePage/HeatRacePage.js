@@ -190,7 +190,7 @@ function HeatRacePage() {
   const handleCreateNewHeatsBasedOnLeaderboard = async () => {
     if (finalSeriesStarted) {
       alert(
-        'Cannot create new heats based on leaderboard after the final series has started.',
+        'Operation not allowed: The final series has begun, so new heats cannot be created based on the leaderboard.',
       );
       return;
     }

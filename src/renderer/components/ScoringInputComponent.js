@@ -51,10 +51,6 @@ function ScoringInputComponent({ heat, onSubmit }) {
       const updatedTemporary = [...temporaryBoats, sailNumber];
       setTemporaryBoats(updatedTemporary);
       setInputValue(updatedTemporary.join(' '));
-      // Refocus the input so it remains interactive.
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
     }
   };
 
@@ -165,7 +161,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
       onSubmit(boatPlaces);
     } else {
       alert(
-        'All boats must be assigned a place or a penalty before submitting.',
+        'Submission error: Please assign a place or penalty to every boat before submitting the scores.',
       );
     }
   };
@@ -189,8 +185,9 @@ function ScoringInputComponent({ heat, onSubmit }) {
       }}
     >
       <div style={{ flex: '1', padding: '10px', boxSizing: 'border-box' }}>
-        <h2>Scoring for {heat.heat_name}</h2>
+        <h2>Scoring for Heat: {heat.heat_name}</h2>
         <p>Heat ID: {heat.heat_id}</p>
+        <p>Click any row below to add that boat to the scoring list.</p>
         <div
           style={{
             display: 'flex',
@@ -262,14 +259,18 @@ function ScoringInputComponent({ heat, onSubmit }) {
         </div>
       </div>
       <div style={{ flex: '1', padding: '10px', boxSizing: 'border-box' }}>
-        <h2>Scoring Input</h2>
+        <h2>Enter Boat Numbers</h2>
+        <p>
+          Type the sail number(s) below, separated by spaces (or click on a row
+          above), then click the button to add them.
+        </p>
         <div>
           <input
             type="text"
             ref={inputRef}
             value={inputValue}
             onChange={handleInputChange}
-            placeholder="Enter boat number"
+            placeholder="e.g. 101 102 103"
             style={{
               width: '100%',
               padding: '10px',
@@ -278,7 +279,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
             }}
           />
           <button type="button" onClick={handleAddBoats}>
-            Add Boat
+            Add Entered Boat(s)
           </button>
         </div>
         <ul>
@@ -320,7 +321,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
                     : `Place: ${placeNumbers[number]}`}
                 </span>
                 <button type="button" onClick={() => handleRemoveBoat(index)}>
-                  Remove
+                  Remove Boat
                 </button>
               </li>
             </React.Fragment>
@@ -337,7 +338,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
           )}
         </ul>
         <button type="button" onClick={handleSubmit}>
-          Submit Scores
+          Finalize and Submit Scores
         </button>
       </div>
     </div>

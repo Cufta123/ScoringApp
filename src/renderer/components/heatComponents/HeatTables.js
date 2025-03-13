@@ -28,7 +28,9 @@ export default function HeatTables({
       handleDisplayHeats(); // Refresh the heats display
     } catch (error) {
       console.error('Error transferring boat:', error);
-      alert('Error transferring boat. Please try again later.');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(`Error transferring boat. ${errorMessage}`);
     }
   };
 

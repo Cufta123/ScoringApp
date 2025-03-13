@@ -51,7 +51,6 @@ export default async function handleStartFinalSeries({
     console.log('Number of completed races', numCompletedRaces);
     let finalRanking;
     if (numCompletedRaces > 5 && numCompletedRaces < 8) {
-      // Call calculateBoatScores with finalSeriesRanking flag enabled
       const setMoreThan5LestThan8 = true;
       finalRanking = calculateBoatScores(
         summaryResults,
@@ -62,6 +61,13 @@ export default async function handleStartFinalSeries({
         'Updated leaderboard with second worst race excluded:',
         finalRanking,
       );
+      // Fallback if calculateBoatScores returned undefined
+      if (!finalRanking) {
+        console.warn(
+          'calculateBoatScores returned undefined; falling back to leaderboard.',
+        );
+        finalRanking = leaderboard;
+      }
     } else {
       finalRanking = leaderboard;
       console.log('No need to update leaderboard:', finalRanking);
@@ -121,8 +127,9 @@ export default async function handleStartFinalSeries({
     setFinalSeriesStarted(true); // Final series is now started
     alert('Final Series started successfully!');
     handleDisplayHeats(); // Refresh the heats display
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error starting final series:', error);
-    alert('Error starting final series. Please try again later.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    alert(`Error starting final series: ${errorMessage}`);
   }
 }

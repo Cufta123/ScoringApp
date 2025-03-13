@@ -72,7 +72,9 @@ function HeatComponent({
 
   const createHeats = async () => {
     if (raceHappened || finalSeriesStarted) {
-      alert('Cannot create heats after a race has happened.');
+      alert(
+        'Heats cannot be generated because a race has been conducted or the final series has already started.',
+      );
       return;
     }
 
@@ -84,7 +86,9 @@ function HeatComponent({
         await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
 
       if (existingHeats.length > 0) {
-        alert('Heats already exist for this event.');
+        alert(
+          'Heats already exist for this event. Use the reset option to generate new heats.',
+        );
         setHeatsCreated(true);
         return;
       }
@@ -120,12 +124,16 @@ function HeatComponent({
       );
       await Promise.all(heatBoatPromises);
 
-      alert('Heats created successfully!');
+      alert('Heats have been generated successfully!');
       setHeatsCreated(true);
       await handleDisplayHeats();
     } catch (error) {
-      console.error('Error creating heats:', error);
-      alert('Error creating heats. Please try again later.');
+      console.error('Error generating heats:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(
+        `An error occurred while generating heats. Details: ${errorMessage}`,
+      );
     }
   };
 
@@ -135,7 +143,9 @@ function HeatComponent({
 
   const handleRecreateHeats = async () => {
     if (raceHappened || finalSeriesStarted) {
-      alert('Cannot recreate heats after a race has happened.');
+      alert(
+        'Heats cannot be reset because a race has been conducted or the final series has already started.',
+      );
       return;
     }
     try {
@@ -144,8 +154,14 @@ function HeatComponent({
       );
       await createHeats();
     } catch (error) {
-      console.error('Error recreating heats:', error);
-      alert('Error recreating heats. Please try again later.');
+      console.error('Error generating heats:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(
+        `An error occurred while resetting and generating heats. Details: ${
+          errorMessage
+        }`,
+      );
     }
   };
 
@@ -186,7 +202,7 @@ function HeatComponent({
 
   const initiateFinalSeries = () => {
     const confirmed = window.confirm(
-      'Are you sure you want to start the final series? This action cannot be undone.',
+      'Are you sure you want to begin the final series? This action cannot be undone.',
     );
     if (confirmed) {
       handleFinalSeriesStarted();
@@ -205,12 +221,13 @@ function HeatComponent({
       <div>
         {!raceHappened && !finalSeriesStarted && (
           <>
-            <label htmlFor="numHeats">Number of Heats:</label>
+            <label htmlFor="numHeats">Select Number of Heats:</label>
             <select
               id="numHeats"
               value={numHeats}
               onChange={(e) => setNumHeats(Number(e.target.value))}
               disabled={raceHappened || finalSeriesStarted}
+              style={{ width: '80px', marginLeft: '5px' }} // Reduced width for a smaller field
             >
               {[...Array(10).keys()].map((i) => (
                 <option key={i + 1} value={i + 1}>
@@ -223,7 +240,7 @@ function HeatComponent({
               onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
               disabled={raceHappened || finalSeriesStarted}
             >
-              {heatsCreated ? 'Recreate Heats' : 'Create Heats'}
+              {heatsCreated ? 'Reset and Generate Heats' : 'Generate New Heats'}
             </button>
           </>
         )}
@@ -231,13 +248,13 @@ function HeatComponent({
 
       {raceHappened && (
         <button type="button" onClick={toggleDisplayMode}>
-          {displayLastHeats ? 'Show All Heats' : 'Show Last Heats'}
+          {displayLastHeats ? 'View All Heats' : 'View Final Heats'}
         </button>
       )}
 
       {raceHappened && !finalSeriesStarted && (
         <button type="button" onClick={initiateFinalSeries}>
-          Start Final Series
+          Begin Final Series
         </button>
       )}
 

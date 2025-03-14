@@ -131,9 +131,7 @@ function HeatComponent({
       console.error('Error generating heats:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(
-        `An error occurred while generating heats. Details: ${errorMessage}`,
-      );
+      alert(`Error generating heats: ${errorMessage}`);
     }
   };
 
@@ -157,11 +155,7 @@ function HeatComponent({
       console.error('Error generating heats:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(
-        `An error occurred while resetting and generating heats. Details: ${
-          errorMessage
-        }`,
-      );
+      alert(`Error generating heats: ${errorMessage}`);
     }
   };
 
@@ -227,7 +221,6 @@ function HeatComponent({
               value={numHeats}
               onChange={(e) => setNumHeats(Number(e.target.value))}
               disabled={raceHappened || finalSeriesStarted}
-              style={{ width: '80px', marginLeft: '5px' }} // Reduced width for a smaller field
             >
               {[...Array(10).keys()].map((i) => (
                 <option key={i + 1} value={i + 1}>

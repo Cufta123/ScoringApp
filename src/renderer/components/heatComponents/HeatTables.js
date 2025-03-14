@@ -1,4 +1,7 @@
-import React from 'react';
+/* eslint-disable react/require-default-props */
+/* eslint-disable no-console */
+/* eslint-disable no-alert */
+import React, { useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import HeatRows from './HeatRows';
 
@@ -9,79 +12,99 @@ export default function HeatTables({
   clickable,
   onHeatSelect,
   handleDisplayHeats,
-  selectedHeatId,
-  handleStartScoring,
+  selectedHeatId = null,
+  handleStartScoring = () => {},
 }) {
-  const handleBoatTransfer = async (boat, fromHeatId, toHeatId) => {
-    if (raceHappened || finalSeriesStarted) {
-      alert('Cannot transfer boats after a race has happened.');
-      return;
-    }
+  const handleBoatTransfer = useCallback(
+    async (boat, fromHeatId, toHeatId) => {
+      if (raceHappened || finalSeriesStarted) {
+        alert('Cannot transfer boats after a race has happened.');
+        return;
+      }
+      try {
+        await window.electron.sqlite.heatRaceDB.transferBoatBetweenHeats(
+          fromHeatId,
+          toHeatId,
+          boat.boat_id,
+        );
+        alert('Boat transferred successfully!');
+        handleDisplayHeats();
+      } catch (error) {
+        console.error('Error transferring boat:', error);
+        alert(`Error transferring boat. ${error.message}`);
+      }
+    },
+    [raceHappened, finalSeriesStarted, handleDisplayHeats],
+  );
 
-    try {
-      await window.electron.sqlite.heatRaceDB.transferBoatBetweenHeats(
-        fromHeatId,
-        toHeatId,
-        boat.boat_id,
-      );
-      alert('Boat transferred successfully!');
-      handleDisplayHeats(); // Refresh the heats display
-    } catch (error) {
-      console.error('Error transferring boat:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      alert(`Error transferring boat. ${errorMessage}`);
-    }
-  };
+  const handleDrop = useCallback(
+    async (e, toHeatId) => {
+      e.preventDefault();
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const { boat, fromHeatId } = data;
+      await handleBoatTransfer(boat, fromHeatId, toHeatId);
+    },
+    [handleBoatTransfer],
+  );
 
-  const handleDrop = async (e, toHeatId) => {
-    e.preventDefault();
-    const data = JSON.parse(e.dataTransfer.getData('application/json'));
-    const { boat, fromHeatId } = data;
-    await handleBoatTransfer(boat, fromHeatId, toHeatId);
-  };
+  const heatsContainerStyle = useMemo(
+    () => ({
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '10px',
+      padding: '10px',
+    }),
+    [],
+  );
 
-  const handleHeatClick = (heat) => {
-    if (clickable) {
-      onHeatSelect(heat);
-    }
-  };
+  // Inline style objects can be memoized if they are computed dynamically.
+  const heatColumnStyle = useMemo(
+    () => ({
+      backgroundColor: '#f0f0f0',
+      border: '2px solid #ccc',
+      borderRadius: '5px',
+      padding: '10px',
+      maxWidth: '400px',
+      flex: '1 1 30%',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      cursor: clickable ? 'pointer' : 'default',
+    }),
+    [clickable],
+  );
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const selectedHeatColumnStyle = useMemo(
+    () => ({
+      ...heatColumnStyle,
+      border: '2px solid #007bff',
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    }),
+    [heatColumnStyle],
+  );
 
-  const heatsContainerStyle = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    padding: '10px',
-  };
+  const boatNumberColumnStyle = useMemo(
+    () => ({
+      ...heatColumnStyle,
+      maxWidth: '100px',
+    }),
+    [heatColumnStyle],
+  );
 
-  const heatColumnStyle = {
-    backgroundColor: '#f0f0f0',
-    border: '2px solid #ccc',
-    borderRadius: '5px',
-    padding: '10px',
-    maxWidth: '400px', // Set max width
-    flex: '1 1 30%', // Ensure only 4 columns per row with uniform spacing
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    cursor: clickable ? 'pointer' : 'default',
-  };
-  const selectedHeatColumnStyle = {
-    ...heatColumnStyle,
-    border: '2px solid #007bff', // Blue border to highlight the selected heat
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // Add shadow for more emphasis
-  };
-  const boatNumberColumnStyle = {
-    ...heatColumnStyle,
-    maxWidth: '100px', // Shorter width for boat number
-  };
+  const sailorNameColumnStyle = useMemo(
+    () => ({
+      ...heatColumnStyle,
+      maxWidth: '400px',
+    }),
+    [heatColumnStyle],
+  );
 
-  const sailorNameColumnStyle = {
-    ...heatColumnStyle,
-    maxWidth: '400px', // Wider width for sailor name
-  };
+  const handleHeatClick = useCallback(
+    (heat) => {
+      if (clickable) {
+        onHeatSelect(heat);
+      }
+    },
+    [clickable, onHeatSelect],
+  );
 
   return (
     <div style={heatsContainerStyle} className="heats-container">
@@ -103,7 +126,7 @@ export default function HeatTables({
             }
           }}
           onDrop={(e) => handleDrop(e, heat.heat_id)}
-          onDragOver={handleDragOver}
+          onDragOver={(e) => e.preventDefault()}
         >
           <h4>
             {heat.heat_name} (Race {heat.raceNumber})

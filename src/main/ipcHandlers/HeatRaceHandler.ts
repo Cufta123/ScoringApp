@@ -607,12 +607,7 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
        VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group, place = excluded.place`,
     );
-    const pointsMap = new Map<number, any[]>();
-    const temporaryTable = calculateFinalBoatScores(
-      results,
-      event_id,
-      pointsMap,
-    );
+    const temporaryTable = calculateFinalBoatScores(results, event_id);
 
     temporaryTable.forEach((boat) => {
       console.log('Updating FinalLeaderboard with:', boat);

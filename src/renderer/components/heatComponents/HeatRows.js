@@ -1,26 +1,27 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Flag from 'react-world-flags';
 import iocToFlagCodeMap from '../../constants/iocToFlagCodeMap';
 
-export default function HeatRows({
+function HeatRows({
   heat,
   raceHappened,
   finalSeriesStarted,
   boatNumberColumnStyle,
   sailorNameColumnStyle,
 }) {
-  const getFlagCode = (iocCode) => {
-    return iocToFlagCodeMap[iocCode] || iocCode;
-  };
+  const getFlagCode = useCallback(
+    (iocCode) => iocToFlagCodeMap[iocCode] || iocCode,
+    [],
+  );
 
-  const handleDragStart = (e, boat, fromHeatId) => {
+  const handleDragStart = useCallback((e, boat, fromHeatId) => {
     const { nativeEvent } = e;
     nativeEvent.dataTransfer.setData(
       'application/json',
       JSON.stringify({ boat, fromHeatId }),
     );
-  };
+  }, []);
 
   return (
     <tbody>
@@ -71,3 +72,5 @@ HeatRows.propTypes = {
     maxWidth: PropTypes.string,
   }).isRequired,
 };
+
+export default React.memo(HeatRows);

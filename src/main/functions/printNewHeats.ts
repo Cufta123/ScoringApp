@@ -30,6 +30,7 @@ export default async function printNewHeats(
   event: { event_name: any },
   heats: string | any[],
   format: string,
+  finalSeriesStarted: boolean,
 ) {
   console.log('Heats to print (before filtering):', heats);
   if (!Array.isArray(heats) || heats.length === 0) {
@@ -41,8 +42,14 @@ export default async function printNewHeats(
   const latestHeats = getLatestHeats(heats);
   console.log('Latest heats to print:', latestHeats);
 
+  // Filter for finals if finalSeriesStarted is true
+  const heatsToPrint = finalSeriesStarted
+    ? latestHeats.filter((heat) => heat.heat_type === 'Final')
+    : latestHeats;
+  console.log('Filtered heats to print:', heatsToPrint);
+
   await Promise.all(
-    latestHeats.map(async (heat) => {
+    heatsToPrint.map(async (heat) => {
       if (!Array.isArray(heat.boats) || heat.boats.length === 0) {
         try {
           heat.boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
@@ -68,7 +75,7 @@ export default async function printNewHeats(
       { key: 'col3', width: 20 },
     ];
 
-    latestHeats.forEach((heat) => {
+    heatsToPrint.forEach((heat) => {
       const headerRow = worksheet.addRow([`Heat: ${heat.heat_name}`]);
       headerRow.font = { bold: true };
       worksheet.mergeCells(`A${headerRow.number}:C${headerRow.number}`);
@@ -93,14 +100,20 @@ export default async function printNewHeats(
     try {
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/octet-stream' });
-      const heatNumber =
-        latestHeats.length > 0
-          ? (latestHeats[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
-              null,
-              'unknown',
-            ])[1]
-          : 'unknown';
-      saveAs(blob, `${eventName}_heat_${heatNumber}.xlsx`);
+      let filename: string;
+      if (finalSeriesStarted) {
+        filename = `${eventName}_final_series_heats.xlsx`;
+      } else {
+        const heatNumber =
+          heatsToPrint.length > 0
+            ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
+                null,
+                'unknown',
+              ])[1]
+            : 'unknown';
+        filename = `${eventName}_heat_${heatNumber}.xlsx`;
+      }
+      saveAs(blob, filename);
     } catch (error) {
       console.error('Error exporting Excel file:', error);
     }
@@ -110,7 +123,7 @@ export default async function printNewHeats(
     doc.text('New Heats', 14, 10);
     let finalY = 20;
 
-    latestHeats.forEach((heat) => {
+    heatsToPrint.forEach((heat) => {
       doc.setFontSize(14);
       doc.text(`Heat: ${heat.heat_name}`, 14, finalY);
       const header = ['Sailor Name', 'Country', 'Boat Number'];
@@ -127,12 +140,15 @@ export default async function printNewHeats(
         theme: 'grid',
         startY: finalY + 10,
         didDrawPage: (data) => {
-          finalY = data.cursor.y + 10;
+          finalY = data.cursor ? data.cursor.y + 10 : finalY + 10;
         },
       });
     });
 
-    doc.save(`${eventName}_new_heats.pdf`);
+    const pdfFilename = finalSeriesStarted
+      ? `${eventName}_final_series_heats.pdf`
+      : `${eventName}_new_heats.pdf`;
+    doc.save(pdfFilename);
   } else if (format === 'html') {
     let html = `<html><head><title>${eventName} New Heats</title>
     <style>
@@ -143,7 +159,7 @@ export default async function printNewHeats(
     </head><body>`;
     html += `<h1>New Heats</h1>`;
 
-    latestHeats.forEach((heat) => {
+    heatsToPrint.forEach((heat) => {
       html += `<h2>Heat: ${heat.heat_name}</h2>`;
       html += `<table><thead><tr>
         <th>Sailor Name</th>
@@ -164,6 +180,9 @@ export default async function printNewHeats(
 
     html += `</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
-    saveAs(blob, `${eventName}_new_heats.html`);
+    const htmlFilename = finalSeriesStarted
+      ? `${eventName}_final_series_heats.html`
+      : `${eventName}_new_heats.html`;
+    saveAs(blob, htmlFilename);
   }
 }

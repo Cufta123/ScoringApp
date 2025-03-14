@@ -1,3 +1,5 @@
+/* eslint-disable no-alert */
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 
 import calculateBoatScores from './calculateBoatScores';
@@ -128,8 +130,20 @@ export default async function handleStartFinalSeries({
     alert('Final Series started successfully!');
     handleDisplayHeats(); // Refresh the heats display
   } catch (error: unknown) {
-    console.error('Error starting final series:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    alert(`Error starting final series: ${errorMessage}`);
+    console.error(
+      'Error starting final series for event:',
+      event.event_id,
+      error,
+    );
+    let detailedError = `An error occurred while starting the final series for event ${event.event_id}.\n`;
+    if (error instanceof Error) {
+      detailedError += `Error message: ${error.message}\n`;
+      if (error.stack) {
+        detailedError += `Stack trace: ${error.stack}\n`;
+      }
+    } else {
+      detailedError += `Error details: ${String(error)}\n`;
+    }
+    alert(detailedError);
   }
 }

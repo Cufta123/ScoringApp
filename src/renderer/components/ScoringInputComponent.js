@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+/* eslint-disable no-alert */
+/* eslint-disable no-console */
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import PropTypes from 'prop-types';
+import debounce from 'lodash/debounce';
 
 function ScoringInputComponent({ heat, onSubmit }) {
   const [inputValue, setInputValue] = useState('');
@@ -12,50 +21,66 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [dropIndex, setDropIndex] = useState(null);
   const inputRef = useRef(null);
 
-  // Fetch valid boats for current heat on mount or when heat changes.
+  // Fetch valid boats on mount or when heat changes.
   useEffect(() => {
-    const fetchBoats = async () => {
+    (async () => {
       try {
         const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
           heat.heat_id,
         );
-        // Stores as string to ensure the same type in validBoats and in temporaryBoats.
         setValidBoats(boats.map((boat) => boat.sail_number));
       } catch (error) {
         console.error('Error fetching boats:', error);
       }
-    };
-    fetchBoats();
+    })();
   }, [heat.heat_id]);
 
-  // Helper to update place numbers based on an ordered boats array.
-  const updatePlaces = (boats) => {
+  // Memoize computed place numbers
+  const computedPlaceNumbers = useMemo(() => {
     const newPlaceNumbers = {};
-    boats.forEach((boat, index) => {
-      newPlaceNumbers[boat] = index + 1;
+    boatNumbers.forEach((boat, idx) => {
+      if (!penalties[boat]) newPlaceNumbers[boat] = idx + 1;
     });
-    setPlaceNumbers(newPlaceNumbers);
-  };
+    return newPlaceNumbers;
+  }, [boatNumbers, penalties]);
 
-  // Event Handlers
-  const handleInputChange = (e) => {
-    const input = e.target.value;
-    const inputNumbers = input.split(' ').filter((s) => s.trim() !== '');
-    const uniqueNumbers = [...new Set(inputNumbers)];
-    setTemporaryBoats(uniqueNumbers);
-    setInputValue(input);
-  };
+  // Update places when computedPlaceNumbers changes.
+  useEffect(() => {
+    setPlaceNumbers(computedPlaceNumbers);
+  }, [computedPlaceNumbers]);
 
-  const handleBoatClick = (sailNumber) => {
-    if (!temporaryBoats.includes(sailNumber)) {
-      const updatedTemporary = [...temporaryBoats, sailNumber];
-      setTemporaryBoats(updatedTemporary);
-      setInputValue(updatedTemporary.join(' '));
-    }
-  };
+  // Debounce heavy tasks on input change.
+  const debouncedInputHandler = useMemo(
+    () =>
+      debounce((value) => {
+        console.log('Debounced value:', value);
+      }, 300),
+    [],
+  );
 
-  const handleAddBoats = () => {
-    // Validate and merge the temporary boats into the main boatNumbers list
+  const handleInputChange = useCallback(
+    (e) => {
+      const input = e.target.value;
+      setInputValue(input);
+      debouncedInputHandler(input);
+      const inputNumbers = input.split(' ').filter((s) => s.trim() !== '');
+      setTemporaryBoats([...new Set(inputNumbers)]);
+    },
+    [debouncedInputHandler],
+  );
+
+  const handleBoatClick = useCallback((sailNumber) => {
+    setTemporaryBoats((prev) => {
+      if (!prev.includes(sailNumber)) {
+        const updated = [...prev, sailNumber];
+        setInputValue(updated.join(' '));
+        return updated;
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleAddBoats = useCallback(() => {
     const validNewBoats = temporaryBoats.filter(
       (number) => !boatNumbers.includes(number) && validBoats.includes(number),
     );
@@ -65,86 +90,62 @@ function ScoringInputComponent({ heat, onSubmit }) {
     const boatsWithPenalties = validNewBoats.filter(
       (number) => penalties[number],
     );
+    const updatedBoatNumbers = [
+      ...boatNumbers,
+      ...boatsWithoutPenalties,
+      ...boatsWithPenalties,
+    ];
+    setBoatNumbers(updatedBoatNumbers);
+    setTemporaryBoats([]);
+    setInputValue('');
+  }, [temporaryBoats, boatNumbers, validBoats, penalties]);
 
-    // Merge new boats into boatNumbers list
-    const updatedBoatNumbers = [...boatNumbers, ...boatsWithoutPenalties];
-    // Add penalized boats at the end if any
-    boatsWithPenalties.forEach((boat) => updatedBoatNumbers.push(boat));
-
-    // Compute new place numbers (boatsWithoutPenalties get places based on order)
-    const updatedPlaceNumbers = { ...placeNumbers };
-    updatedBoatNumbers.forEach((boat, index) => {
-      if (!penalties[boat]) {
-        updatedPlaceNumbers[boat] = index + 1;
-      }
+  const handleRemoveBoat = useCallback((index) => {
+    setBoatNumbers((prev) => {
+      const updated = [...prev];
+      updated.splice(index, 1);
+      return updated;
     });
+  }, []);
 
-    setBoatNumbers(updatedBoatNumbers);
-    setPlaceNumbers(updatedPlaceNumbers);
-    setTemporaryBoats([]); // Clear temporary state
-    setInputValue(''); // Clear input field
-  };
-
-  const handleRemoveBoat = (index) => {
-    const updatedBoatNumbers = [...boatNumbers];
-    const removedBoat = updatedBoatNumbers.splice(index, 1)[0];
-    const updatedPlaceNumbers = { ...placeNumbers };
-    delete updatedPlaceNumbers[removedBoat];
-
-    // Update place numbers for remaining boats (skip penalized ones)
-    updatedBoatNumbers.forEach((boat, idx) => {
-      if (!penalties[boat]) {
-        updatedPlaceNumbers[boat] = idx + 1;
-      }
+  const handleReorderBoat = useCallback((fromIndex, toIndex) => {
+    setBoatNumbers((prev) => {
+      const updated = [...prev];
+      const [movedBoat] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, movedBoat);
+      return updated;
     });
+  }, []);
 
-    setBoatNumbers(updatedBoatNumbers);
-    setPlaceNumbers(updatedPlaceNumbers);
-  };
-
-  const handleReorderBoat = (fromIndex, toIndex) => {
-    const updatedBoatNumbers = [...boatNumbers];
-    const [movedBoat] = updatedBoatNumbers.splice(fromIndex, 1);
-    updatedBoatNumbers.splice(toIndex, 0, movedBoat);
-    setBoatNumbers(updatedBoatNumbers);
-    updatePlaces(updatedBoatNumbers);
-  };
-
-  const handleDragStart = (index) => setDraggingIndex(index);
-
-  const handleDragOver = (index) => (e) => {
-    e.preventDefault();
-    setDropIndex(index);
-  };
-
-  const handleDrop = () => {
+  const handleDragStart = useCallback((index) => setDraggingIndex(index), []);
+  const handleDragOver = useCallback(
+    (index) => (e) => {
+      e.preventDefault();
+      setDropIndex(index);
+    },
+    [],
+  );
+  const handleDrop = useCallback(() => {
     if (draggingIndex !== null && dropIndex !== null) {
       handleReorderBoat(draggingIndex, dropIndex);
       setDraggingIndex(null);
       setDropIndex(null);
     }
-  };
+  }, [draggingIndex, dropIndex, handleReorderBoat]);
 
-  const handlePenaltyChange = (boatNumber, penalty) => {
-    setPenalties((prev) => ({
-      ...prev,
-      [boatNumber]: penalty,
-    }));
-  };
+  const handlePenaltyChange = useCallback((boatNumber, penalty) => {
+    setPenalties((prev) => ({ ...prev, [boatNumber]: penalty }));
+  }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     const allBoats = [...new Set([...boatNumbers, ...validBoats])];
     const boatsWithPenalties = allBoats.filter((boat) => penalties[boat]);
     const boatsWithoutPenalties = allBoats.filter((boat) => !penalties[boat]);
-
-    // Compute boat places for boats without penalties
     const boatPlaces = boatsWithoutPenalties.map((boat, index) => ({
       boatNumber: boat,
       place: index + 1,
       status: 'FINISHED',
     }));
-
-    // Append penalized boats with status
     boatsWithPenalties.forEach((boat) => {
       boatPlaces.push({
         boatNumber: boat,
@@ -152,29 +153,26 @@ function ScoringInputComponent({ heat, onSubmit }) {
         status: penalties[boat],
       });
     });
-
     const allBoatsAccountedFor = allBoats.every(
       (boat) => placeNumbers[boat] || penalties[boat],
     );
-
     if (allBoatsAccountedFor) {
       onSubmit(boatPlaces);
     } else {
-      alert(
-        'Submission error: Please assign a place or penalty to every boat before submitting the scores.',
-      );
+      alert('Please assign a place or penalty to every boat.');
     }
-  };
+  }, [boatNumbers, validBoats, penalties, placeNumbers, onSubmit]);
 
-  // Returns the place number for a boat to display in the table.
-  const getPlaceNumber = (sailNumber) => {
-    if (penalties[sailNumber]) return penalties[sailNumber];
-    if (temporaryBoats.includes(sailNumber))
-      return temporaryBoats.indexOf(sailNumber) + 1;
-    return placeNumbers[sailNumber] || '';
-  };
+  const getPlaceNumber = useCallback(
+    (sailNumber) => {
+      if (penalties[sailNumber]) return penalties[sailNumber];
+      if (temporaryBoats.includes(sailNumber))
+        return temporaryBoats.indexOf(sailNumber) + 1;
+      return placeNumbers[sailNumber] || '';
+    },
+    [penalties, temporaryBoats, placeNumbers],
+  );
 
-  // JSX
   return (
     <div
       style={{

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 
 export interface SummaryResult {
@@ -233,7 +234,11 @@ export default function calculateBoatScores(
         group.sort((a, b) => {
           const scoresA = scoresByBoat[a.boat_id] || [];
           const scoresB = scoresByBoat[b.boat_id] || [];
-          for (let i = 0; i < Math.max(scoresA.length, scoresB.length); i++) {
+          for (
+            let i = 0;
+            i < Math.max(scoresA.length, scoresB.length);
+            i += 1
+          ) {
             const scoreA = scoresA[i] ?? Number.MAX_SAFE_INTEGER;
             const scoreB = scoresB[i] ?? Number.MAX_SAFE_INTEGER;
             if (scoreA !== scoreB) return scoreA - scoreB;

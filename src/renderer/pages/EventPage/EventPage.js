@@ -50,8 +50,9 @@ function EventPage() {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       alert(
-        'An error occurred while fetching boat and sailor data. Details: ' +
-          errorMessage,
+        `An error occurred while fetching boat and sailor data. Details: ${
+          errorMessage
+        }`,
       );
     }
   }, [event.event_id]);
@@ -185,8 +186,9 @@ function EventPage() {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       alert(
-        'An error occurred while associating boats with the event. Details: ' +
-          errorMessage,
+        `An error occurred while associating boats with the event. Details: ${
+          errorMessage
+        }`,
       );
     }
   };

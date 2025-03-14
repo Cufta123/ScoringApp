@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 import { db } from '../../../public/Database/DBManager';
 
@@ -32,7 +33,6 @@ function getFinalScores(event_id: any, boat_id: any) {
 export default function calculateFinalBoatScores(
   results: Result[],
   event_id: any,
-  pointsMap: Map<number, any[]>,
 ): TemporaryTableEntry[] {
   // Log each result to check the placement_group property
   results.forEach((result, index) => {
@@ -104,11 +104,6 @@ export default function calculateFinalBoatScores(
         boats.push(boat_id);
       }
     });
-
-    // Sort boats by total points and assign places
-    const sortedBoats = Array.from(groupPointsMap.entries()).sort(
-      ([pointsA], [pointsB]) => pointsA - pointsB,
-    );
 
     // Create a temporary table with all boats and their total points
     groupPointsMap.forEach((boats, totalPoints) => {

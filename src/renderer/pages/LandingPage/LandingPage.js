@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 /* eslint-disable prettier/prettier */
 // src/pages/LandingPage/LandingPage.js
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import EventForm from '../../components/EventForm';
 import GlobalLeaderboardComponent from '../../components/GlobalLeaderboard';
 
@@ -10,13 +10,14 @@ function LandingPage() {
 
   console.log('LandingPage component rendered');
 
-  const handleOpenLeaderboard = () => {
+  const handleOpenLeaderboard = useCallback(() => {
     setShowLeaderboard(true);
-  };
+  }, []);
 
-  const handleCloseLeaderboard = () => {
+  const handleCloseLeaderboard = useCallback(() => {
     setShowLeaderboard(false);
-  };
+  }, []);
+
   if (showLeaderboard) {
     return (
       <div>

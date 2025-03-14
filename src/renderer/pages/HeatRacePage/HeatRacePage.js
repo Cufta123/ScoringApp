@@ -21,7 +21,7 @@ function HeatRacePage() {
   const [allHeatsEqual, setAllHeatsEqual] = useState(false);
   const [exportFormat, setExportFormat] = useState('excel');
 
-  // Fetch event data if needed
+  // Fetch or update event data
   useEffect(() => {
     if (!eventData && event) {
       window.electron.sqlite.eventDB
@@ -33,7 +33,6 @@ function HeatRacePage() {
     }
   }, [eventData, event]);
 
-  // Update heats list
   const fetchHeats = useCallback(() => {
     if (event?.event_id) {
       window.electron.sqlite.heatRaceDB
@@ -51,7 +50,6 @@ function HeatRacePage() {
     }
   }, [event, fetchHeats]);
 
-  // Check if final series has started
   const checkFinalSeriesStarted = useCallback(async () => {
     if (event?.event_id) {
       try {
@@ -71,7 +69,6 @@ function HeatRacePage() {
     checkFinalSeriesStarted();
   }, [checkFinalSeriesStarted]);
 
-  // Check if all latest heats have the same non-zero number of races
   const evaluateHeatsEquality = useCallback(async () => {
     if (event?.event_id) {
       try {
@@ -89,7 +86,6 @@ function HeatRacePage() {
           }
           return acc;
         }, {});
-
         const lastHeats = Object.values(latestHeats).map((entry) => entry.heat);
         const raceCounts = await Promise.all(
           lastHeats.map(async (heat) => {
@@ -99,13 +95,10 @@ function HeatRacePage() {
             return races ? races.length : null;
           }),
         );
-
-        // If any race count is null or 0, equality check fails.
         if (raceCounts.includes(null) || raceCounts[0] === 0) {
           setAllHeatsEqual(false);
           return false;
         }
-
         const equal = raceCounts.every((count) => count === raceCounts[0]);
         setAllHeatsEqual(equal);
         return equal;
@@ -114,6 +107,8 @@ function HeatRacePage() {
         setAllHeatsEqual(false);
         return false;
       }
+    } else {
+      return false;
     }
   }, [event]);
 
@@ -121,80 +116,95 @@ function HeatRacePage() {
     evaluateHeatsEquality();
   }, [heats, event, evaluateHeatsEquality]);
 
-  const handleHeatSelect = (heat) => setSelectedHeat(heat);
-  const handleStartScoring = () => setIsScoring(true);
-  const handleBackToHeats = () => setIsScoring(false);
+  const handleHeatSelect = useCallback((heat) => {
+    setSelectedHeat(heat);
+  }, []);
 
-  const handleSubmitScores = async (placeNumbers) => {
-    console.log('Submitted place numbers:', placeNumbers);
-    try {
-      // Fetch races and create a new one
-      const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
-        selectedHeat.heat_id,
-      );
-      const nextRaceNumber = races.length + 1;
+  const handleStartScoring = useCallback(() => {
+    setIsScoring(true);
+  }, []);
 
-      const { lastInsertRowid: raceId } =
-        await window.electron.sqlite.heatRaceDB.insertRace(
+  const handleBackToHeats = useCallback(() => {
+    setIsScoring(false);
+  }, []);
+
+  const handleSubmitScores = useCallback(
+    async (placeNumbers) => {
+      console.log('Submitted place numbers:', placeNumbers);
+      try {
+        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
           selectedHeat.heat_id,
-          nextRaceNumber,
+        );
+        const nextRaceNumber = races.length + 1;
+
+        const { lastInsertRowid: raceId } =
+          await window.electron.sqlite.heatRaceDB.insertRace(
+            selectedHeat.heat_id,
+            nextRaceNumber,
+          );
+
+        await Promise.all(
+          placeNumbers.map(async ({ boatNumber, place, status }) => {
+            const boats =
+              await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
+                selectedHeat.heat_id,
+              );
+            const boatDetails = boats.find(
+              (boat) => boat.sail_number === boatNumber,
+            );
+            if (boatDetails) {
+              await window.electron.sqlite.heatRaceDB.insertScore(
+                raceId,
+                boatDetails.boat_id,
+                place,
+                place,
+                status,
+              );
+            }
+          }),
         );
 
-      // insert scores for the new race
-      await Promise.all(
-        placeNumbers.map(async ({ boatNumber, place, status }) => {
-          const boats = await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
-            selectedHeat.heat_id,
-          );
-          const boatDetails = boats.find(
-            (boat) => boat.sail_number === boatNumber,
-          );
-          if (boatDetails) {
-            await window.electron.sqlite.heatRaceDB.insertScore(
-              raceId,
-              boatDetails.boat_id,
-              place,
-              place,
-              status,
+        if (!finalSeriesStarted) {
+          const allEqual = await evaluateHeatsEquality();
+          if (allEqual) {
+            await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
+              event.event_id,
+            );
+          } else {
+            console.log(
+              'Not all heats have the same number of races. Local leaderboard will not be updated.',
             );
           }
-        }),
-      );
-
-      if (!finalSeriesStarted) {
-        const allEqual = await evaluateHeatsEquality();
-        if (allEqual) {
-          await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
+        } else {
+          console.log('Final series has started. Leaderboard will be updated.');
+          await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
             event.event_id,
           );
-        } else {
-          console.log(
-            'Not all heats have the same number of races. Local leaderboard will not be updated.',
-          );
         }
-      } else {
-        console.log('Final series has started. Leaderboard will be updated.');
-        await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
-          event.event_id,
-        );
+
+        setIsScoring(false);
+        setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
+        fetchHeats();
+      } catch (error) {
+        console.error('Error submitting scores:', error.message);
       }
+    },
+    [
+      selectedHeat,
+      finalSeriesStarted,
+      evaluateHeatsEquality,
+      event,
+      fetchHeats,
+    ],
+  );
 
-      setIsScoring(false);
-      setSelectedHeat({ ...selectedHeat, raceNumber: nextRaceNumber });
-      fetchHeats();
-    } catch (error) {
-      console.error('Error submitting scores:', error.message);
-    }
-  };
-
-  const handleCreateNewHeatsBasedOnLeaderboard = async () => {
+  const handleCreateNewHeatsBasedOnLeaderboard = useCallback(async () => {
     if (finalSeriesStarted) {
       alert(
         'Operation not allowed: The final series has begun, so new heats cannot be created based on the leaderboard.',
       );
       return;
     }
-
     try {
       await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(
         event.event_id,
@@ -207,18 +217,18 @@ function HeatRacePage() {
         error.message,
       );
     }
-  };
+  }, [finalSeriesStarted, event, fetchHeats]);
 
-  const handlePrintNewHeats = async () => {
+  const handlePrintNewHeats = useCallback(async () => {
     try {
       const latestHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
         event.event_id,
       );
-      await printNewHeats(event, latestHeats, exportFormat);
+      await printNewHeats(event, latestHeats, exportFormat, finalSeriesStarted);
     } catch (error) {
       console.error('Error printing new heats:', error.message);
     }
-  };
+  }, [event, exportFormat, finalSeriesStarted]);
 
   return (
     <div>
@@ -240,8 +250,6 @@ function HeatRacePage() {
             handleStartScoring={handleStartScoring}
             handleFinalSeriesStarted={() => setFinalSeriesStarted(true)}
           />
-
-          {/* Render "Create New Heats" button only when allowed */}
           {!finalSeriesStarted && allHeatsEqual && (
             <button
               type="button"
@@ -250,23 +258,24 @@ function HeatRacePage() {
               Create New Heats
             </button>
           )}
-
-          {!finalSeriesStarted && (
-            <>
-              <select
-                id="exportFormat"
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value)}
-                style={{ maxWidth: '80px' }}
-              >
-                <option value="excel">Excel</option>
-                <option value="pdf">PDF</option>
-                <option value="html">HTML</option>
-              </select>
-              <button type="button" onClick={handlePrintNewHeats}>
-                Print new heats
-              </button>
-            </>
+          <select
+            id="exportFormat"
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value)}
+            style={{ maxWidth: '80px' }}
+          >
+            <option value="excel">Excel</option>
+            <option value="pdf">PDF</option>
+            <option value="html">HTML</option>
+          </select>
+          {!finalSeriesStarted ? (
+            <button type="button" onClick={handlePrintNewHeats}>
+              Print new heats
+            </button>
+          ) : (
+            <button type="button" onClick={handlePrintNewHeats}>
+              Print Final Series
+            </button>
           )}
         </>
       ) : (

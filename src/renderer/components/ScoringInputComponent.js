@@ -230,6 +230,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
                     <td>{getPlaceNumber(boat.sail_number)}</td>
                     <td>
                       <select
+                        style={{ width: '70px' }}
                         value={penalties[boat.sail_number] || ''}
                         onChange={(e) =>
                           handlePenaltyChange(boat.sail_number, e.target.value)
@@ -335,6 +336,9 @@ function ScoringInputComponent({ heat, onSubmit }) {
             />
           )}
         </ul>
+        <p style={{ fontStyle: 'italic', color: '#555' }}>
+          You can rearrange boats by clicking, holding, and dragging them.
+        </p>
         <button type="button" onClick={handleSubmit}>
           Finalize and Submit Scores
         </button>

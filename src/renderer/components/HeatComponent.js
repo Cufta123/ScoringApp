@@ -218,6 +218,7 @@ function HeatComponent({
             <label htmlFor="numHeats">Select Number of Heats:</label>
             <select
               id="numHeats"
+              style={{ maxWidth: '70px' }}
               value={numHeats}
               onChange={(e) => setNumHeats(Number(e.target.value))}
               disabled={raceHappened || finalSeriesStarted}

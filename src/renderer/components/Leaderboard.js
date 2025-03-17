@@ -208,14 +208,16 @@ function LeaderboardComponent({ eventId }) {
       </div>
       <div>
         <button type="button" onClick={toggleEditMode}>
-          {editMode ? 'Cancel Edit Mode' : 'Enable Edit Mode'}
+          {editMode
+            ? 'Exit Edit Mode (Discard Changes)'
+            : 'Enter Edit Mode (Manual Adjustments)'}
         </button>
         {editMode && (
           <div>
             <button
               type="button"
-              onClick={() =>
-                HandleSave({
+              onClick={async () => {
+                await HandleSave({
                   eventId,
                   leaderboard,
                   editableLeaderboard,
@@ -224,8 +226,9 @@ function LeaderboardComponent({ eventId }) {
                   setEditMode,
                   shiftPositions,
                   finalSeriesStarted,
-                })
-              }
+                });
+                await fetchLeaderboard();
+              }}
               style={{ marginLeft: '10px' }}
             >
               Save Changes

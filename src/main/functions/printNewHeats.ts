@@ -39,14 +39,12 @@ export default async function printNewHeats(
   }
 
   const eventName = event.event_name;
-  const latestHeats = getLatestHeats(heats);
+  const heatsFiltered = finalSeriesStarted
+    ? heats.filter((heat) => heat.heat_type === 'Final')
+    : heats;
+  const latestHeats = getLatestHeats(heatsFiltered);
   console.log('Latest heats to print:', latestHeats);
-
-  // Filter for finals if finalSeriesStarted is true
-  const heatsToPrint = finalSeriesStarted
-    ? latestHeats.filter((heat) => heat.heat_type === 'Final')
-    : latestHeats;
-  console.log('Filtered heats to print:', heatsToPrint);
+  const heatsToPrint = latestHeats;
 
   await Promise.all(
     heatsToPrint.map(async (heat) => {

@@ -135,9 +135,12 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       </button>
       {isExpanded && (
         <>
-          <label htmlFor="sortCriteria">Sort by: </label>
+          <label htmlFor="sortCriteria" style={{ maxWidth: '50px' }}>
+            Sort by:{' '}
+          </label>
           <select
             id="sortCriteria"
+            style={{ maxWidth: '120px' }}
             value={sortCriteria}
             onChange={(e) => setSortCriteria(e.target.value)}
           >

@@ -135,8 +135,6 @@ function HeatComponent({
 
       alert('Heats have been generated successfully!');
       setHeatsCreated(true);
-      // Optionally clear the custom assignment after use:
-      setCustomAssignment([]);
       await handleDisplayHeats();
     } catch (error) {
       console.error('Error generating heats:', error);

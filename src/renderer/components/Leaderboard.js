@@ -310,9 +310,22 @@ function LeaderboardComponent({ eventId }) {
     }, {}) || {};
 
   const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
-  const sortedGroups = Object.keys(groupedLeaderboard).sort(
-    (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
-  );
+  const sortedGroups = Object.keys(groupedLeaderboard).sort((a, b) => {
+    // Create a regex that matches any of the group names
+    const regex = new RegExp(groupOrder.join('|'), 'i');
+    const extractGroup = (group) => {
+      const match = group.match(regex);
+      return match ? match[0] : group;
+    };
+    const aGroup = extractGroup(a);
+    const bGroup = extractGroup(b);
+    // Normalize to proper case to match the order array
+    const normalize = (s) =>
+      s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    const indexA = groupOrder.indexOf(normalize(aGroup));
+    const indexB = groupOrder.indexOf(normalize(bGroup));
+    return indexA - indexB;
+  });
   const handlePrintLeaderboard = async () => {
     try {
       await printLeaderboard(

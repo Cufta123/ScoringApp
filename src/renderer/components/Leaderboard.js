@@ -442,7 +442,7 @@ function LeaderboardComponent({ eventId }) {
           Print Leaderboard
         </button>
       </div>
-      <div>
+      <div style={{ marginBottom: '10px' }}>
         <button type="button" onClick={toggleEditMode}>
           {editMode
             ? 'Exit Edit Mode (Discard Changes)'
@@ -460,6 +460,16 @@ function LeaderboardComponent({ eventId }) {
             {swapMode ? 'Cancel Swap Mode' : 'Enable Swap Mode'}
           </button>
         )}
+        {editMode && swapMode && (
+          <div
+            style={{ marginTop: '5px', fontStyle: 'italic', fontSize: '15px' }}
+          >
+            Swap Mode is active: Click on a boat&apos;s race cell to select it.
+            All cells from boats in the same heat are highlighted in light blue.
+            Select exactly two cells (from the same heat) and then click
+            &quot;Save Swapped Changes&quot;.
+          </div>
+        )}
         {editMode && swapMode && selectedSwapCells.length === 2 && (
           <button
             type="button"
@@ -469,7 +479,7 @@ function LeaderboardComponent({ eventId }) {
             Save Swapped Changes
           </button>
         )}
-        {editMode && (
+        {editMode && !swapMode && (
           <button
             type="button"
             onClick={async () => {
@@ -522,7 +532,7 @@ function LeaderboardComponent({ eventId }) {
                       headers.push(<th key={`race-${j}`}>Race {j}</th>);
                       if (editMode) {
                         headers.push(
-                          <th key={`penalty-${j}`}>Penalty Race{j}</th>,
+                          <th key={`penalty-${j}`}>Penalty Race {j}</th>,
                         );
                       }
                     }

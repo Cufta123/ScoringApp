@@ -45,7 +45,8 @@ export type Channels =
   | 'getRaceMapping'
   | 'getEventName'
   | 'importCSV'
-  | 'calculateAverageScores';
+  | 'calculateAverageScores'
+  | 'swapRaceResults';
 
 const electronHandler = {
   ipcRenderer: {
@@ -535,10 +536,28 @@ const electronHandler = {
           return false;
         }
       },
+      async swapRaceResults(
+        event_id: string,
+        race_id: string,
+        boat1_id: string,
+        boat2_id: string,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'swapRaceResults',
+            event_id,
+            race_id,
+            boat1_id,
+            boat2_id,
+          );
+        } catch (error) {
+          console.error('Error invoking swapRaceResults IPC:', error);
+          return false;
+        }
+      },
     },
   },
 };
-
 contextBridge.exposeInMainWorld('electron', electronHandler);
 
 export type ElectronHandler = typeof electronHandler;

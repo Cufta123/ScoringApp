@@ -63,6 +63,7 @@ const electronHandler = {
     getScoresResult: heatRaceDB.getScoresResult,
     getRaceMapping: heatRaceDB.getRaceMapping,
     calculateAverageScores: heatRaceDB.calculateAverageScores,
+    swapRaceResults: heatRaceDB.swapRaceResults,
   },
 };
 

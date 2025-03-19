@@ -1,3 +1,4 @@
+/* eslint-disable no-alert */
 /* eslint-disable no-console */
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -22,6 +23,9 @@ function LeaderboardComponent({ eventId }) {
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
   const [perRacePenaltyMode, setPerRacePenaltyMode] = useState(false);
   const [perRacePenalties, setPerRacePenalties] = useState({});
+  const [swapMode, setSwapMode] = useState(false);
+  // Each selected cell is recorded as an object: { boatId, raceIndex, raceId }
+  const [selectedSwapCells, setSelectedSwapCells] = useState([]);
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -291,6 +295,84 @@ function LeaderboardComponent({ eventId }) {
     }
   };
 
+  // New function to handle cell selection in swap mode.
+  const toggleSwapCell = (entry, raceIndex) => {
+    // Get raceIds from the entry.
+    const raceIds =
+      typeof entry.race_ids === 'string'
+        ? entry.race_ids.split(',')
+        : entry.race_ids;
+    const raceId = raceIds[raceIndex];
+    // Build the cell object.
+    const cell = { boatId: entry.boat_id, raceIndex, raceId };
+    // Check if already selected.
+    const exists = selectedSwapCells.find(
+      (selected) =>
+        selected.boatId.toString() === cell.boatId.toString() &&
+        selected.raceIndex === cell.raceIndex,
+    );
+    if (exists) {
+      // Unselect if already added.
+      setSelectedSwapCells((prev) =>
+        prev.filter(
+          (selected) =>
+            !(
+              selected.boatId.toString() === cell.boatId.toString() &&
+              selected.raceIndex === cell.raceIndex
+            ),
+        ),
+      );
+    } else {
+      // Allow maximum two selections.
+      if (selectedSwapCells.length < 2) {
+        setSelectedSwapCells((prev) => [...prev, cell]);
+      } else {
+        alert('Maximum of two selections allowed.');
+      }
+    }
+  };
+
+  const handleSaveSwappedChanges = async () => {
+    if (selectedSwapCells.length !== 2) {
+      alert('Please select exactly two cells.');
+      return;
+    }
+    // Check both cells belong to the same race.
+    const [cell1, cell2] = selectedSwapCells;
+    if (cell1.raceId !== cell2.raceId) {
+      alert('Both cells must be from the same race.');
+      return;
+    }
+    try {
+      // Swap race results.
+      await window.electron.ipcRenderer.invoke(
+        'swapRaceResults',
+        eventId,
+        cell1.raceId,
+        cell1.boatId,
+        cell2.boatId,
+      );
+      // Conditionally update the leaderboard based on whether the final series has started.
+      if (finalSeriesStarted) {
+        await window.electron.ipcRenderer.invoke(
+          'updateFinalLeaderboard',
+          eventId,
+        );
+      } else {
+        await window.electron.ipcRenderer.invoke(
+          'updateEventLeaderboard',
+          eventId,
+        );
+      }
+      alert('Swap completed successfully.');
+      setSelectedSwapCells([]);
+      setSwapMode(false);
+      fetchLeaderboard();
+    } catch (error) {
+      console.error('Swap failed:', error);
+      alert('Swap failed. See console for details.');
+    }
+  };
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -369,6 +451,27 @@ function LeaderboardComponent({ eventId }) {
         {editMode && (
           <button
             type="button"
+            onClick={() => {
+              setSwapMode(!swapMode);
+              setSelectedSwapCells([]); // Reset any previous selections
+            }}
+            style={{ marginLeft: '10px' }}
+          >
+            {swapMode ? 'Cancel Swap Mode' : 'Enable Swap Mode'}
+          </button>
+        )}
+        {editMode && swapMode && selectedSwapCells.length === 2 && (
+          <button
+            type="button"
+            onClick={handleSaveSwappedChanges}
+            style={{ marginLeft: '10px' }}
+          >
+            Save Swapped Changes
+          </button>
+        )}
+        {editMode && (
+          <button
+            type="button"
             onClick={async () => {
               await HandleSave({
                 eventId,
@@ -415,9 +518,12 @@ function LeaderboardComponent({ eventId }) {
                   {(() => {
                     const headers = [];
                     for (let j = 1; j <= groupRacesCount; j += 1) {
+                      // Only add Race and Penalty headers
                       headers.push(<th key={`race-${j}`}>Race {j}</th>);
                       if (editMode) {
-                        headers.push(<th key={`penalty-${j}`}>Penalty {j}</th>);
+                        headers.push(
+                          <th key={`penalty-${j}`}>Penalty Race{j}</th>,
+                        );
                       }
                     }
                     return headers;
@@ -442,83 +548,149 @@ function LeaderboardComponent({ eventId }) {
                     <td>{entry.boat_number}</td>
                     <td>{entry.boat_type}</td>
                     {Array.from({ length: groupRacesCount }).map(
-                      (_, raceIndex) => (
-                        // For each race, first cell for race placement...
-                        <React.Fragment
-                          key={`race-fragment-${entry.boat_id}-${entry.race_ids[raceIndex]}`}
-                        >
-                          <td
-                            style={{
-                              cursor: editMode ? 'pointer' : 'default',
-                              backgroundColor: editMode
-                                ? '#f9f9f9'
-                                : 'transparent',
-                            }}
+                      (_, raceIndex) => {
+                        // Compute cell's raceId from entry.race_ids (handle string or array)
+                        const cellRaceId =
+                          typeof entry.race_ids === 'string'
+                            ? entry.race_ids.split(',')[raceIndex]
+                            : entry.race_ids[raceIndex];
+                        // Determine if this cell should be highlighted.
+                        const isHighlighted =
+                          swapMode &&
+                          selectedSwapCells.some(
+                            (cell) => cell.raceId === cellRaceId,
+                          );
+
+                        return (
+                          <React.Fragment
+                            key={`race-fragment-${entry.boat_id}-${cellRaceId}`}
                           >
-                            {editMode ? (
-                              <input
-                                type="number"
-                                value={
-                                  typeof entry.races[raceIndex] === 'string'
-                                    ? (entry.races[raceIndex].match(/\d+/) || [
-                                        '',
-                                      ])[0]
-                                    : entry.races[raceIndex] || ''
-                                }
-                                onChange={(e) =>
-                                  setEditableLeaderboard(
-                                    HandleRaceChange({
-                                      boatId: entry.boat_id,
-                                      raceIndex,
-                                      newHandleRaceChangeValue: e.target.value,
-                                      editableLeaderboard,
-                                      shiftPositions,
-                                    }),
-                                  )
-                                }
-                                style={{ width: '50px' }}
-                              />
-                            ) : (
-                              entry.races[raceIndex] || ''
-                            )}
-                          </td>
-                          {editMode && (
-                            // ...and then a new cell for the penalty dropdown for that race.
-                            <td>
-                              <select
-                                value={
-                                  perRacePenalties[entry.boat_id] &&
-                                  perRacePenalties[entry.boat_id][raceIndex]
-                                    ? perRacePenalties[entry.boat_id][raceIndex]
-                                    : ''
-                                }
-                                onChange={(e) =>
-                                  applyPenaltyUpdates(
-                                    entry.boat_id,
-                                    raceIndex,
-                                    e.target.value,
-                                  )
-                                }
-                                style={{ width: '80px' }}
-                              >
-                                <option value="">None</option>
-                                <option value="DNS">DNS</option>
-                                <option value="DNF">DNF</option>
-                                <option value="RET">RET</option>
-                                <option value="NSC">NSC</option>
-                                <option value="OCS">OCS</option>
-                                <option value="DNC">DNC</option>
-                                <option value="WTH">WTH</option>
-                                <option value="UFD">UFD</option>
-                                <option value="BFD">BFD</option>
-                                <option value="DSQ">DSQ</option>
-                                <option value="DNE">DNE</option>
-                                <option value="RDG">RDG</option>
-                              </select>
+                            <td
+                              style={{
+                                position: 'relative',
+                                backgroundColor: (() => {
+                                  if (isHighlighted) {
+                                    return '#ADD8E6';
+                                  }
+                                  if (editMode) {
+                                    return '#f9f9f9';
+                                  }
+                                  return 'transparent';
+                                })(),
+                              }}
+                            >
+                              {editMode ? (
+                                <input
+                                  type="number"
+                                  value={
+                                    typeof entry.races[raceIndex] === 'string'
+                                      ? (entry.races[raceIndex].match(
+                                          /\d+/,
+                                        ) || [''])[0]
+                                      : entry.races[raceIndex] || ''
+                                  }
+                                  onChange={(e) =>
+                                    setEditableLeaderboard(
+                                      HandleRaceChange({
+                                        boatId: entry.boat_id,
+                                        raceIndex,
+                                        newHandleRaceChangeValue:
+                                          e.target.value,
+                                        editableLeaderboard,
+                                        shiftPositions,
+                                      }),
+                                    )
+                                  }
+                                  style={{ width: '50px' }}
+                                />
+                              ) : (
+                                entry.races[raceIndex] || ''
+                              )}
+                              {/* When swap mode is enabled, render a small interactive button */}
+                              {editMode && swapMode && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleSwapCell(entry, raceIndex)
+                                  }
+                                  style={{
+                                    position: 'absolute',
+                                    right: '5px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: '15px',
+                                    height: '15px',
+                                    border: '1px solid #000',
+                                    backgroundColor: (() => {
+                                      const isSelected =
+                                        !!selectedSwapCells.find(
+                                          (cell) =>
+                                            cell.boatId.toString() ===
+                                              entry.boat_id.toString() &&
+                                            cell.raceIndex === raceIndex,
+                                        );
+                                      return isSelected ? '#cce5ff' : '#fff';
+                                    })(),
+                                    padding: 0,
+                                    margin: 0,
+                                    borderRadius: 0,
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    lineHeight: '15px',
+                                    textAlign: 'center',
+                                  }}
+                                  aria-label="Select cell for swap"
+                                >
+                                  {selectedSwapCells.some(
+                                    (cell) =>
+                                      cell.boatId.toString() ===
+                                        entry.boat_id.toString() &&
+                                      cell.raceIndex === raceIndex,
+                                  ) && (
+                                    <span style={{ color: 'blue' }}>✔</span>
+                                  )}
+                                </button>
+                              )}
                             </td>
-                          )}
-                        </React.Fragment>
-                      ),
+                            {editMode && (
+                              <td>
+                                <select
+                                  value={
+                                    perRacePenalties[entry.boat_id] &&
+                                    perRacePenalties[entry.boat_id][raceIndex]
+                                      ? perRacePenalties[entry.boat_id][
+                                          raceIndex
+                                        ]
+                                      : ''
+                                  }
+                                  onChange={(e) =>
+                                    applyPenaltyUpdates(
+                                      entry.boat_id,
+                                      raceIndex,
+                                      e.target.value,
+                                    )
+                                  }
+                                  style={{ width: '80px' }}
+                                >
+                                  <option value="">None</option>
+                                  <option value="DNS">DNS</option>
+                                  <option value="DNF">DNF</option>
+                                  <option value="RET">RET</option>
+                                  <option value="NSC">NSC</option>
+                                  <option value="OCS">OCS</option>
+                                  <option value="DNC">DNC</option>
+                                  <option value="WTH">WTH</option>
+                                  <option value="UFD">UFD</option>
+                                  <option value="BFD">BFD</option>
+                                  <option value="DSQ">DSQ</option>
+                                  <option value="DNE">DNE</option>
+                                  <option value="RDG">RDG</option>
+                                </select>
+                              </td>
+                            )}
+                          </React.Fragment>
+                        );
+                      },
                     )}
                     <td>
                       {finalSeriesStarted

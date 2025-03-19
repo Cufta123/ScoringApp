@@ -751,3 +751,56 @@ ipcMain.handle('calculateAverageScores', async (event, event_id) => {
     throw error;
   }
 });
+
+ipcMain.handle(
+  'swapRaceResults',
+  async (event, event_id, raceId, boat1_id, boat2_id) => {
+    try {
+      // Verify both boats have a score record for this race.
+      const scoreQuery = db.prepare(
+        'SELECT boat_id, position FROM Scores WHERE race_id = ? AND boat_id IN (?, ?)',
+      );
+      const scores = scoreQuery.all(raceId, boat1_id, boat2_id);
+      if (scores.length < 2) {
+        throw new Error(
+          'Both boats must be recorded in the same race to swap.',
+        );
+      }
+      const boat1Score = scores.find(
+        (s: { boat_id: { toString: () => any } }) =>
+          s.boat_id.toString() === boat1_id.toString(),
+      );
+      const boat2Score = scores.find(
+        (s: { boat_id: { toString: () => any } }) =>
+          s.boat_id.toString() === boat2_id.toString(),
+      );
+      if (!boat1Score || !boat2Score) {
+        throw new Error('Boat scores not found.');
+      }
+      // Swap positions using two update statements.
+      const updateQuery = db.prepare(
+        'UPDATE Scores SET position = ? , points = ? WHERE race_id = ? AND boat_id = ?',
+      );
+      updateQuery.run(
+        boat1Score.position,
+        boat1Score.position,
+        raceId,
+        boat2_id,
+      );
+      updateQuery.run(
+        boat2Score.position,
+        boat2Score.position,
+        raceId,
+        boat1_id,
+      );
+
+      console.log(
+        `Swapped race ${raceId} results between boat ${boat1_id} and boat ${boat2_id}.`,
+      );
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error swapping race results:', error.message);
+      throw error;
+    }
+  },
+);

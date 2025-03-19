@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import assignBoatsToNewHeatsZigZag from '../../main/functions/creatingNewHeatsZigZag';
 import HeatTables from './heatComponents/HeatTables';
 import handleStartFinalSeries from '../../main/functions/handleStartFinalSeries';
+import CustomHeatAssignment from './CustomHeatsAssignment';
 
 function HeatComponent({
   event,
@@ -21,6 +22,8 @@ function HeatComponent({
   const [raceHappened, setRaceHappened] = useState(false);
   const [displayLastHeats, setDisplayLastHeats] = useState(true);
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
+  const [showCustomAssignment, setShowCustomAssignment] = useState(false);
+  const [customAssignment, setCustomAssignment] = useState([]);
 
   const fetchHeatsDetails = useCallback(async () => {
     const heatsRaw = await window.electron.sqlite.heatRaceDB.readAllHeats(
@@ -79,9 +82,14 @@ function HeatComponent({
     }
 
     try {
-      const eventBoats = await window.electron.sqlite.eventDB.readBoatsByEvent(
-        event.event_id,
-      );
+      // Use customAssignment if available, otherwise fetch event boats.
+      const eventBoats =
+        customAssignment.length > 0
+          ? customAssignment
+          : await window.electron.sqlite.eventDB.readBoatsByEvent(
+              event.event_id,
+            );
+
       const existingHeats =
         await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
 
@@ -93,12 +101,13 @@ function HeatComponent({
         return;
       }
 
-      // Sort boats
-      eventBoats.sort((a, b) => {
-        if (a.boat_country < b.boat_country) return -1;
-        if (a.boat_country > b.boat_country) return 1;
-        return a.sail_number - b.sail_number;
-      });
+      if (customAssignment.length === 0) {
+        eventBoats.sort((a, b) => {
+          if (a.boat_country < b.boat_country) return -1;
+          if (a.boat_country > b.boat_country) return 1;
+          return a.sail_number - b.sail_number;
+        });
+      }
 
       const heatPromises = [];
       for (let i = 0; i < numHeats; i += 1) {
@@ -113,7 +122,7 @@ function HeatComponent({
       }
       await Promise.all(heatPromises);
 
-      // Refetch heats and assign boats
+      // Refetch heats and assign boats using assignBoatsToNewHeatsZigZag
       const fetchedHeats = await window.electron.sqlite.heatRaceDB.readAllHeats(
         event.event_id,
       );
@@ -126,6 +135,8 @@ function HeatComponent({
 
       alert('Heats have been generated successfully!');
       setHeatsCreated(true);
+      // Optionally clear the custom assignment after use:
+      setCustomAssignment([]);
       await handleDisplayHeats();
     } catch (error) {
       console.error('Error generating heats:', error);
@@ -208,12 +219,25 @@ function HeatComponent({
     }
   };
 
+  const handleCustomAssignment = async (customBoats) => {
+    try {
+      // Instead of deleting/recreating heats here, simply store the custom assignment array.
+      setCustomAssignment(customBoats);
+      alert('Custom assignment saved.');
+    } catch (error) {
+      console.error('Error applying custom assignment:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      alert(`Error applying custom assignment: ${errorMessage}`);
+    }
+    setShowCustomAssignment(false);
+  };
   const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
 
   return (
     <div>
       <div>
-        {!raceHappened && !finalSeriesStarted && (
+        {!showCustomAssignment && !raceHappened && !finalSeriesStarted && (
           <>
             <label htmlFor="numHeats">Select Number of Heats:</label>
             <select
@@ -236,9 +260,44 @@ function HeatComponent({
             >
               {heatsCreated ? 'Reset and Generate Heats' : 'Generate New Heats'}
             </button>
+            <button
+              type="button"
+              onClick={() => setShowCustomAssignment(true)}
+              disabled={raceHappened || finalSeriesStarted}
+            >
+              {customAssignment.length > 0
+                ? 'Edit Custom Assignment (Active)'
+                : 'Custom Heat Assignment'}
+            </button>
+            {customAssignment.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Are you sure you want to clear the custom assignment?',
+                    )
+                  ) {
+                    setCustomAssignment([]);
+                    alert('Custom assignment cleared.');
+                  }
+                }}
+                disabled={raceHappened || finalSeriesStarted}
+              >
+                Clear Custom Assignment
+              </button>
+            )}
           </>
         )}
       </div>
+
+      {showCustomAssignment && (
+        <CustomHeatAssignment
+          event={event}
+          onSave={handleCustomAssignment}
+          onCancel={() => setShowCustomAssignment(false)}
+        />
+      )}
 
       {raceHappened && (
         <button type="button" onClick={toggleDisplayMode}>

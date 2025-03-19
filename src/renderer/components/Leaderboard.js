@@ -262,7 +262,7 @@ function LeaderboardComponent({ eventId }) {
                   <th>Rank</th>
                   <th>Name</th>
                   <th>Country</th>
-                  <th>Boat Number</th>
+                  <th>Sail Number</th>
                   <th>Boat Type</th>
                   {Array.from({ length: groupRacesCount }).map((_, index) => (
                     <th key={`header-race-${index}`}>Race {index + 1}</th>

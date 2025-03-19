@@ -36,7 +36,7 @@ export default async function printLeaderboard(
         'Rank',
         'Name',
         'Country',
-        'Boat Number',
+        'Sail Number',
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
@@ -89,7 +89,7 @@ export default async function printLeaderboard(
         'Rank',
         'Name',
         'Country',
-        'Boat Number',
+        'Sail Number',
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
@@ -153,7 +153,7 @@ export default async function printLeaderboard(
       <th>Rank</th>
       <th>Name</th>
       <th>Country</th>
-      <th>Boat Number</th>
+      <th>Sail Number</th>
       <th>Boat Type</th>`;
       const maxRaceCount = Math.max(
         ...groupedLeaderboard[group].map((entry) =>

@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import debounce from 'lodash/debounce';
+import LatestHeats from '../../main/functions/LastestHeats';
 
 function ScoringInputComponent({ heat, onSubmit }) {
   const [inputValue, setInputValue] = useState('');
@@ -20,6 +21,20 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
   const inputRef = useRef(null);
+  const [existingHeats, setExistingHeats] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const heats = await window.electron.sqlite.heatRaceDB.readAllHeats(
+          heat.event_id,
+        );
+        setExistingHeats(heats);
+      } catch (error) {
+        console.error('Error fetching existing heats:', error);
+      }
+    })();
+  }, [heat.event_id]);
 
   // Fetch valid boats on mount or when heat changes.
   useEffect(() => {
@@ -137,7 +152,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
     setPenalties((prev) => ({ ...prev, [boatNumber]: penalty }));
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const allBoats = [...new Set([...boatNumbers, ...validBoats])];
     const boatsWithPenalties = allBoats.filter((boat) => penalties[boat]);
     const boatsWithoutPenalties = allBoats.filter((boat) => !penalties[boat]);
@@ -146,13 +161,52 @@ function ScoringInputComponent({ heat, onSubmit }) {
       place: index + 1,
       status: 'FINISHED',
     }));
+
+    // Use LatestHeats to get the latest heats for this event.
+    const latestHeats = LatestHeats(existingHeats);
+
+    // Retrieve boats for each latest heat if not already present.
+    await Promise.all(
+      latestHeats.map(async (h) => {
+        if (!h.boats || h.boats.length === 0) {
+          try {
+            const boats =
+              await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
+                h.heat_id,
+              );
+            h.boats = boats;
+          } catch (err) {
+            console.error(
+              `Error retrieving boats for heat ${h.heat_name}:`,
+              err,
+            );
+            h.boats = [];
+          }
+        }
+      }),
+    );
+
+    latestHeats.forEach((h) => {
+      console.log(
+        `Heat ${h.heat_name} has ${h.boats ? h.boats.length : 0} boats.`,
+      );
+    });
+
+    // Determine the longest heat (maximum number of boats among latest heats)
+    const longestHeatCount = latestHeats.reduce((max, h) => {
+      const count = h.boats ? h.boats.length : 0;
+      return count > max ? count : max;
+    }, 0);
+
+    // Assign boats with penalties a place equal to longestHeatCount + 1.
     boatsWithPenalties.forEach((boat) => {
       boatPlaces.push({
         boatNumber: boat,
-        place: allBoats.length + 1,
+        place: longestHeatCount + 1,
         status: penalties[boat],
       });
     });
+
     const allBoatsAccountedFor = allBoats.every(
       (boat) => placeNumbers[boat] || penalties[boat],
     );
@@ -161,7 +215,14 @@ function ScoringInputComponent({ heat, onSubmit }) {
     } else {
       alert('Please assign a place or penalty to every boat.');
     }
-  }, [boatNumbers, validBoats, penalties, placeNumbers, onSubmit]);
+  }, [
+    boatNumbers,
+    validBoats,
+    existingHeats,
+    penalties,
+    placeNumbers,
+    onSubmit,
+  ]);
 
   const getPlaceNumber = useCallback(
     (sailNumber) => {
@@ -211,7 +272,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
                 <tr>
                   <th>Sailor Name</th>
                   <th>Country</th>
-                  <th>Boat Number</th>
+                  <th>Sail Number</th>
                   <th>Place</th>
                   <th>Penalty</th>
                 </tr>
@@ -258,7 +319,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
         </div>
       </div>
       <div style={{ flex: '1', padding: '10px', boxSizing: 'border-box' }}>
-        <h2>Enter Boat Numbers</h2>
+        <h2>Enter Sail Numbers</h2>
         <p>
           Type the sail number(s) below, separated by spaces (or click on a row
           above), then click the button to add them.
@@ -346,9 +407,9 @@ function ScoringInputComponent({ heat, onSubmit }) {
     </div>
   );
 }
-
 ScoringInputComponent.propTypes = {
   heat: PropTypes.shape({
+    event_id: PropTypes.number.isRequired,
     heat_id: PropTypes.number.isRequired,
     heat_name: PropTypes.string.isRequired,
     boats: PropTypes.arrayOf(
@@ -363,5 +424,4 @@ ScoringInputComponent.propTypes = {
   }).isRequired,
   onSubmit: PropTypes.func.isRequired,
 };
-
 export default ScoringInputComponent;

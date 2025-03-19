@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { findLatestHeatsBySuffix } from '../../main/functions/creatingNewHeatsUtls'; // adjust the import path as needed
 
 const getLatestHeats = (heats: any[]) => {
   // Reduce heats to the latest (highest numeric suffix) for each base letter
@@ -83,7 +84,7 @@ export default async function handlePrintNewHeats(
       const subHeaderRow = worksheet.addRow([
         'Sailor Name',
         'Country',
-        'Boat Number',
+        'Sail Number',
       ]);
       subHeaderRow.font = { bold: true };
 
@@ -148,7 +149,7 @@ export async function exportToExcel(
     'Rank',
     'Name',
     'Country',
-    'Boat Number',
+    'Sail Number',
     'Boat Type',
     ...(leaderboard[0]?.races?.map(
       (_: any, index: number) => `Race ${index + 1}`,
@@ -210,7 +211,7 @@ export async function exportEventSailors(event: any, sailors: any[]) {
     return;
   }
 
-  // Sort sailors by Country, then by Club, then by Boat Number.
+  // Sort sailors by Country, then by Club, then by Sail Number.
   const sortedSailors = sailors.sort((a, b) => {
     const countryA = (a.country || a.boat_country || '').toLowerCase();
     const countryB = (b.country || b.boat_country || '').toLowerCase();
@@ -230,12 +231,12 @@ export async function exportEventSailors(event: any, sailors: any[]) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Event Sailors');
 
-  // Define columns for Name, Surname, Country, Boat Number, Club.
+  // Define columns for Name, Surname, Country, Sail Number, Club.
   worksheet.columns = [
     { key: 'name', header: 'Name', width: 20 },
     { key: 'surname', header: 'Surname', width: 20 },
     { key: 'country', header: 'Country', width: 20 },
-    { key: 'sail_number', header: 'Boat Number', width: 15 },
+    { key: 'sail_number', header: 'Sail Number', width: 15 },
     { key: 'club', header: 'Club', width: 20 },
   ];
 
@@ -297,7 +298,7 @@ export async function exportToPDF(
         'Rank',
         'Name',
         'Country',
-        'Boat Number',
+        'Sail Number',
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
@@ -349,7 +350,7 @@ export async function exportToPDF(
       'Rank',
       'Name',
       'Country',
-      'Boat Number',
+      'Sail Number',
       'Boat Type',
       ...Array.from({ length: raceCount }, (_, i) => `Race ${i + 1}`),
       'Total Points',
@@ -413,7 +414,7 @@ export async function exportToHTML(
       <th>Rank</th>
       <th>Name</th>
       <th>Country</th>
-      <th>Boat Number</th>
+      <th>Sail Number</th>
       <th>Boat Type</th>
       <th>Races</th>
       <th>Total Points</th>
@@ -436,7 +437,7 @@ export async function exportToHTML(
       <th>Rank</th>
       <th>Name</th>
       <th>Country</th>
-      <th>Boat Number</th>
+      <th>Sail Number</th>
       <th>Boat Type</th>
       <th>Races</th>
       <th>Total Points</th>

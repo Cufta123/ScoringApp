@@ -332,7 +332,7 @@ function EventPage() {
         <option value="html">HTML</option>
       </select>
       <button type="button" onClick={handlePrintStartingList}>
-        Generate Starting List Printout
+        Generate Competitor List Printout
       </button>
 
       <h3>Participating Boats &amp; Sailors</h3>

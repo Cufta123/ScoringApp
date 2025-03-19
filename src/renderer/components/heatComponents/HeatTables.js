@@ -136,7 +136,7 @@ export default function HeatTables({
               <tr>
                 <th style={sailorNameColumnStyle}>Sailor Name</th>
                 <th>Country</th>
-                <th style={boatNumberColumnStyle}>Boat Number</th>
+                <th style={boatNumberColumnStyle}>Sail Number</th>
               </tr>
             </thead>
             <HeatRows

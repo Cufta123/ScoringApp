@@ -80,7 +80,7 @@ export default async function printNewHeats(
       const subHeaderRow = worksheet.addRow([
         'Sailor Name',
         'Country',
-        'Boat Number',
+        'Sail Number',
       ]);
       subHeaderRow.font = { bold: true };
       heat.boats.forEach(
@@ -124,7 +124,7 @@ export default async function printNewHeats(
     heatsToPrint.forEach((heat) => {
       doc.setFontSize(14);
       doc.text(`Heat: ${heat.heat_name}`, 14, finalY);
-      const header = ['Sailor Name', 'Country', 'Boat Number'];
+      const header = ['Sailor Name', 'Country', 'Sail Number'];
       const body = heat.boats.map(
         (boat: { name: any; surname: any; country: any; sail_number: any }) => [
           `${boat.name} ${boat.surname}`,
@@ -162,7 +162,7 @@ export default async function printNewHeats(
       html += `<table><thead><tr>
         <th>Sailor Name</th>
         <th>Country</th>
-        <th>Boat Number</th>
+        <th>Sail Number</th>
         </tr></thead><tbody>`;
       heat.boats.forEach(
         (boat: { name: any; surname: any; country: any; sail_number: any }) => {

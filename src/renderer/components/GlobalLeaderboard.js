@@ -61,7 +61,7 @@ function GlobalLeaderboardComponent() {
       'Rank',
       'Name',
       'Surname',
-      'Boat Number',
+      'Sail Number',
       'Boat Type',
       'Country',
       'Total Points',
@@ -102,7 +102,7 @@ function GlobalLeaderboardComponent() {
             <th>Rank</th>
             <th>Name</th>
             <th>Surname</th>
-            <th>Boat Number</th>
+            <th>Sail Number</th>
             <th>Boat Type</th>
             <th>Country</th>
             <th>Total Points</th>

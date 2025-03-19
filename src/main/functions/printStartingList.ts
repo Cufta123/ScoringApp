@@ -15,7 +15,7 @@ export default async function printStartingList(
 
   const eventName = event.event_name;
 
-  // Sort sailors by Country, then by Club, then by Boat Number.
+  // Sort sailors by Country, then by Club, then by Sail Number.
   const sortedSailors = sailors.sort((a, b) => {
     const countryA = (a.country || a.boat_country || '').toLowerCase();
     const countryB = (b.country || b.boat_country || '').toLowerCase();
@@ -34,13 +34,13 @@ export default async function printStartingList(
 
   if (format === 'excel') {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Starting List');
+    const worksheet = workbook.addWorksheet('Competitor List');
 
     worksheet.columns = [
       { key: 'name', header: 'Name', width: 20 },
       { key: 'surname', header: 'Surname', width: 20 },
       { key: 'country', header: 'Country', width: 20 },
-      { key: 'sail_number', header: 'Boat Number', width: 15 },
+      { key: 'sail_number', header: 'Sail Number', width: 15 },
       { key: 'club', header: 'Club', width: 20 },
     ];
 
@@ -68,7 +68,7 @@ export default async function printStartingList(
     doc.setFontSize(16);
     doc.text('Starting List', 14, 10);
 
-    const header = ['Name', 'Surname', 'Country', 'Boat Number', 'Club'];
+    const header = ['Name', 'Surname', 'Country', 'Sail Number', 'Club'];
     const body = sortedSailors.map((sailor) => [
       sailor.name || 'N/A',
       sailor.surname || 'N/A',
@@ -97,7 +97,7 @@ export default async function printStartingList(
       <th>Name</th>
       <th>Surname</th>
       <th>Country</th>
-      <th>Boat Number</th>
+      <th>Sail Number</th>
       <th>Club</th>
       </tr></thead><tbody>`;
     sortedSailors.forEach((sailor) => {

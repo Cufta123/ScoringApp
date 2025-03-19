@@ -44,7 +44,8 @@ export type Channels =
   | 'getScoresResult'
   | 'getRaceMapping'
   | 'getEventName'
-  | 'importCSV';
+  | 'importCSV'
+  | 'calculateAverageScores';
 
 const electronHandler = {
   ipcRenderer: {
@@ -515,6 +516,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('getScoresResult', event_id);
         } catch (error) {
           console.error('Error invoking getScoresResult IPC:', error);
+          return false;
+        }
+      },
+      async calculateAverageScores(event_id: string) {
+        try {
+          return await ipcRenderer.invoke('calculateAverageScores', event_id);
+        } catch (error) {
+          console.error('Error invoking calculateAverageScores IPC:', error);
           return false;
         }
       },

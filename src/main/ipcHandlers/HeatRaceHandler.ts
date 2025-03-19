@@ -386,13 +386,14 @@ ipcMain.handle(
     new_position,
     shift_positions,
     heat_id,
+    penalty = null,
   ) => {
     try {
       console.log(
-        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}, heat_id: ${heat_id}`,
+        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}, heat_id: ${heat_id}, penalty: ${penalty}`,
       );
 
-      // Step 1: Get the current race result.
+      // Get the current result for shifting purposes.
       const currentResult = db
         .prepare(
           `SELECT position FROM Scores WHERE race_id = ? AND boat_id = ?`,
@@ -408,32 +409,24 @@ ipcMain.handle(
 
       const currentPosition = currentResult.position;
 
-      // Step 2: Update both position and points in the Scores table for the specific heat.
+      // Update the score – now update the status column as well.
       const updateQuery = db.prepare(
-        `UPDATE Scores SET position = ?, points = ? WHERE race_id = ? AND boat_id = ?`,
+        `UPDATE Scores SET position = ?, points = ?, status = ? WHERE race_id = ? AND boat_id = ?`,
       );
-      updateQuery.run(new_position, new_position, race_id, boat_id);
+      // Use the provided penalty if available; otherwise default to 'FINISHED'.
+      const statusToUpdate = penalty || 'FINISHED';
+      updateQuery.run(
+        new_position,
+        new_position,
+        statusToUpdate,
+        race_id,
+        boat_id,
+      );
 
-      // Step 3: Optionally shift positions if needed, but only for boats in the same heat.
+      // Optionally shift other boats' positions.
       if (shift_positions) {
         if (currentPosition > new_position) {
-          // Boat moved up, shift others down.
-          const affectedBoats = db
-            .prepare(
-              `SELECT boat_id, position FROM Scores
-               WHERE race_id = ?
-                 AND position >= ?
-                 AND position < ?
-                 AND boat_id != ?
-                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
-            )
-            .all(race_id, new_position, currentPosition, boat_id, heat_id);
-
-          console.log(
-            'Shifting down boats (moved up scenario). Affected boats:',
-            affectedBoats,
-          );
-
+          // Shift down boats (boat moved up).
           const shiftQuery = db.prepare(
             `UPDATE Scores
              SET position = position + 1
@@ -443,32 +436,15 @@ ipcMain.handle(
                AND boat_id != ?
                AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
           );
-          const result = shiftQuery.run(
+          shiftQuery.run(
             race_id,
             new_position,
             currentPosition,
             boat_id,
             heat_id,
           );
-          console.log(`Shift down complete. Rows updated: ${result.changes}`);
         } else if (currentPosition < new_position) {
-          // Boat moved down, shift others up.
-          const affectedBoats = db
-            .prepare(
-              `SELECT boat_id, position FROM Scores
-               WHERE race_id = ?
-                 AND position <= ?
-                 AND position > ?
-                 AND boat_id != ?
-                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
-            )
-            .all(race_id, new_position, currentPosition, boat_id, heat_id);
-
-          console.log(
-            'Shifting up boats (moved down scenario). Affected boats:',
-            affectedBoats,
-          );
-
+          // Shift up boats (boat moved down).
           const shiftQuery = db.prepare(
             `UPDATE Scores
              SET position = position - 1
@@ -478,18 +454,16 @@ ipcMain.handle(
                AND boat_id != ?
                AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
           );
-          const result = shiftQuery.run(
+          shiftQuery.run(
             race_id,
             new_position,
             currentPosition,
             boat_id,
             heat_id,
           );
-          console.log(`Shift up complete. Rows updated: ${result.changes}`);
         }
       }
 
-      // Step 4: Leaderboard update will occur later via updateEventLeaderboard.
       return { success: true };
     } catch (err) {
       console.error('Error updating race result:', (err as Error).message);
@@ -714,6 +688,66 @@ ipcMain.handle('getScoresResult', async (event, event_id) => {
     return results;
   } catch (error) {
     console.error('Error reading boat scores ordered by race number:', error);
+    throw error;
+  }
+});
+
+// ...existing code...
+
+ipcMain.handle('calculateAverageScores', async (event, event_id) => {
+  try {
+    // Calculate average for Qualifying series
+    const qualifyingQuery = db.prepare(`
+      SELECT s.boat_id, AVG(s.points) AS avgPointsQualifying
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ? AND h.heat_type = 'Qualifying'
+      GROUP BY s.boat_id
+    `);
+    const qualifyingAverages = qualifyingQuery.all(event_id);
+
+    // Calculate average for Final series
+    const finalQuery = db.prepare(`
+      SELECT s.boat_id, AVG(s.points) AS avgPointsFinal
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ? AND h.heat_type = 'Final'
+      GROUP BY s.boat_id
+    `);
+    const finalAverages = finalQuery.all(event_id);
+
+    // Merge results by boat_id.
+    const averages: {
+      [boat_id: string]: {
+        avgPointsQualifying: number | null;
+        avgPointsFinal: number | null;
+      };
+    } = {};
+    qualifyingAverages.forEach(
+      (row: { boat_id: string | number; avgPointsQualifying: any }) => {
+        averages[row.boat_id] = {
+          avgPointsQualifying: row.avgPointsQualifying,
+          avgPointsFinal: null,
+        };
+      },
+    );
+    finalAverages.forEach(
+      (row: { boat_id: string | number; avgPointsFinal: number | null }) => {
+        if (averages[row.boat_id]) {
+          averages[row.boat_id].avgPointsFinal = row.avgPointsFinal;
+        } else {
+          averages[row.boat_id] = {
+            avgPointsQualifying: null,
+            avgPointsFinal: row.avgPointsFinal,
+          };
+        }
+      },
+    );
+    return averages;
+  } catch (error) {
+    console.error('Error calculating average scores:', error);
     throw error;
   }
 });

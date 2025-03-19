@@ -198,7 +198,7 @@ ipcMain.handle('lockEvent', async (event, event_id) => {
     `);
 
     let rank = 1;
-    const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
+    const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
     if (finalSeriesStarted) {
       groupOrder.forEach((group) => {
         const groupBoats = leaderboard.filter(

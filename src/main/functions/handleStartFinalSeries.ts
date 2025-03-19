@@ -78,7 +78,7 @@ export default async function handleStartFinalSeries({
     // Determine fleet sizes using the ranking order in finalRanking
     const boatsPerFleet = Math.floor(finalRanking.length / numFinalHeats);
     const extraBoats = finalRanking.length % numFinalHeats;
-    const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron'];
+    const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
 
     // Build data for each final heat (fleet)
     let boatIndex = 0;

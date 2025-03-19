@@ -9,6 +9,7 @@ import {
   HandleRaceChange,
 } from '../../main/functions/editingLeaderboard';
 import printLeaderboard from '../../main/functions/printLeaderboard';
+import LatestHeats from '../../main/functions/LastestHeats'; // ensure LatestHeats is imported
 
 function LeaderboardComponent({ eventId }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -17,8 +18,10 @@ function LeaderboardComponent({ eventId }) {
   const [editMode, setEditMode] = useState(false); // Toggle for edit mode
   const [editableLeaderboard, setEditableLeaderboard] = useState([]); // Tracks editable leaderboard
   const [exportFormat, setExportFormat] = useState('excel'); // 'excel' | 'pdf' | 'html'
-
+  const [editablePenalties, setEditablePenalties] = useState({});
   const [shiftPositions, setShiftPositions] = useState(false); // Tracks the state of the checkbox
+  const [perRacePenaltyMode, setPerRacePenaltyMode] = useState(false);
+  const [perRacePenalties, setPerRacePenalties] = useState({});
 
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -150,6 +153,144 @@ function LeaderboardComponent({ eventId }) {
     setEditMode(!editMode);
   };
 
+  // When entering edit mode, initialize penalties for each row.
+  useEffect(() => {
+    if (editMode && Array.isArray(editableLeaderboard)) {
+      const penaltiesInit = {};
+      editableLeaderboard.forEach((entry) => {
+        // Initialize with an empty string or current penalty (if any)
+        penaltiesInit[entry.boat_id] = entry.penalty || '';
+      });
+      setEditablePenalties(penaltiesInit);
+    }
+  }, [editMode, editableLeaderboard]);
+
+  // When perRacePenaltyMode is toggled on, initialize per race penalties.
+  useEffect(() => {
+    if (editMode && perRacePenaltyMode) {
+      const penalties = {};
+      editableLeaderboard.forEach((entry) => {
+        // Initialize an array of the same length as the number of race results.
+        penalties[entry.boat_id] = entry.races.map(() => '');
+      });
+      setPerRacePenalties(penalties);
+    }
+  }, [editMode, perRacePenaltyMode, editableLeaderboard]);
+
+  useEffect(() => {
+    if (editMode && Array.isArray(editableLeaderboard)) {
+      const penalties = {};
+      editableLeaderboard.forEach((entry) => {
+        // Set penalties array—with one element per race.
+        penalties[entry.boat_id] = entry.races.map(() => '');
+      });
+      setPerRacePenalties(penalties);
+    }
+  }, [editMode, editableLeaderboard]);
+
+  // Function to apply penalty updates similar to handleSubmit logic.
+  // Function to apply penalty updates similar to handleSubmit logic.
+  const applyPenaltyUpdates = async (boatId, raceIndex, penalty) => {
+    // If any of the required parameters is missing, do nothing.
+    if (
+      typeof boatId === 'undefined' ||
+      typeof raceIndex === 'undefined' ||
+      !penalty
+    ) {
+      return;
+    }
+
+    try {
+      const raceMapping =
+        await window.electron.sqlite.heatRaceDB.getRaceMapping(eventId);
+      const entry = editableLeaderboard.find(
+        (e) => e.boat_id.toString() === boatId.toString(),
+      );
+      if (!entry) return;
+
+      // Convert race_ids into an array.
+      const raceIds =
+        typeof entry.race_ids === 'string'
+          ? entry.race_ids.split(',')
+          : entry.race_ids;
+      const raceId = raceIds[raceIndex];
+      if (!raceId) return;
+
+      // 1. Retrieve all heats for the event.
+      const allHeats =
+        await window.electron.sqlite.heatRaceDB.readAllHeats(eventId);
+      // 2. Determine the latest heats using LatestHeats.
+      const latestHeats = LatestHeats(allHeats);
+      // 3. Ensure each latest heat has its boats loaded.
+      await Promise.all(
+        latestHeats.map(async (h) => {
+          if (!h.boats || h.boats.length === 0) {
+            try {
+              const boats =
+                await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
+                  h.heat_id,
+                );
+              h.boats = boats;
+            } catch (err) {
+              console.error(
+                `Error retrieving boats for heat ${h.heat_name}:`,
+                err,
+              );
+              h.boats = [];
+            }
+          }
+        }),
+      );
+      // 4. Get the maximum number of boats among the latest heats.
+      const longestHeatCount = latestHeats.reduce((max, h) => {
+        const count = h.boats ? h.boats.length : 0;
+        return count > max ? count : max;
+      }, 0);
+
+      // 5. Determine newPosition based on penalty.
+      let newPosition = longestHeatCount + 1;
+      if (penalty === 'RDG') {
+        // Call calculateAverageScores and pick the competitor's average.
+        const averages = await window.electron.ipcRenderer.invoke(
+          'calculateAverageScores',
+          eventId,
+        );
+        const boatAverages = averages[boatId];
+        if (boatAverages) {
+          // Use avgPointsFinal if final series has started; otherwise avgPointsQualifying.
+          if (finalSeriesStarted && boatAverages.avgPointsFinal !== null) {
+            newPosition = Math.round(boatAverages.avgPointsFinal);
+          } else if (boatAverages.avgPointsQualifying !== null) {
+            newPosition = Math.round(boatAverages.avgPointsQualifying);
+          }
+        }
+      }
+
+      const heat_id = raceMapping[raceId] || null;
+
+      // Call the updateRaceResult IPC using the calculated newPosition.
+      await window.electron.ipcRenderer.invoke(
+        'updateRaceResult',
+        eventId, // event_id
+        raceId, // race_id
+        boatId, // boat_id
+        newPosition, // new_position set according to penalty condition
+        false, // shift_positions (no shifting)
+        heat_id, // heat_id
+        penalty, // new penalty value
+      );
+
+      // Update local state.
+      setPerRacePenalties((prev) => {
+        const updatedBoatPenalties = [...(prev[boatId] || [])];
+        updatedBoatPenalties[raceIndex] = penalty;
+        return { ...prev, [boatId]: updatedBoatPenalties };
+      });
+    } catch (error) {
+      console.error('Error applying single penalty update:', error);
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -168,7 +309,7 @@ function LeaderboardComponent({ eventId }) {
       return acc;
     }, {}) || {};
 
-  const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'General'];
+  const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
   const sortedGroups = Object.keys(groupedLeaderboard).sort(
     (a, b) => groupOrder.indexOf(a) - groupOrder.indexOf(b),
   );
@@ -213,46 +354,40 @@ function LeaderboardComponent({ eventId }) {
             : 'Enter Edit Mode (Manual Adjustments)'}
         </button>
         {editMode && (
-          <div>
-            <button
-              type="button"
-              onClick={async () => {
-                await HandleSave({
-                  eventId,
-                  leaderboard,
-                  editableLeaderboard,
-                  setLeaderboard,
-                  setEditableLeaderboard,
-                  setEditMode,
-                  shiftPositions,
-                  finalSeriesStarted,
-                });
-                await fetchLeaderboard();
-              }}
-              style={{ marginLeft: '10px' }}
-            >
-              Save Changes
-            </button>
-            <label
-              htmlFor="shiftPositionsCheckbox"
-              style={{ marginLeft: '10px' }}
-            >
-              <input
-                id="shiftPositionsCheckbox"
-                type="checkbox"
-                checked={shiftPositions}
-                onChange={(e) => setShiftPositions(e.target.checked)}
-              />
-              Shift positions of other boats
-            </label>
-          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await HandleSave({
+                eventId,
+                leaderboard,
+                editableLeaderboard,
+                setLeaderboard,
+                setEditableLeaderboard,
+                setEditMode,
+                shiftPositions,
+                finalSeriesStarted,
+              });
+              // After saving race positions, update any penalties.
+              await applyPenaltyUpdates();
+              // Force recalculation of leaderboard totals by calling the backend update
+              await window.electron.ipcRenderer.invoke(
+                'updateEventLeaderboard',
+                eventId,
+              );
+              // Then fetch the refreshed leaderboard
+              await fetchLeaderboard();
+            }}
+            style={{ marginLeft: '10px' }}
+          >
+            Save Changes
+          </button>
         )}
       </div>
       {sortedGroups.map((group) => {
+        // Determine how many races this group has.
         const groupRacesCount = Math.max(
           ...groupedLeaderboard[group].map((entry) => entry.races.length),
         );
-
         return (
           <div key={`group-${group}`}>
             <h3>{group} Group</h3>
@@ -264,15 +399,22 @@ function LeaderboardComponent({ eventId }) {
                   <th>Country</th>
                   <th>Sail Number</th>
                   <th>Boat Type</th>
-                  {Array.from({ length: groupRacesCount }).map((_, index) => (
-                    <th key={`header-race-${index}`}>Race {index + 1}</th>
-                  ))}
+                  {(() => {
+                    const headers = [];
+                    for (let j = 1; j <= groupRacesCount; j += 1) {
+                      headers.push(<th key={`race-${j}`}>Race {j}</th>);
+                      if (editMode) {
+                        headers.push(<th key={`penalty-${j}`}>Penalty {j}</th>);
+                      }
+                    }
+                    return headers;
+                  })()}
                   <th>Total Points</th>
                 </tr>
               </thead>
               <tbody>
                 {groupedLeaderboard[group]?.map((entry, index) => (
-                  <tr key={`boat-${entry.boat_id}-${index}`}>
+                  <tr key={`boat-${entry.boat_id}`}>
                     <td>{index + 1}</td>
                     <td>
                       {entry.name} {entry.surname}
@@ -288,48 +430,86 @@ function LeaderboardComponent({ eventId }) {
                     <td>{entry.boat_type}</td>
                     {Array.from({ length: groupRacesCount }).map(
                       (_, raceIndex) => (
-                        <td
-                          key={`entry-race-${entry.boat_id}-${raceIndex}`}
-                          style={{
-                            cursor: editMode ? 'pointer' : 'default',
-                            backgroundColor: editMode
-                              ? '#f9f9f9'
-                              : 'transparent',
-                          }}
+                        // For each race, first cell for race placement...
+                        <React.Fragment
+                          key={`race-fragment-${entry.boat_id}-${entry.race_ids[raceIndex]}`}
                         >
-                          {editMode ? (
-                            <input
-                              type="number"
-                              value={
-                                typeof entry.races[raceIndex] === 'string'
-                                  ? entry.races[raceIndex]?.replace(
-                                      /[()]/g,
-                                      '',
-                                    ) || ''
-                                  : entry.races[raceIndex] || ''
-                              } // Remove parentheses for editing
-                              onChange={(e) =>
-                                setEditableLeaderboard(
-                                  HandleRaceChange({
-                                    boatId: entry.boat_id,
+                          <td
+                            style={{
+                              cursor: editMode ? 'pointer' : 'default',
+                              backgroundColor: editMode
+                                ? '#f9f9f9'
+                                : 'transparent',
+                            }}
+                          >
+                            {editMode ? (
+                              <input
+                                type="number"
+                                value={
+                                  typeof entry.races[raceIndex] === 'string'
+                                    ? (entry.races[raceIndex].match(/\d+/) || [
+                                        '',
+                                      ])[0]
+                                    : entry.races[raceIndex] || ''
+                                }
+                                onChange={(e) =>
+                                  setEditableLeaderboard(
+                                    HandleRaceChange({
+                                      boatId: entry.boat_id,
+                                      raceIndex,
+                                      newHandleRaceChangeValue: e.target.value,
+                                      editableLeaderboard,
+                                      shiftPositions,
+                                    }),
+                                  )
+                                }
+                                style={{ width: '50px' }}
+                              />
+                            ) : (
+                              entry.races[raceIndex] || ''
+                            )}
+                          </td>
+                          {editMode && (
+                            // ...and then a new cell for the penalty dropdown for that race.
+                            <td>
+                              <select
+                                value={
+                                  perRacePenalties[entry.boat_id] &&
+                                  perRacePenalties[entry.boat_id][raceIndex]
+                                    ? perRacePenalties[entry.boat_id][raceIndex]
+                                    : ''
+                                }
+                                onChange={(e) =>
+                                  applyPenaltyUpdates(
+                                    entry.boat_id,
                                     raceIndex,
-                                    newHandleRaceChangeValue: e.target.value,
-                                    editableLeaderboard,
-                                    shiftPositions,
-                                  }),
-                                )
-                              }
-                              style={{ width: '50px' }}
-                            />
-                          ) : (
-                            entry.races[raceIndex] || ''
+                                    e.target.value,
+                                  )
+                                }
+                                style={{ width: '80px' }}
+                              >
+                                <option value="">None</option>
+                                <option value="DNS">DNS</option>
+                                <option value="DNF">DNF</option>
+                                <option value="RET">RET</option>
+                                <option value="NSC">NSC</option>
+                                <option value="OCS">OCS</option>
+                                <option value="DNC">DNC</option>
+                                <option value="WTH">WTH</option>
+                                <option value="UFD">UFD</option>
+                                <option value="BFD">BFD</option>
+                                <option value="DSQ">DSQ</option>
+                                <option value="DNE">DNE</option>
+                                <option value="RDG">RDG</option>
+                              </select>
+                            </td>
                           )}
-                        </td>
+                        </React.Fragment>
                       ),
                     )}
                     <td>
                       {finalSeriesStarted
-                        ? entry.total_points_combined // Use total_points_combined when final series has started
+                        ? entry.total_points_combined
                         : entry.total_points_event}
                     </td>
                   </tr>

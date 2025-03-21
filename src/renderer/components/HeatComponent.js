@@ -309,7 +309,8 @@ function HeatComponent({
         </button>
       )}
 
-      {heatsToDisplay.length > 0 && (
+      {/* Only show heats if custom assignment panel is not active */}
+      {!showCustomAssignment && heatsToDisplay.length > 0 && (
         <HeatTables
           heatsToDisplay={heatsToDisplay}
           raceHappened={raceHappened}

@@ -514,7 +514,7 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
         GROUP_CONCAT(
           CASE
             WHEN sc.status <> 'FINISHED'
-              THEN '(' || sc.position || ') ' || sc.status
+              THEN '(' || sc.status || ') ' || sc.position
             ELSE sc.position
           END
           ORDER BY r.race_number
@@ -627,7 +627,7 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
         GROUP_CONCAT(
           CASE
             WHEN sc.status <> 'FINISHED'
-              THEN '(' || sc.position || ') ' || sc.status
+              THEN '(' || sc.status || ') ' || sc.position
             ELSE sc.position
           END
           ORDER BY r.race_number

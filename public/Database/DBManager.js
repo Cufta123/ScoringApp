@@ -99,7 +99,7 @@ const createSailorsTable = `
 const createBoatsTable = `
   CREATE TABLE IF NOT EXISTS Boats (
     boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sail_number TEXT NOT NULL UNIQUE,
+    sail_number VARCHAR NOT NULL UNIQUE,
     country TEXT NOT NULL,
     model TEXT NOT NULL,
     sailor_id INTEGER,
@@ -232,7 +232,7 @@ const expectedDatabaseStructure = {
   },
   Boats: {
     boat_id: 'INTEGER',
-    sail_number: 'TEXT',
+    sail_number: 'VARCHAR',
     country: 'TEXT',
     model: 'TEXT',
     sailor_id: 'INTEGER',
@@ -310,7 +310,6 @@ function checkDatabaseIntegrity() {
       break;
     }
 
-    // Create a map of actual column names to their types (normalized to uppercase)
     const actualMap = {};
     actualColumns.forEach((col) => {
       actualMap[col.name] = col.type.toUpperCase();
@@ -319,7 +318,6 @@ function checkDatabaseIntegrity() {
     const expectedNames = Object.keys(expectedColumns);
     const actualNames = Object.keys(actualMap);
 
-    // Check if column count matches exactly
     if (expectedNames.length !== actualNames.length) {
       console.error(
         `Integrity check: Column count mismatch in table ${tableName}. Expected ${expectedNames.length} but got ${actualNames.length}.`,
@@ -328,7 +326,6 @@ function checkDatabaseIntegrity() {
       break;
     }
 
-    // Compare each expected column's type with actual table column's type
     for (let j = 0; j < expectedNames.length; j += 1) {
       const colName = expectedNames[j];
       const expectedType = expectedColumns[colName].toUpperCase();
@@ -353,9 +350,7 @@ function checkDatabaseIntegrity() {
 
   if (schemaMismatch) {
     console.error('Database integrity check failed. Dropping the database...');
-    alert(
-      'Database integrity check failed. The database will be dropped. Please restart the application.',
-    );
+    // Remove alert; you're in Node/Electron main process.
     db.close();
     fs.unlinkSync(dbPath);
     process.exit(0);

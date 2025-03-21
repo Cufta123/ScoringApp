@@ -31,28 +31,47 @@ function CustomHeatAssignment({ event, onSave, onCancel }) {
     e.dataTransfer.setData('text/plain', JSON.stringify({ source, index }));
   };
 
-  // Called when dropping on a new assignment row.
+  // Modified drop handler for assignment table using insertion-shift behavior
   const handleDropAssigned = (e, targetIndex) => {
     e.preventDefault();
     const data = JSON.parse(e.dataTransfer.getData('text/plain'));
     if (!data) return;
 
+    let boat;
+    // Remove boat from its original table
     if (data.source === 'existing') {
-      const boat = availableSailors[data.index];
+      boat = availableSailors[data.index];
       if (!boat) return;
       const newAvailable = [...availableSailors];
       newAvailable.splice(data.index, 1);
       setAvailableSailors(newAvailable);
-      const newAssigned = [...assignedSailors];
-      newAssigned[targetIndex] = boat;
-      setAssignedSailors(newAssigned);
     } else if (data.source === 'assigned') {
+      // Remove boat from its current assigned slot
       const newAssigned = [...assignedSailors];
-      const boat = newAssigned[data.index];
-      newAssigned[data.index] = newAssigned[targetIndex];
-      newAssigned[targetIndex] = boat;
+      boat = newAssigned[data.index];
+      newAssigned[data.index] = null;
       setAssignedSailors(newAssigned);
     }
+
+    // Insert boat at targetIndex with shifting if needed.
+    const newAssigned = [...assignedSailors];
+    let displaced = boat;
+    for (let i = targetIndex; i < newAssigned.length; i++) {
+      if (newAssigned[i] === null) {
+        newAssigned[i] = displaced;
+        displaced = null;
+        break;
+      } else {
+        let temp = newAssigned[i];
+        newAssigned[i] = displaced;
+        displaced = temp;
+      }
+    }
+    // If a boat was bumped out of the last slot, add it back to available sailors.
+    if (displaced !== null) {
+      setAvailableSailors([...availableSailors, displaced]);
+    }
+    setAssignedSailors(newAssigned);
   };
 
   // When dropping back on the existing sailors table.

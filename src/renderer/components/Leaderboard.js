@@ -383,7 +383,7 @@ function LeaderboardComponent({ eventId }) {
 
   const groupedLeaderboard =
     editableLeaderboard?.reduce((acc, entry) => {
-      const group = entry.placement_group || 'General';
+      const group = entry.placement_group || 'Overall scores';
       if (!acc[group]) {
         acc[group] = [];
       }
@@ -443,7 +443,11 @@ function LeaderboardComponent({ eventId }) {
         </button>
       </div>
       <div style={{ marginBottom: '10px' }}>
-        <button type="button" onClick={toggleEditMode}>
+        <button
+          type="button"
+          onClick={toggleEditMode}
+          title="Enter Edit Mode to manually adjust race scores and penalties. For sailing, update finish times to reflect real conditions and apply penalties if needed."
+        >
           {editMode
             ? 'Exit Edit Mode (Discard Changes)'
             : 'Enter Edit Mode (Manual Adjustments)'}
@@ -462,12 +466,20 @@ function LeaderboardComponent({ eventId }) {
         )}
         {editMode && swapMode && (
           <div
-            style={{ marginTop: '5px', fontStyle: 'italic', fontSize: '15px' }}
+            style={{ marginTop: '5px', fontStyle: 'italic', fontSize: '16px' }}
           >
             Swap Mode is active: Click on a boat&apos;s race cell to select it.
             All cells from boats in the same heat are highlighted in light blue.
             Select exactly two cells (from the same heat) and then click
             &quot;Save Swapped Changes&quot;.
+          </div>
+        )}
+        {editMode && !swapMode && (
+          <div
+            style={{ marginTop: '5px', fontStyle: 'italic', fontSize: '16px' }}
+          >
+            Edit Mode is active: You can adjust race scores directly and select
+            penalties using the dropdown menus next to each race.
           </div>
         )}
         {editMode && swapMode && selectedSwapCells.length === 2 && (
@@ -514,9 +526,13 @@ function LeaderboardComponent({ eventId }) {
         const groupRacesCount = Math.max(
           ...groupedLeaderboard[group].map((entry) => entry.races.length),
         );
+        const groupHeader =
+          !finalSeriesStarted && group === 'Overall scores'
+            ? 'Overall scores'
+            : `${group} Group`;
         return (
           <div key={`group-${group}`}>
-            <h3>{group} Group</h3>
+            <h3>{groupHeader}</h3>
             <table>
               <thead>
                 <tr>
@@ -530,7 +546,7 @@ function LeaderboardComponent({ eventId }) {
                     for (let j = 1; j <= groupRacesCount; j += 1) {
                       // Only add Race and Penalty headers
                       headers.push(<th key={`race-${j}`}>Race {j}</th>);
-                      if (editMode) {
+                      if (editMode && !swapMode) {
                         headers.push(
                           <th key={`penalty-${j}`}>Penalty Race {j}</th>,
                         );
@@ -662,7 +678,7 @@ function LeaderboardComponent({ eventId }) {
                                 </button>
                               )}
                             </td>
-                            {editMode && (
+                            {editMode && !swapMode && (
                               <td>
                                 <select
                                   value={

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 /* eslint-disable camelcase */
 interface LeaderboardEntry {
@@ -100,7 +101,7 @@ export function HandleRaceChange({
                     otherPosition - 1
                   } (moved down scenario)`,
                 );
-                otherEntry.races[raceIndex] = otherPosition - 1;
+                otherEntry.races[raceIndex] = (otherPosition - 1).toString();
               }
             }
           });

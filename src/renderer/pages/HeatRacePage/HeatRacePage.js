@@ -169,6 +169,7 @@ function HeatRacePage() {
           if (allEqual) {
             await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
               event.event_id,
+              false,
             );
           } else {
             console.log(

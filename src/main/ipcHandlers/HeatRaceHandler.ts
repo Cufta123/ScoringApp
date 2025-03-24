@@ -33,6 +33,17 @@ ipcMain.handle('readAllHeats', async (event, event_id) => {
   }
 });
 
+ipcMain.handle('getHeatDetails', async (event, heat_id) => {
+  try {
+    const query = `SELECT * FROM Heats WHERE heat_id = ?`;
+    const getQuery = db.prepare(query);
+    return getQuery.get(heat_id);
+  } catch (error) {
+    console.error('Error getting heat details:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('insertHeat', async (event, event_id, heat_name, heat_type) => {
   if (isEventLocked(event_id)) {
     throw new Error('Cannot insert heat for locked event.');
@@ -178,13 +189,21 @@ ipcMain.handle(
     }
   },
 );
-ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
-  if (isEventLocked(event_id)) {
-    throw new Error('Cannot insert heat for locked event.');
-  }
-  try {
-    // 1. Get summary results for each boat in the event.
-    const summaryQuery = `
+ipcMain.handle(
+  'updateEventLeaderboard',
+  async (event, event_id, finalSeriesStarted) => {
+    if (isEventLocked(event_id)) {
+      throw new Error('Cannot insert heat for locked event.');
+    }
+    console.log('Final series started:', finalSeriesStarted);
+    try {
+      if (finalSeriesStarted) {
+        // When finals have started, skip updating the qualifying leaderboard.
+        console.log('Final Series started; skipping updateEventLeaderboard.');
+        return { success: true };
+      }
+      // 1. Get summary results for each boat in the event.
+      const summaryQuery = `
       SELECT boat_id, SUM(points) as total_points_event, COUNT(DISTINCT Races.race_id) as number_of_races
       FROM Scores
       JOIN Races ON Scores.race_id = Races.race_id
@@ -193,10 +212,10 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
       GROUP BY boat_id
       ORDER BY total_points_event ASC
     `;
-    const summaryResults = db.prepare(summaryQuery).all(event_id);
+      const summaryResults = db.prepare(summaryQuery).all(event_id);
 
-    // 2. Fetch all raw scores for the event. (sorted as needed)
-    const scoresQuery = db.prepare(`
+      // 2. Fetch all raw scores for the event.
+      const scoresQuery = db.prepare(`
       SELECT s.boat_id, s.points, r.race_number, h.heat_name, h.heat_id
       FROM Scores s
       JOIN Races r ON s.race_id = r.race_id
@@ -204,35 +223,35 @@ ipcMain.handle('updateEventLeaderboard', async (event, event_id) => {
       WHERE h.event_id = ?
       ORDER BY s.points DESC, r.race_number DESC
     `);
-    const rawScores = scoresQuery.all(event_id);
-    console.log('Raw scores:', rawScores);
+      const rawScores = scoresQuery.all(event_id);
+      console.log('Raw scores:', rawScores);
 
-    // 3. Calculate the temporary leaderboard from the raw data.
-    // The calculateBoatScores function now becomes pure, using summaryResults and rawScores.
-    const setFinalSeriesStarted = false;
-    const temporaryTable = calculateBoatScores(
-      summaryResults,
-      rawScores,
-      setFinalSeriesStarted,
-    );
+      // 3. Calculate the temporary leaderboard.
+      const temporaryTable = calculateBoatScores(
+        summaryResults,
+        rawScores,
+        false, // qualifying: always false
+      );
 
-    // 4. Update the Leaderboard table.
-    const updateQuery = db.prepare(
-      `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
+      // 4. Update the qualifying Leaderboard table.
+      const updateQuery = db.prepare(
+        `INSERT INTO Leaderboard (boat_id, total_points_event, event_id, place)
        VALUES (?, ?, ?, ?)
        ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_event = excluded.total_points_event, place = excluded.place`,
-    );
-    temporaryTable.forEach((boat) => {
-      updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
-    });
-  } catch (error) {
-    console.error(
-      'Error updating event leaderboard:',
-      (error as Error).message,
-    );
-    throw error;
-  }
-});
+      );
+      temporaryTable.forEach((boat) => {
+        updateQuery.run(boat.boat_id, boat.totalPoints, event_id, boat.place);
+      });
+      return { success: true };
+    } catch (error) {
+      console.error(
+        'Error updating event leaderboard:',
+        (error as Error).message,
+      );
+      throw error;
+    }
+  },
+);
 
 ipcMain.handle('updateGlobalLeaderboard', async (event, event_id) => {
   if (isEventLocked(event_id)) {
@@ -390,7 +409,7 @@ ipcMain.handle(
   ) => {
     try {
       console.log(
-        `Updating race result for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}, heat_id: ${heat_id}, penalty: ${penalty}`,
+        `Updating race result in HeatRaceHandler for event_id: ${event_id}, race_id: ${race_id}, boat_id: ${boat_id}, new_position: ${new_position}, shift_positions: ${shift_positions}, heat_id: ${heat_id}, penalty: ${penalty}`,
       );
 
       // Get the current result for shifting purposes.
@@ -464,6 +483,46 @@ ipcMain.handle(
             boat_id,
             heat_id,
           );
+        }
+      }
+
+      // If a penalty was applied and the heat is from the Final series,
+      // immediately recalculate the final leaderboard.
+      if (penalty) {
+        const heatInfo = db
+          .prepare('SELECT heat_type FROM Heats WHERE heat_id = ?')
+          .get(heat_id);
+        if (heatInfo && heatInfo.heat_type === 'Final') {
+          console.log(
+            'Penalty applied in Final heat; recalculating final leaderboard...',
+          );
+          const query = `
+            SELECT boat_id, heat_name, SUM(points) as total_points_final, COUNT(DISTINCT Races.race_id) as number_of_races
+            FROM Scores
+            JOIN Races ON Scores.race_id = Races.race_id
+            JOIN Heats ON Races.heat_id = Heats.heat_id
+            WHERE Heats.event_id = ? AND Heats.heat_type = 'Final'
+            GROUP BY boat_id, heat_name
+            ORDER BY heat_name, total_points_final ASC
+          `;
+          const readQuery = db.prepare(query);
+          const results = readQuery.all(event_id);
+          const updateFinalQuery = db.prepare(
+            `INSERT INTO FinalLeaderboard (boat_id, total_points_final, event_id, placement_group, place)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(boat_id, event_id) DO UPDATE SET total_points_final = excluded.total_points_final, placement_group = excluded.placement_group, place = excluded.place`,
+          );
+          const temporaryTable = calculateFinalBoatScores(results, event_id);
+          temporaryTable.forEach((boat) => {
+            console.log('Updating FinalLeaderboard with:', boat);
+            updateFinalQuery.run(
+              boat.boat_id,
+              boat.totalPoints,
+              event_id,
+              boat.placement_group,
+              boat.place,
+            );
+          });
         }
       }
 

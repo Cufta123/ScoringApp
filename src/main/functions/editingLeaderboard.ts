@@ -5,6 +5,9 @@ interface LeaderboardEntry {
   boat_id: any;
   races: string[];
   heat_ids: { [key: string]: any };
+  total_points_event?: number;
+  total_points_final?: number;
+  total_points_combined?: number;
 }
 
 const parseRaceValue = (race: string): number => {
@@ -19,12 +22,14 @@ export function HandleRaceChange({
   newHandleRaceChangeValue,
   editableLeaderboard,
   shiftPositions,
+  finalSeriesStarted, // new parameter to indicate if finals are running
 }: {
   boatId: any;
   raceIndex: number;
   newHandleRaceChangeValue: string;
   editableLeaderboard: LeaderboardEntry[];
   shiftPositions: boolean;
+  finalSeriesStarted: boolean;
 }) {
   console.log('--- HandleRaceChange called ---');
   console.log({ boatId, raceIndex, newHandleRaceChangeValue });
@@ -130,36 +135,63 @@ export function HandleRaceChange({
         }
 
         // Recalculate totals using sanitized values.
+        if (finalSeriesStarted) {
+          // In finals, update only final totals.
+          const totalPointsFinal = entry.races.reduce(
+            (acc: number, race: string) => acc + parseRaceValue(race),
+            0,
+          );
+          console.log('>>> New finals total for boat', boatId, {
+            totalPointsFinal,
+          });
+          return {
+            ...entry,
+            total_points_final: totalPointsFinal,
+            heat_id: heatId, // Include heat_id in the entry.
+          };
+        }
+        // In qualifying, update both totals.
         const totalPointsEvent = entry.races.reduce(
           (acc: number, race: string) => acc + parseRaceValue(race),
           0,
         );
-        const totalPointsFinal = totalPointsEvent;
         console.log('>>> New totals for boat', boatId, {
           totalPointsEvent,
-          totalPointsFinal,
         });
         return {
           ...entry,
           total_points_event: totalPointsEvent,
-          total_points_final: totalPointsFinal,
+          total_points_final: totalPointsEvent,
           heat_id: heatId, // Include heat_id in the entry.
         };
       }
       return entry;
     });
 
-    // Recalculate total points for all boats after shifting positions.
+    // Recalculate totals for all boats after shifting positions.
     const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
+      if (finalSeriesStarted) {
+        // Assume entry.total_points_event holds the qualifying score.
+        const qualifyingScore = entry.total_points_event || 0;
+        const totalPointsFinal = entry.races.reduce(
+          (acc: number, race: string) => acc + parseRaceValue(race),
+          0,
+        );
+        return {
+          ...entry,
+          total_points_final: totalPointsFinal,
+          total_points_combined: qualifyingScore + totalPointsFinal,
+        };
+      }
       const totalPointsEvent = entry.races.reduce(
         (acc: number, race: string) => acc + parseRaceValue(race),
         0,
       );
-      const totalPointsFinal = totalPointsEvent;
       return {
         ...entry,
         total_points_event: totalPointsEvent,
-        total_points_final: totalPointsFinal,
+        total_points_final: totalPointsEvent,
+        total_points_combined: totalPointsEvent,
       };
     });
 
@@ -193,6 +225,7 @@ export async function HandleSave({
     shiftPositions,
     finalSeriesStarted,
   });
+  console.log('finalSeriesStarted:', finalSeriesStarted);
   console.log('Updated leaderboard before saving:', editableLeaderboard);
   try {
     if (!editableLeaderboard || !leaderboard) {
@@ -221,7 +254,7 @@ export async function HandleSave({
         if (!originalEntry) return;
 
         for (let i = 0; i < entry.races.length; i += 1) {
-          // Check for changes by comparing with the original entry.
+          // Only enqueue race result updates for qualifying series.
           if (entry.races[i] !== originalEntry.races[i]) {
             const race_id = entry.race_ids[i]; // Get the correct race_id.
             // Determine heat_id: first try an existing heat_ids array then fall back to mapping.
@@ -235,9 +268,8 @@ export async function HandleSave({
             }
             const newPosition = parseInt(entry.races[i], 10);
             console.log(
-              `Updating race result for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}, heat_id: ${heat_id}`,
+              `Updating race result in editingLeaderboard for event_id: ${eventId}, race_id: ${race_id}, boat_id: ${entry.boat_id}, new_position: ${newPosition}, heat_id: ${heat_id}`,
             );
-            // Call updateRaceResult – note that this only updates the score for the heat.
             updatePromises.push(
               window.electron.sqlite.heatRaceDB.updateRaceResult(
                 eventId,
@@ -257,9 +289,21 @@ export async function HandleSave({
     // Wait for all update operations to complete.
     await Promise.all(updatePromises);
 
-    // Now, update the event leaderboard (total points are recalculated based on current Scores)
-    await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(eventId);
-    console.log('Event leaderboard updated in database');
+    // In the edited save logic, conditionally update the proper leaderboard:
+    if (finalSeriesStarted) {
+      console.log('Updating final leaderboard');
+      await window.electron.ipcRenderer.invoke(
+        'updateFinalLeaderboard',
+        eventId,
+      );
+    } else {
+      console.log('Updating event leaderboard');
+      await window.electron.ipcRenderer.invoke(
+        'updateEventLeaderboard',
+        eventId,
+        finalSeriesStarted,
+      );
+    }
 
     // Refresh the leaderboard with updated data.
     const results = finalSeriesStarted

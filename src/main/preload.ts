@@ -46,7 +46,8 @@ export type Channels =
   | 'getEventName'
   | 'importCSV'
   | 'calculateAverageScores'
-  | 'swapRaceResults';
+  | 'swapRaceResults'
+  | 'getHeatDetails';
 
 const electronHandler = {
   ipcRenderer: {
@@ -533,6 +534,14 @@ const electronHandler = {
           return await ipcRenderer.invoke('getRaceMapping', event_id);
         } catch (error) {
           console.error('Error invoking getRaceMapping IPC:', error);
+          return false;
+        }
+      },
+      async getHeatDetails(heat_id: string) {
+        try {
+          return await ipcRenderer.invoke('getHeatDetails', heat_id);
+        } catch (error) {
+          console.error('Error invoking getHeatDetails IPC:', error);
           return false;
         }
       },

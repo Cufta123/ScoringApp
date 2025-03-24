@@ -370,6 +370,7 @@ function LeaderboardComponent({ eventId }) {
         await window.electron.ipcRenderer.invoke(
           'updateEventLeaderboard',
           eventId,
+          finalSeriesStarted,
         );
       }
       alert('Swap completed successfully.');
@@ -543,6 +544,7 @@ function LeaderboardComponent({ eventId }) {
               await window.electron.ipcRenderer.invoke(
                 'updateEventLeaderboard',
                 eventId,
+                finalSeriesStarted,
               );
               // Then fetch the refreshed leaderboard.
               await fetchLeaderboard();
@@ -656,6 +658,7 @@ function LeaderboardComponent({ eventId }) {
                                           e.target.value,
                                         editableLeaderboard,
                                         shiftPositions,
+                                        finalSeriesStarted, // <-- add this line
                                       }),
                                     )
                                   }
@@ -722,7 +725,7 @@ function LeaderboardComponent({ eventId }) {
                                       : ''
                                   }
                                   onChange={(e) => {
-                                    const value = e.target.value;
+                                    const { value } = e.target;
                                     setPerRacePenalties((prev) => {
                                       const updated = [
                                         ...(prev[entry.boat_id] || []),

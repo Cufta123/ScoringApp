@@ -425,7 +425,7 @@ ipcMain.handle(
       // Shift other boats if required.
       if (shift_positions) {
         if (currentPosition > new_position) {
-          // Boat moved up - shift down others:
+          // Boat moved up - shift down others that have no penalty (status = 'FINISHED')
           const shiftQuery = db.prepare(
             `UPDATE Scores
              SET position = position + 1,
@@ -434,6 +434,7 @@ ipcMain.handle(
                AND position >= ?
                AND position < ?
                AND boat_id != ?
+               AND status = 'FINISHED'
                AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
           );
           shiftQuery.run(
@@ -444,7 +445,7 @@ ipcMain.handle(
             heat_id,
           );
         } else if (currentPosition < new_position) {
-          // Boat moved down - shift up others:
+          // Boat moved down - shift up others that have no penalty
           const shiftQuery = db.prepare(
             `UPDATE Scores
              SET position = position - 1,
@@ -453,6 +454,7 @@ ipcMain.handle(
                AND position <= ?
                AND position > ?
                AND boat_id != ?
+               AND status = 'FINISHED'
                AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
           );
           shiftQuery.run(
@@ -467,7 +469,7 @@ ipcMain.handle(
 
       return { success: true };
     } catch (err) {
-      console.error('Error updating race result:', (err as Error).message);
+      console.error('Error updating race result:', err.message);
       throw err;
     }
   },

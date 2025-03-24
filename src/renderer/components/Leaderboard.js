@@ -60,6 +60,12 @@ function LeaderboardComponent({ eventId }) {
 
       console.log('Fetched results:', results);
 
+      // Add this helper to extract the numeric value from a race result.
+      const parseRaceValue = (race) => {
+        const sanitized = race.replace(/[^\d]/g, '');
+        return sanitized ? parseInt(sanitized, 10) : 0;
+      };
+
       const leaderboardWithRaces = results.map((entry) => {
         const races = entry.race_positions
           ? entry.race_positions.split(',')
@@ -73,16 +79,16 @@ function LeaderboardComponent({ eventId }) {
           excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
         }
 
-        // Sort races in descending order to find the worst places
+        // Use parseRaceValue so that penalty values like "DSQ 17" yield 17.
         const sortedRaces = [...races]
-          .map((r) => parseInt(r, 10))
+          .map((r) => parseRaceValue(r))
           .sort((a, b) => b - a);
         const worstPlaces = sortedRaces.slice(0, excludeCount);
 
-        // Mark the worst places with parentheses
+        // Mark the worst places with parentheses.
         let excludeCounter = 0;
         const markedRaces = races.map((race) => {
-          const raceInt = parseInt(race, 10);
+          const raceInt = parseRaceValue(race);
           if (worstPlaces.includes(raceInt) && excludeCounter < excludeCount) {
             excludeCounter += 1;
             worstPlaces.splice(worstPlaces.indexOf(raceInt), 1); // Remove the marked race from worstPlaces
@@ -185,8 +191,10 @@ function LeaderboardComponent({ eventId }) {
     if (editMode && Array.isArray(editableLeaderboard)) {
       const penalties = {};
       editableLeaderboard.forEach((entry) => {
-        // Set penalties array—with one element per race.
-        penalties[entry.boat_id] = entry.races.map(() => '');
+        penalties[entry.boat_id] =
+          entry.perRacePenalties && Array.isArray(entry.perRacePenalties)
+            ? entry.perRacePenalties
+            : entry.races.map(() => '');
       });
       setPerRacePenalties(penalties);
     }
@@ -472,7 +480,7 @@ function LeaderboardComponent({ eventId }) {
                 type="checkbox"
                 checked={shiftPositions}
                 onChange={(e) => setShiftPositions(e.target.checked)}
-                style={{ marginRight: '5px' }}
+                style={{ marginRight: '5px', maxWidth: '50px' }}
               />
               Shift Other Boats
             </label>

@@ -409,11 +409,10 @@ ipcMain.handle(
 
       const currentPosition = currentResult.position;
 
-      // Update the score – now update the status column as well.
+      // Update the score – update both position and points.
       const updateQuery = db.prepare(
         `UPDATE Scores SET position = ?, points = ?, status = ? WHERE race_id = ? AND boat_id = ?`,
       );
-      // Use the provided penalty if available; otherwise default to 'FINISHED'.
       const statusToUpdate = penalty || 'FINISHED';
       updateQuery.run(
         new_position,
@@ -423,13 +422,14 @@ ipcMain.handle(
         boat_id,
       );
 
-      // Optionally shift other boats' positions.
+      // Shift other boats if required.
       if (shift_positions) {
         if (currentPosition > new_position) {
-          // Shift down boats (boat moved up).
+          // Boat moved up - shift down others:
           const shiftQuery = db.prepare(
             `UPDATE Scores
-             SET position = position + 1
+             SET position = position + 1,
+                 points = position + 1
              WHERE race_id = ?
                AND position >= ?
                AND position < ?
@@ -444,10 +444,11 @@ ipcMain.handle(
             heat_id,
           );
         } else if (currentPosition < new_position) {
-          // Shift up boats (boat moved down).
+          // Boat moved down - shift up others:
           const shiftQuery = db.prepare(
             `UPDATE Scores
-             SET position = position - 1
+             SET position = position - 1,
+                 points = position - 1
              WHERE race_id = ?
                AND position <= ?
                AND position > ?
@@ -691,8 +692,6 @@ ipcMain.handle('getScoresResult', async (event, event_id) => {
     throw error;
   }
 });
-
-// ...existing code...
 
 ipcMain.handle('calculateAverageScores', async (event, event_id) => {
   try {

@@ -7,6 +7,12 @@ interface LeaderboardEntry {
   heat_ids: { [key: string]: any };
 }
 
+const parseRaceValue = (race: string): number => {
+  // Remove any non-digit characters (such as parentheses) and parse.
+  const sanitized = race.replace(/[^\d]/g, '');
+  return sanitized ? parseInt(sanitized, 10) : 0;
+};
+
 export function HandleRaceChange({
   boatId,
   raceIndex,
@@ -31,7 +37,7 @@ export function HandleRaceChange({
       if (entry.boat_id === boatId) {
         console.log(`>>> Updating entry for boat ${boatId}`);
         console.log('Current entry:', entry);
-        const oldPosition = parseInt(entry.races[raceIndex], 10);
+        const oldPosition = parseRaceValue(entry.races[raceIndex]);
         const newPosition = parseInt(newHandleRaceChangeValue, 10);
         const heatId =
           entry.heat_ids && entry.heat_ids[raceIndex]
@@ -43,7 +49,7 @@ export function HandleRaceChange({
           .filter((e) => e.heat_ids && e.heat_ids[raceIndex] === heatId)
           .map((e) => ({
             boat_id: e.boat_id,
-            position: parseInt(e.races[raceIndex], 10),
+            position: parseRaceValue(e.races[raceIndex]),
           }))
           .sort((a, b) => a.position - b.position);
         console.log(
@@ -76,7 +82,7 @@ export function HandleRaceChange({
               otherEntry.heat_ids &&
               otherEntry.heat_ids[raceIndex] === currentHeatId
             ) {
-              const otherPosition = parseInt(otherEntry.races[raceIndex], 10);
+              const otherPosition = parseRaceValue(otherEntry.races[raceIndex]);
               // Boat moved up: shift boats between newPosition and oldPosition up by +1.
               if (
                 oldPosition > newPosition &&
@@ -114,7 +120,7 @@ export function HandleRaceChange({
             )
             .map((e) => ({
               boat_id: e.boat_id,
-              position: parseInt(e.races[raceIndex], 10),
+              position: parseRaceValue(e.races[raceIndex]),
             }))
             .sort((a, b) => a.position - b.position);
           console.log(
@@ -123,8 +129,9 @@ export function HandleRaceChange({
           );
         }
 
+        // Recalculate totals using sanitized values.
         const totalPointsEvent = entry.races.reduce(
-          (acc: number, race: string) => acc + parseInt(race, 10),
+          (acc: number, race: string) => acc + parseRaceValue(race),
           0,
         );
         const totalPointsFinal = totalPointsEvent;
@@ -145,7 +152,7 @@ export function HandleRaceChange({
     // Recalculate total points for all boats after shifting positions.
     const recalculatedLeaderboard = updatedLeaderboard.map((entry) => {
       const totalPointsEvent = entry.races.reduce(
-        (acc: number, race: string) => acc + parseInt(race, 10),
+        (acc: number, race: string) => acc + parseRaceValue(race),
         0,
       );
       const totalPointsFinal = totalPointsEvent;

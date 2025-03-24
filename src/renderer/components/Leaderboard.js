@@ -279,7 +279,7 @@ function LeaderboardComponent({ eventId }) {
         raceId, // race_id
         boatId, // boat_id
         newPosition, // new_position set according to penalty condition
-        false, // shift_positions (no shifting)
+        shiftPositions, // use the checked value so shifting is applied when desired
         heat_id, // heat_id
         penalty, // new penalty value
       );
@@ -464,6 +464,20 @@ function LeaderboardComponent({ eventId }) {
             {swapMode ? 'Cancel Swap Mode' : 'Enable Swap Mode'}
           </button>
         )}
+        {editMode && !swapMode && (
+          <div style={{ marginTop: '10px' }}>
+            <label htmlFor="shiftPositionsCheckbox">
+              <input
+                id="shiftPositionsCheckbox"
+                type="checkbox"
+                checked={shiftPositions}
+                onChange={(e) => setShiftPositions(e.target.checked)}
+                style={{ marginRight: '5px' }}
+              />
+              Shift Other Boats
+            </label>
+          </div>
+        )}
         {editMode && swapMode && (
           <div
             style={{ marginTop: '5px', fontStyle: 'italic', fontSize: '16px' }}
@@ -505,14 +519,24 @@ function LeaderboardComponent({ eventId }) {
                 shiftPositions,
                 finalSeriesStarted,
               });
-              // After saving race positions, update any penalties.
-              await applyPenaltyUpdates();
-              // Force recalculation of leaderboard totals by calling the backend update
+              // Now update penalties for each boat's race where a penalty has been set.
+              const penaltyPromises = [];
+              Object.keys(perRacePenalties).forEach((boatId) => {
+                perRacePenalties[boatId].forEach((penalty, raceIndex) => {
+                  if (penalty) {
+                    penaltyPromises.push(
+                      applyPenaltyUpdates(boatId, raceIndex, penalty),
+                    );
+                  }
+                });
+              });
+              await Promise.all(penaltyPromises);
+              // Force recalculation of leaderboard totals.
               await window.electron.ipcRenderer.invoke(
                 'updateEventLeaderboard',
                 eventId,
               );
-              // Then fetch the refreshed leaderboard
+              // Then fetch the refreshed leaderboard.
               await fetchLeaderboard();
             }}
             style={{ marginLeft: '10px' }}
@@ -689,13 +713,19 @@ function LeaderboardComponent({ eventId }) {
                                         ]
                                       : ''
                                   }
-                                  onChange={(e) =>
-                                    applyPenaltyUpdates(
-                                      entry.boat_id,
-                                      raceIndex,
-                                      e.target.value,
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPerRacePenalties((prev) => {
+                                      const updated = [
+                                        ...(prev[entry.boat_id] || []),
+                                      ];
+                                      updated[raceIndex] = value;
+                                      return {
+                                        ...prev,
+                                        [entry.boat_id]: updated,
+                                      };
+                                    });
+                                  }}
                                   style={{ width: '80px' }}
                                 >
                                   <option value="">None</option>

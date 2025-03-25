@@ -70,28 +70,26 @@ function LeaderboardComponent({ eventId }) {
         const races = entry.race_positions
           ? entry.race_positions.split(',')
           : [];
-        const race_ids = entry.race_ids ? entry.race_ids.split(',') : [];
-
-        // Calculate the number of worst places to exclude
         const number_of_races = races.length;
         let excludeCount = 0;
         if (number_of_races >= 4) {
           excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
         }
-
-        // Use parseRaceValue so that penalty values like "DSQ 17" yield 17.
-        const sortedRaces = [...races]
-          .map((r) => parseRaceValue(r))
+        // Only consider non-DNE races for exclusion.
+        const validRaces = races.filter((race) => !race.includes('DNE'));
+        const validRaceValues = validRaces
+          .map(parseRaceValue)
           .sort((a, b) => b - a);
-        const worstPlaces = sortedRaces.slice(0, excludeCount);
+        const worstPlaces = validRaceValues.slice(0, excludeCount);
 
-        // Mark the worst places with parentheses.
         let excludeCounter = 0;
         const markedRaces = races.map((race) => {
+          // If the race contains "DNE", leave it unmodified.
+          if (race.includes('DNE')) return race;
           const raceInt = parseRaceValue(race);
           if (worstPlaces.includes(raceInt) && excludeCounter < excludeCount) {
             excludeCounter += 1;
-            worstPlaces.splice(worstPlaces.indexOf(raceInt), 1); // Remove the marked race from worstPlaces
+            worstPlaces.splice(worstPlaces.indexOf(raceInt), 1);
             return `(${race})`;
           }
           return race;
@@ -100,7 +98,7 @@ function LeaderboardComponent({ eventId }) {
         return {
           ...entry,
           races: markedRaces,
-          race_ids, // Ensure race_ids are included
+          race_ids: entry.race_ids ? entry.race_ids.split(',') : [],
         };
       });
 

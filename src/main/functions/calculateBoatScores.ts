@@ -13,6 +13,7 @@ export interface RawScore {
   race_number: number;
   heat_name: string;
   heat_id: number;
+  status: string; // <-- new field added
 }
 
 export interface TemporaryTableEntry {
@@ -42,11 +43,11 @@ export default function calculateBoatScores(
   // - boatScoresByRace: sorted descending by race_number (for tie-breaking)
   const boatScoresByPoints = new Map<
     string,
-    { points: number; heat_name: string; heat_id: number }[]
+    { points: number; heat_name: string; heat_id: number; status: string }[]
   >();
   const boatScoresByRace = new Map<
     string,
-    { points: number; heat_name: string; heat_id: number }[]
+    { points: number; heat_name: string; heat_id: number; status: string }[]
   >();
 
   // Initialize maps for all boats from summaryResults.
@@ -66,12 +67,14 @@ export default function calculateBoatScores(
         points: score.points,
         heat_name: score.heat_name,
         heat_id: score.heat_id,
+        status: score.status,
       });
       // For race-based (tie-break) ordering, assume rawScores came in order of race_number descending.
       boatScoresByRace.get(score.boat_id)!.push({
         points: score.points,
         heat_name: score.heat_name,
         heat_id: score.heat_id,
+        status: score.status,
       });
     }
   });
@@ -104,27 +107,27 @@ export default function calculateBoatScores(
     let excludeCount = thresholds.filter(
       (threshold) => number_of_races >= threshold,
     ).length;
-    // If finalSeries ranking is requested, exclude one additional (i.e. the second worst) race score.
     if (finalSeries) {
       excludeCount += 1;
     }
-    // Exclude the "worst" scores – we assume that the beginning of the sorted array (highest points) should be excluded.
-    const scoresToInclude = scores.slice(excludeCount);
+    // Exclude only scores that don't have status "DNE"
+    const { scoresToInclude } = scores.reduce(
+      (acc, score) => {
+        if (acc.excludedCount < excludeCount && score.status !== 'DNE') {
+          return {
+            excludedCount: acc.excludedCount + 1,
+            scoresToInclude: acc.scoresToInclude,
+          };
+        }
+        acc.scoresToInclude.push(score);
+        return acc;
+      },
+      { excludedCount: 0, scoresToInclude: [] as typeof scores },
+    );
     const totalPoints = scoresToInclude.reduce(
       (acc, score) => acc + score.points,
       0,
     );
-    //  console.log(
-    //   `Boat ${boat_id}: number_of_races = ${number_of_races}, excludeCount = ${excludeCount}`,
-    //   );
-    //   console.log(
-    //     `Boat ${boat_id}: scores =`,
-    //     scores,
-    //    '-> scoresToInclude =',
-    //    scoresToInclude,
-    //    'totalPoints =',
-    //    totalPoints,
-    //  );
     temporaryTable.push({ boat_id, totalPoints });
   });
 
@@ -177,7 +180,7 @@ export default function calculateBoatScores(
         // Use scores from common heats to break the tie
         //     console.log(`Boats tied for ${totalPointsKey} points:`);
         tiedBoats.forEach((boat_id) => {
-          const scores = boatScoresByRace.get(boat_id) || [];
+          // const scores = boatScoresByRace.get(boat_id) || [];
           //   console.log(
           //     `Boat ${boat_id}: Scores = ${scores
           //      .map(
@@ -224,11 +227,11 @@ export default function calculateBoatScores(
         });
 
         // Log the scores in array format after processing all heats
-        Object.keys(scoresByBoat).forEach((boat_id) => {
-          //  console.log(
-          //   `Boat ${boat_id} scores: [${scoresByBoat[boat_id].join(', ')}]`,
-          //  );
-        });
+        //   Object.keys(scoresByBoat).forEach((boat_id) => {
+        //  console.log(
+        //   `Boat ${boat_id} scores: [${scoresByBoat[boat_id].join(', ')}]`,
+        //  );
+        //  });
 
         // Update the places for the boats in this group based on the sorted scores
         group.sort((a, b) => {

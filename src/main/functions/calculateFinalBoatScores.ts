@@ -17,9 +17,10 @@ interface TemporaryTableEntry {
   placement_group: string;
 }
 
+// Update getFinalScores to return both points and status
 function getFinalScores(event_id: any, boat_id: any) {
   const scoresQuery = db.prepare(`
-    SELECT points
+    SELECT points, status
     FROM Scores
     JOIN Races ON Scores.race_id = Races.race_id
     JOIN Heats ON Races.heat_id = Heats.heat_id
@@ -28,8 +29,9 @@ function getFinalScores(event_id: any, boat_id: any) {
   `);
   return scoresQuery
     .all(event_id, boat_id)
-    .map((row: { points: any }) => row.points);
+    .map((row: { points: number; status: string }) => row);
 }
+
 export default function calculateFinalBoatScores(
   results: Result[],
   event_id: any,
@@ -78,19 +80,38 @@ export default function calculateFinalBoatScores(
         `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Places to Exclude: ${excludeCount}`,
       );
 
-      // Exclude the worst scores
+      // Exclude the worst scores while skipping DNE scores
       const initialTotalPoints = scores.reduce(
-        (acc: any, score: any) => acc + score,
+        (acc: number, score: any) => acc + score.points,
         0,
       );
-      const worstPlaces = scores.slice(0, excludeCount);
-      const scoresToInclude = scores.slice(excludeCount);
+      const { scoresToInclude } = scores.reduce(
+        (
+          acc: {
+            excludedCount: number;
+            scoresToInclude: { points: number; status: string }[];
+          },
+          score: { status: string },
+        ) => {
+          if (acc.excludedCount < excludeCount && score.status !== 'DNE') {
+            return {
+              excludedCount: acc.excludedCount + 1,
+              scoresToInclude: acc.scoresToInclude,
+            };
+          }
+          return {
+            excludedCount: acc.excludedCount,
+            scoresToInclude: [...acc.scoresToInclude, score],
+          };
+        },
+        { excludedCount: 0, scoresToInclude: [] },
+      );
       const totalPoints = scoresToInclude.reduce(
-        (acc: any, score: any) => acc + score,
+        (acc: number, score: any) => acc + score.points,
         0,
       );
       console.log(
-        `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Worst Places: ${worstPlaces}`,
+        `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Places to Exclude: ${excludeCount}`,
       );
 
       console.log(
@@ -164,7 +185,10 @@ export default function calculateFinalBoatScores(
           const scoresToInclude = scores.slice(excludeCount);
           return {
             boat_id,
-            scores: scoresToInclude.sort((a: number, b: number) => a - b),
+            scores: scoresToInclude.sort(
+              (a: { points: number }, b: { points: number }) =>
+                a.points - b.points,
+            ),
           };
         });
 
@@ -175,8 +199,8 @@ export default function calculateFinalBoatScores(
             i < Math.min(a.scores.length, b.scores.length);
             i += 1
           ) {
-            if (a.scores[i] !== b.scores[i]) {
-              return a.scores[i] - b.scores[i]; // Compare scores in ascending order
+            if (a.scores[i].points !== b.scores[i].points) {
+              return a.scores[i].points - b.scores[i].points; // Compare scores in ascending order
             }
           }
           return 0; // If all scores are the same, keep the original order
@@ -184,9 +208,12 @@ export default function calculateFinalBoatScores(
 
         sortedScores.sort((a, b) => {
           const initialComparison = a.scores.reduce(
-            (acc: number, score: number, index: number) => {
+            (acc: number, score: { points: number }, index: number) => {
               if (acc !== 0) return acc;
-              return score - (b.scores[index] ?? Number.MAX_SAFE_INTEGER);
+              return (
+                score.points -
+                (b.scores[index]?.points ?? Number.MAX_SAFE_INTEGER)
+              );
             },
             0,
           );
@@ -203,9 +230,9 @@ export default function calculateFinalBoatScores(
           const maxLength = Math.max(scoresA.length, scoresB.length);
           for (let i = 1; i <= maxLength; i += 1) {
             const scoreA =
-              scoresA[scoresA.length - i] ?? Number.MAX_SAFE_INTEGER;
+              scoresA[scoresA.length - i]?.points ?? Number.MAX_SAFE_INTEGER;
             const scoreB =
-              scoresB[scoresB.length - i] ?? Number.MAX_SAFE_INTEGER;
+              scoresB[scoresB.length - i]?.points ?? Number.MAX_SAFE_INTEGER;
             console.log(
               `Comparing race ${i}: Boat ${a.boat_id} score: ${scoreA}, Boat ${b.boat_id} score: ${scoreB}`,
             );

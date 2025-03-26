@@ -213,8 +213,10 @@ function SailorForm({ onAddSailor, eventId }) {
       );
 
       if (existingBoatInEvent) {
-        console.warn(
-          `Boat with sail number ${sailNumber} already exists in event ID ${eventId}`,
+        const eventName =
+          await window.electron.sqlite.eventDB.getEventName(eventId);
+        window.alert(
+          `Boat with sail number ${sailNumber} already exists in event ${eventName}`,
         );
         toast.error(
           'A boat with the same sail number already exists in this event.',
@@ -255,7 +257,7 @@ function SailorForm({ onAddSailor, eventId }) {
       const existingAssociation = eventBoats.find((b) => b.boat_id === boat_id);
 
       if (existingAssociation) {
-        console.log(
+        window.alert(
           `Boat ID ${boat_id} is already associated with event ID ${eventId}`,
         );
       } else {
@@ -292,7 +294,6 @@ function SailorForm({ onAddSailor, eventId }) {
 
       fetchSailors();
       fetchBoats();
-      onAddSailor();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

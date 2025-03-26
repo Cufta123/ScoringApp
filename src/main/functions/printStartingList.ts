@@ -36,6 +36,7 @@ export default async function printStartingList(
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Competitor List');
 
+    // Define columns
     worksheet.columns = [
       { key: 'name', header: 'Name', width: 20 },
       { key: 'surname', header: 'Surname', width: 20 },
@@ -44,6 +45,13 @@ export default async function printStartingList(
       { key: 'club', header: 'Club', width: 20 },
     ];
 
+    // Insert the event name as the first row (just the event name, no prefix)
+    worksheet.insertRow(1, [eventName]);
+    // Insert a blank row for spacing
+    worksheet.insertRow(2, []);
+    // Insert the header row manually so it appears below the event name row
+
+    // Add data rows starting at row 4
     sortedSailors.forEach((sailor) => {
       worksheet.addRow({
         name: sailor.name || 'N/A',
@@ -67,6 +75,9 @@ export default async function printStartingList(
     const doc = new JsPDF();
     doc.setFontSize(16);
     doc.text('Starting List', 14, 10);
+    doc.setFontSize(12);
+    doc.text(`Event: ${eventName}`, 14, 16);
+    const startY = 22;
 
     const header = ['Name', 'Surname', 'Country', 'Sail Number', 'Club'];
     const body = sortedSailors.map((sailor) => [
@@ -78,6 +89,7 @@ export default async function printStartingList(
     ]);
 
     autoTable(doc, {
+      startY,
       head: [header],
       body,
       theme: 'grid',
@@ -93,6 +105,7 @@ export default async function printStartingList(
     </style>
     </head><body>`;
     html += `<h1>Starting List</h1>`;
+    html += `<h2>Event: ${eventName}</h2>`;
     html += `<table><thead><tr>
       <th>Name</th>
       <th>Surname</th>

@@ -67,6 +67,11 @@ export default async function printNewHeats(
   if (format === 'excel') {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('New Heats');
+
+    // Insert event header row before listing heats
+    worksheet.insertRow(1, [eventName]);
+    worksheet.insertRow(2, []);
+
     worksheet.columns = [
       { key: 'col1', width: 30 },
       { key: 'col2', width: 20 },
@@ -117,9 +122,10 @@ export default async function printNewHeats(
     }
   } else if (format === 'pdf') {
     const doc = new JsPDF();
+    // Removed "New Heats" text; only showing event name as header.
     doc.setFontSize(16);
-    doc.text('New Heats', 14, 10);
-    let finalY = 20;
+    doc.text(eventName, 14, 10);
+    let finalY = 16;
 
     heatsToPrint.forEach((heat) => {
       doc.setFontSize(14);
@@ -143,9 +149,19 @@ export default async function printNewHeats(
       });
     });
 
-    const pdfFilename = finalSeriesStarted
-      ? `${eventName}_final_series_heats.pdf`
-      : `${eventName}_new_heats.pdf`;
+    let pdfFilename: string;
+    if (finalSeriesStarted) {
+      pdfFilename = `${eventName}_final_series_heats.pdf`;
+    } else {
+      const heatNumber =
+        heatsToPrint.length > 0
+          ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
+              null,
+              'unknown',
+            ])[1]
+          : 'unknown';
+      pdfFilename = `${eventName}_heat_${heatNumber}.pdf`;
+    }
     doc.save(pdfFilename);
   } else if (format === 'html') {
     let html = `<html><head><title>${eventName} New Heats</title>
@@ -155,8 +171,8 @@ export default async function printNewHeats(
       th { background-color: #f2f2f2; }
     </style>
     </head><body>`;
-    html += `<h1>New Heats</h1>`;
-
+    // Removed "New Heats" text; only showing event name.
+    html += `<h2>${eventName}</h2>`;
     heatsToPrint.forEach((heat) => {
       html += `<h2>Heat: ${heat.heat_name}</h2>`;
       html += `<table><thead><tr>
@@ -175,12 +191,21 @@ export default async function printNewHeats(
       );
       html += `</tbody></table>`;
     });
-
     html += `</body></html>`;
     const blob = new Blob([html], { type: 'text/html' });
-    const htmlFilename = finalSeriesStarted
-      ? `${eventName}_final_series_heats.html`
-      : `${eventName}_new_heats.html`;
+    let htmlFilename: string;
+    if (finalSeriesStarted) {
+      htmlFilename = `${eventName}_final_series_heats.html`;
+    } else {
+      const heatNumber =
+        heatsToPrint.length > 0
+          ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
+              null,
+              'unknown',
+            ])[1]
+          : 'unknown';
+      htmlFilename = `${eventName}_heat_${heatNumber}.html`;
+    }
     saveAs(blob, htmlFilename);
   }
 }

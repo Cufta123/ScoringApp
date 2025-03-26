@@ -36,12 +36,23 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
     localStorage.setItem('isExpanded', JSON.stringify(isExpanded));
   }, [isExpanded]);
 
-  // Update sortedSailors to use sortDirection
+  // Update sortedSailors to use sortDirection and perform numeric comparison for sail_number
   const sortedSailors = [...sailors].sort((a, b) => {
-    if (a[sortCriteria] < b[sortCriteria])
-      return sortDirection === 'asc' ? -1 : 1;
-    if (a[sortCriteria] > b[sortCriteria])
-      return sortDirection === 'asc' ? 1 : -1;
+    let aValue = a[sortCriteria];
+    let bValue = b[sortCriteria];
+
+    // If sorting by sail_number, compare them as numbers
+    if (sortCriteria === 'sail_number') {
+      const numA = parseInt(aValue, 10);
+      const numB = parseInt(bValue, 10);
+      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+        aValue = numA;
+        bValue = numB;
+      }
+    }
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
 

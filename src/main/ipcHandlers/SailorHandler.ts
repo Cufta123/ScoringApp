@@ -43,7 +43,7 @@ ipcMain.handle(
       // Parse the CSV using delimiter ";" and skipping the header row.
       const records = parse(csvData, {
         delimiter: ';',
-        from_line: 2,
+        from_line: 1,
         columns: [
           'name',
           'surname',

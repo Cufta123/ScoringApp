@@ -3,6 +3,7 @@
 /* eslint-disable camelcase */
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import { useLocation } from 'react-router-dom';
 import Flag from 'react-world-flags';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
 import {
@@ -26,7 +27,7 @@ function LeaderboardComponent({ eventId }) {
   const [swapMode, setSwapMode] = useState(false);
   // Each selected cell is recorded as an object: { boatId, raceIndex, raceId }
   const [selectedSwapCells, setSelectedSwapCells] = useState([]);
-
+  const { state: { event } = {} } = useLocation();
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
       const heats =
@@ -258,23 +259,7 @@ function LeaderboardComponent({ eventId }) {
       }, 0);
 
       // 5. Determine newPosition based on penalty.
-      let newPosition = longestHeatCount + 1;
-      if (penalty === 'RDG') {
-        // Call calculateAverageScores and pick the competitor's average.
-        const averages = await window.electron.ipcRenderer.invoke(
-          'calculateAverageScores',
-          eventId,
-        );
-        const boatAverages = averages[boatId];
-        if (boatAverages) {
-          // Use avgPointsFinal if final series has started; otherwise avgPointsQualifying.
-          if (finalSeriesStarted && boatAverages.avgPointsFinal !== null) {
-            newPosition = Math.round(boatAverages.avgPointsFinal);
-          } else if (boatAverages.avgPointsQualifying !== null) {
-            newPosition = Math.round(boatAverages.avgPointsQualifying);
-          }
-        }
-      }
+      const newPosition = longestHeatCount + 1;
 
       const heat_id = raceMapping[raceId] || null;
 
@@ -289,6 +274,7 @@ function LeaderboardComponent({ eventId }) {
         heat_id, // heat_id
         penalty, // new penalty value
       );
+      await window.electron.sqlite.heatRaceDB.updateRDGScores(eventId);
 
       // Update local state.
       setPerRacePenalties((prev) => {
@@ -526,6 +512,7 @@ function LeaderboardComponent({ eventId }) {
                 shiftPositions,
                 finalSeriesStarted,
               });
+
               // Now update penalties for each boat's race where a penalty has been set.
               const penaltyPromises = [];
               Object.keys(perRacePenalties).forEach((boatId) => {

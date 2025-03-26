@@ -812,69 +812,6 @@ ipcMain.handle('calculateAverageScores', async (event, event_id) => {
   }
 });
 
-ipcMain.handle('calculateRDGAverages', async (event, event_id) => {
-  try {
-    // Calculate average for Qualifying series with RDG status
-    const qualifyingQuery = db.prepare(`
-      SELECT s.boat_id, AVG(s.points) AS avgPointsQualifyingRDG
-      FROM Scores s
-      JOIN Races r ON s.race_id = r.race_id
-      JOIN Heats h ON r.heat_id = h.heat_id
-      WHERE h.event_id = ? AND h.heat_type = 'Qualifying' AND s.status = 'RDG'
-      GROUP BY s.boat_id
-    `);
-    const qualifyingRDG = qualifyingQuery.all(event_id);
-
-    // Calculate average for Final series with RDG status
-    const finalQuery = db.prepare(`
-      SELECT s.boat_id, AVG(s.points) AS avgPointsFinalRDG
-      FROM Scores s
-      JOIN Races r ON s.race_id = r.race_id
-      JOIN Heats h ON r.heat_id = h.heat_id
-      WHERE h.event_id = ? AND h.heat_type = 'Final' AND s.status = 'RDG'
-      GROUP BY s.boat_id
-    `);
-    const finalRDG = finalQuery.all(event_id);
-
-    // Merge results by boat_id
-    const averages: {
-      [boat_id: string]: {
-        avgPointsQualifyingRDG: number | null;
-        avgPointsFinalRDG: number | null;
-      };
-    } = {};
-
-    qualifyingRDG.forEach(
-      (row: {
-        boat_id: string | number;
-        avgPointsQualifyingRDG: number | null;
-      }) => {
-        averages[row.boat_id] = {
-          avgPointsQualifyingRDG: row.avgPointsQualifyingRDG,
-          avgPointsFinalRDG: null,
-        };
-      },
-    );
-
-    finalRDG.forEach(
-      (row: { boat_id: string | number; avgPointsFinalRDG: number | null }) => {
-        if (averages[row.boat_id]) {
-          averages[row.boat_id].avgPointsFinalRDG = row.avgPointsFinalRDG;
-        } else {
-          averages[row.boat_id] = {
-            avgPointsQualifyingRDG: null,
-            avgPointsFinalRDG: row.avgPointsFinalRDG,
-          };
-        }
-      },
-    );
-    return averages;
-  } catch (error) {
-    console.error('Error calculating RDG averages:', error);
-    throw error;
-  }
-});
-
 ipcMain.handle(
   'swapRaceResults',
   async (event, event_id, raceId, boat1_id, boat2_id) => {

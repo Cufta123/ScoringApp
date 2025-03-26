@@ -47,7 +47,8 @@ export type Channels =
   | 'importCSV'
   | 'calculateAverageScores'
   | 'swapRaceResults'
-  | 'getHeatDetails';
+  | 'getHeatDetails'
+  | 'updateRDGScores';
 
 const electronHandler = {
   ipcRenderer: {
@@ -542,6 +543,18 @@ const electronHandler = {
           return await ipcRenderer.invoke('getHeatDetails', heat_id);
         } catch (error) {
           console.error('Error invoking getHeatDetails IPC:', error);
+          return false;
+        }
+      },
+      async updateRDGScores(event_id: string, finalSeriesStarted: boolean) {
+        try {
+          return await ipcRenderer.invoke(
+            'updateRDGScores',
+            event_id,
+            finalSeriesStarted,
+          );
+        } catch (error) {
+          console.error('Error invoking updateRDGScores IPC:', error);
           return false;
         }
       },

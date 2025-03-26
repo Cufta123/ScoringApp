@@ -812,6 +812,69 @@ ipcMain.handle('calculateAverageScores', async (event, event_id) => {
   }
 });
 
+ipcMain.handle('calculateRDGAverages', async (event, event_id) => {
+  try {
+    // Calculate average for Qualifying series with RDG status
+    const qualifyingQuery = db.prepare(`
+      SELECT s.boat_id, AVG(s.points) AS avgPointsQualifyingRDG
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ? AND h.heat_type = 'Qualifying' AND s.status = 'RDG'
+      GROUP BY s.boat_id
+    `);
+    const qualifyingRDG = qualifyingQuery.all(event_id);
+
+    // Calculate average for Final series with RDG status
+    const finalQuery = db.prepare(`
+      SELECT s.boat_id, AVG(s.points) AS avgPointsFinalRDG
+      FROM Scores s
+      JOIN Races r ON s.race_id = r.race_id
+      JOIN Heats h ON r.heat_id = h.heat_id
+      WHERE h.event_id = ? AND h.heat_type = 'Final' AND s.status = 'RDG'
+      GROUP BY s.boat_id
+    `);
+    const finalRDG = finalQuery.all(event_id);
+
+    // Merge results by boat_id
+    const averages: {
+      [boat_id: string]: {
+        avgPointsQualifyingRDG: number | null;
+        avgPointsFinalRDG: number | null;
+      };
+    } = {};
+
+    qualifyingRDG.forEach(
+      (row: {
+        boat_id: string | number;
+        avgPointsQualifyingRDG: number | null;
+      }) => {
+        averages[row.boat_id] = {
+          avgPointsQualifyingRDG: row.avgPointsQualifyingRDG,
+          avgPointsFinalRDG: null,
+        };
+      },
+    );
+
+    finalRDG.forEach(
+      (row: { boat_id: string | number; avgPointsFinalRDG: number | null }) => {
+        if (averages[row.boat_id]) {
+          averages[row.boat_id].avgPointsFinalRDG = row.avgPointsFinalRDG;
+        } else {
+          averages[row.boat_id] = {
+            avgPointsQualifyingRDG: null,
+            avgPointsFinalRDG: row.avgPointsFinalRDG,
+          };
+        }
+      },
+    );
+    return averages;
+  } catch (error) {
+    console.error('Error calculating RDG averages:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle(
   'swapRaceResults',
   async (event, event_id, raceId, boat1_id, boat2_id) => {
@@ -864,3 +927,130 @@ ipcMain.handle(
     }
   },
 );
+
+ipcMain.handle('updateRDGScores', async (event, event_id) => {
+  try {
+    const rdgScores = db
+      .prepare(
+        `
+          SELECT s.*, b.boat_id as boatId, b.sail_number, b.model, b.country
+          FROM Scores s
+          JOIN Races r ON s.race_id = r.race_id
+          JOIN Heats h ON r.heat_id = h.heat_id
+          JOIN Boats b ON s.boat_id = b.boat_id
+          WHERE h.event_id = ? AND s.status = 'RDG'
+          `,
+      )
+      .all(event_id);
+    console.log('RDG Scores with boat details:', rdgScores);
+
+    // Retrieve unique boat IDs from the RDG scores.
+    const boatIds = new Set(
+      rdgScores.map((score: { boatId: any }) => score.boatId),
+    );
+
+    // Prepare a query to get all scores for a boat in the current event including heat_type.
+    const boatScoresQuery = db.prepare(
+      `
+        SELECT s.*, r.race_number, h.heat_name, h.heat_type
+        FROM Scores s
+        JOIN Races r ON s.race_id = r.race_id
+        JOIN Heats h ON r.heat_id = h.heat_id
+        WHERE h.event_id = ? AND s.boat_id = ?
+        `,
+    );
+
+    // For each boat, fetch its scores, group by heat type,
+    // calculate the average points and console log them.
+    boatIds.forEach((boatId) => {
+      const boatScores = boatScoresQuery.all(event_id, boatId);
+      const qualifyingScores: any[] = [];
+      const finalScores: any[] = [];
+
+      boatScores.forEach(
+        (score: { heat_type: string; points: number; status: string }) => {
+          if (score.heat_type === 'Qualifying') {
+            qualifyingScores.push(score);
+          } else if (score.heat_type === 'Final') {
+            finalScores.push(score);
+          }
+        },
+      );
+
+      // Calculate and update Qualifying RDG scores.
+      const validQualifying = qualifyingScores.filter(
+        (s) => s.status !== 'RDG',
+      );
+      if (validQualifying.length > 0) {
+        const sum = validQualifying.reduce(
+          (acc: number, s: any) => acc + s.points,
+          0,
+        );
+        const avg = sum / validQualifying.length;
+        // Round upward to the next whole number (e.g. 3.75 -> 4 and 3.4 -> 4)
+        const adjusted = Math.ceil(avg);
+        // Prepare update query that updates both points and position.
+        const updateQuery = db.prepare(
+          'UPDATE Scores SET points = ?, position = ? WHERE score_id = ?',
+        );
+        qualifyingScores
+          .filter((s) => s.status === 'RDG')
+          .forEach((s: any) => {
+            console.log(
+              `Boat (${boatId}) Qualifying RDG score for race ${s.race_id} computed average: ${avg.toFixed(
+                1,
+              )}, adjusted to: ${adjusted}`,
+            );
+            // Update the score in the database: update both points and position.
+            updateQuery.run(adjusted, adjusted, s.score_id);
+          });
+      }
+
+      // Calculate and update Final RDG scores.
+      const validFinal = finalScores.filter((s) => s.status !== 'RDG');
+      if (validFinal.length > 0) {
+        const sum = validFinal.reduce(
+          (acc: number, s: any) => acc + s.points,
+          0,
+        );
+        const avg = sum / validFinal.length;
+        const adjusted = Math.ceil(avg); // rounds upward, e.g. 3.75 -> 4 and 3.4 -> 4
+        const updateQuery = db.prepare(
+          'UPDATE Scores SET points = ?, position = ? WHERE score_id = ?',
+        );
+        finalScores
+          .filter((s) => s.status === 'RDG')
+          .forEach((s: any) => {
+            console.log(
+              `Boat (${boatId}) Final RDG score for race ${s.race_id} computed average: ${avg.toFixed(
+                1,
+              )}, adjusted to: ${adjusted}`,
+            );
+            // Update the score in the database: update both points and position.
+            updateQuery.run(adjusted, adjusted, s.score_id);
+          });
+      }
+
+      // Log complete series details for the boat.
+      const qualifyingAvg =
+        validQualifying.length > 0
+          ? validQualifying.reduce((acc, s) => acc + s.points, 0) /
+            validQualifying.length
+          : 0;
+      const finalAvg =
+        validFinal.length > 0
+          ? validFinal.reduce((acc, s) => acc + s.points, 0) / validFinal.length
+          : 0;
+      console.log(
+        `Boat (${boatId}) Qualifying non-RDG average:`,
+        qualifyingAvg,
+      );
+      console.log(`Boat (${boatId}) Final non-RDG average:`, finalAvg);
+    });
+
+    return { success: true, rdgScores };
+  } catch (error) {
+    console.error('Error updating RDG scores:', error);
+    throw error;
+  }
+});

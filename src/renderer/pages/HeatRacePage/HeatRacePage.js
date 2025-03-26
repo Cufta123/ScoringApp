@@ -164,6 +164,13 @@ function HeatRacePage() {
           }),
         );
 
+        // Update any RDG scores before updating the leaderboard.
+        await window.electron.sqlite.heatRaceDB.updateRDGScores(
+          event.event_id,
+          finalSeriesStarted,
+        );
+
+        // Update leaderboards after RDG scores have been updated.
         if (!finalSeriesStarted) {
           const allEqual = await evaluateHeatsEquality();
           if (allEqual) {

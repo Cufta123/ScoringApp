@@ -67,7 +67,39 @@ const checkSailNumberTypeAndDropDatabase = () => {
     console.error('Error checking sail_number type:', error);
   }
 };
+const checkSailNumberUniqueAndDropDatabase = () => {
+  try {
+    console.log('Checking if sail_number has a unique constraint...');
+    const indexes = db.prepare("PRAGMA index_list('Boats');").all();
+    let hasUniqueSailNumber = false;
+    indexes.forEach((idx) => {
+      if (idx.unique === 1) {
+        const indexInfo = db.prepare(`PRAGMA index_info(${idx.name});`).all();
+        const columns = indexInfo.map((info) => info.name);
+        if (columns.includes('sail_number')) {
+          hasUniqueSailNumber = true;
+        }
+      }
+    });
+    if (hasUniqueSailNumber) {
+      console.log(
+        'Unique constraint detected on sail_number. Dropping whole database...',
+      );
+      db.close();
+      fs.unlinkSync(dbPath);
+      process.exit(0);
+    } else {
+      console.log('No unique constraint on sail_number detected.');
+    }
+  } catch (error) {
+    console.error('Error checking sail_number unique constraint:', error);
+  }
+};
 
+// ---------- EXECUTION FLOW ----------
+
+// Call our new check before recreating the Boats table.
+checkSailNumberUniqueAndDropDatabase();
 checkSailNumberTypeAndDropDatabase();
 migrateSailorsTable();
 
@@ -99,7 +131,7 @@ const createSailorsTable = `
 const createBoatsTable = `
   CREATE TABLE IF NOT EXISTS Boats (
     boat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sail_number VARCHAR NOT NULL UNIQUE,
+    sail_number VARCHAR NOT NULL,
     country TEXT NOT NULL,
     model TEXT NOT NULL,
     sailor_id INTEGER,

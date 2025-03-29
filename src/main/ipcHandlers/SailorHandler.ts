@@ -59,7 +59,7 @@ ipcMain.handle(
       });
 
       // Check if each record has exactly 9 fields.
-      for (let i = 0; i < records.length; i++) {
+      for (let i = 0; i < records.length; i += 1) {
         const record = records[i];
         const keys = Object.keys(record);
         if (keys.length !== 9) {
@@ -161,19 +161,30 @@ ipcMain.handle('readAllSailors', () => {
       .prepare(
         `
 SELECT
-  s.sailor_id, s.name, s.surname, s.birthday,s.gender, s.category_id, s.club_id,
-  b.sail_number, b.model,
-  c.club_name, cat.category_name
+  s.sailor_id,
+  s.name,
+  s.surname,
+  s.birthday,
+  s.gender,
+  s.category_id,
+  s.club_id,
+  b.boat_id,
+  b.sail_number,
+  b.model,
+  b.country AS country,
+  c.club_name,
+  c.country AS club_country,
+  cat.category_name
 FROM Sailors s
 LEFT JOIN Clubs c ON s.club_id = c.club_id
 LEFT JOIN Categories cat ON s.category_id = cat.category_id
 LEFT JOIN Boats b ON s.sailor_id = b.sailor_id
-    `,
+        `,
       )
       .all();
     return rows;
   } catch (error) {
-    log(`Error reading sailors: ${error}`);
+    console.error(`Error reading sailors: ${error}`);
     throw error;
   }
 });
@@ -262,6 +273,7 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
     birthday,
     gender,
     club_name,
+    club_country, // added
     boat_id,
     sail_number,
     country,
@@ -271,28 +283,25 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
   console.log('Received sailorData:', sailorData);
 
   try {
-    // Lookup sailor_id based on boat_id
     const boat = db
       .prepare('SELECT sailor_id FROM Boats WHERE boat_id = ?')
       .get(boat_id);
     if (!boat) throw new Error(`Boat not found with boat_id: ${boat_id}`);
     const { sailor_id } = boat;
 
-    // Fetch category_id based on birthday
     const category_id = calculateCategory(birthday);
     if (category_id === null)
       throw new Error(`Invalid category for birthday: ${birthday}`);
 
-    // Verify that the category exists
     const category = db
       .prepare('SELECT category_id FROM Categories WHERE category_id = ?')
       .get(category_id);
     if (!category)
       throw new Error(
-        `Category ID ${category_id} does not exist in the Categories table`,
+        `Category ID ${category_id} does not exist in Categories`,
       );
 
-    // Fetch club_id based on original club name
+    // Lookup club by original club name
     let club = db
       .prepare('SELECT club_id FROM Clubs WHERE club_name = ?')
       .get(originalClubName);
@@ -300,21 +309,27 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
     let { club_id } = club;
 
     if (club_name !== originalClubName) {
+      // Try to find club by new club name
       club = db
         .prepare('SELECT club_id FROM Clubs WHERE club_name = ?')
         .get(club_name);
       if (club) {
         club_id = club.club_id;
       } else {
-        // Insert new club and get the new club_id
+        // Insert new club using edited club_country
         const newClub = db
           .prepare('INSERT INTO Clubs (club_name, country) VALUES (?, ?)')
-          .run(club_name, country);
+          .run(club_name, club_country);
         club_id = newClub.lastInsertRowid;
       }
+    } else {
+      // If club name hasn't changed, update club's country if needed.
+      db.prepare('UPDATE Clubs SET country = ? WHERE club_id = ?').run(
+        club_country,
+        club_id,
+      );
     }
 
-    // Update sailor information including gender
     const sailorResult = db
       .prepare(
         'UPDATE Sailors SET name = ?, surname = ?, birthday = ?, gender = ?, category_id = ?, club_id = ? WHERE sailor_id = ?',
@@ -322,7 +337,6 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
       .run(name, surname, birthday, gender, category_id, club_id, sailor_id);
     console.log('Sailor update result:', sailorResult);
 
-    // Update boat information
     const boatResult = db
       .prepare(
         'UPDATE Boats SET sail_number = ?, country = ?, model = ? WHERE boat_id = ?',
@@ -336,7 +350,6 @@ ipcMain.handle('updateSailor', async (event, sailorData) => {
     };
   } catch (error) {
     console.error(`Error updating sailor or boat: ${error}`);
-    // Rethrow so the renderer's catch block gets it
     throw error;
   }
 });

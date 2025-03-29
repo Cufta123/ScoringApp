@@ -55,42 +55,33 @@ export default function calculateBoatScores(
     boatScoresByPoints.set(result.boat_id, []);
     boatScoresByRace.set(result.boat_id, []);
   });
-  // console.log('After initialization:');
-  // console.log('boatScoresByPoints:', Array.from(boatScoresByPoints.entries()));
-  // console.log('boatScoresByRace:', Array.from(boatScoresByRace.entries()));
 
   // Populate the maps using the rawScores.
   rawScores.forEach((score) => {
     if (boatScoresByPoints.has(score.boat_id)) {
       // For points-based ordering, we want scores sorted descending.
       boatScoresByPoints.get(score.boat_id)!.push({
-        points: score.points,
+        points: Number(score.points),
         heat_name: score.heat_name,
         heat_id: score.heat_id,
         status: score.status,
       });
       // For race-based (tie-break) ordering, assume rawScores came in order of race_number descending.
       boatScoresByRace.get(score.boat_id)!.push({
-        points: score.points,
+        points: Number(score.points),
         heat_name: score.heat_name,
         heat_id: score.heat_id,
         status: score.status,
       });
     }
   });
-  // console.log('After populating rawScores:');
-  // console.log('boatScoresByPoints:', Array.from(boatScoresByPoints.entries()));
-  // console.log('boatScoresByRace:', Array.from(boatScoresByRace.entries()));
 
   // Optionally sort each boat's scores if not already in proper order.
   boatScoresByPoints.forEach((scores, boat_id) => {
     // sort descending: highest points first
-    scores.sort((a, b) => b.points - a.points);
+    scores.sort((a, b) => Number(b.points) - Number(a.points));
     boatScoresByPoints.set(boat_id, scores);
   });
-  // console.log('After sorting boatScoresByPoints:');
-  // console.log('boatScoresByPoints:', Array.from(boatScoresByPoints.entries()));
-
   // For tie-breaking we assume the rawScores are delivered as needed.
   boatScoresByRace.forEach((scores, boat_id) => {
     boatScoresByRace.set(boat_id, scores);
@@ -112,37 +103,43 @@ export default function calculateBoatScores(
     }
     // Exclude only scores that don't have status "DNE"
     const { scoresToInclude } = scores.reduce(
-      (acc, score) => {
+      (
+        acc: {
+          excludedCount: number;
+          scoresToInclude: {
+            points: number;
+            heat_name: string;
+            heat_id: number;
+            status: string;
+          }[];
+        },
+        score,
+      ) => {
         if (acc.excludedCount < excludeCount && score.status !== 'DNE') {
           return {
             excludedCount: acc.excludedCount + 1,
             scoresToInclude: acc.scoresToInclude,
           };
         }
-        acc.scoresToInclude.push(score);
+        acc.scoresToInclude.push({ ...score, points: Number(score.points) });
         return acc;
       },
-      { excludedCount: 0, scoresToInclude: [] as typeof scores },
+      { excludedCount: 0, scoresToInclude: [] },
     );
+    // Sum points making sure they are numbers.
     const totalPoints = scoresToInclude.reduce(
-      (acc, score) => acc + score.points,
+      (acc: number, score) => acc + Number(score.points),
       0,
     );
     temporaryTable.push({ boat_id, totalPoints });
   });
 
-  // console.log('Temporary table before sorting:', temporaryTable);
-
   // Sort by total points ascending (i.e. lower totalPoints is better).
-  temporaryTable.sort((a, b) => a.totalPoints - b.totalPoints);
+  temporaryTable.sort((a, b) => Number(a.totalPoints) - Number(b.totalPoints));
   // Assign initial places.
   temporaryTable.forEach((boat, index) => {
     boat.place = index + 1;
   });
-  //  console.log(
-  //    'Temporary table after initial place assignment:',
-  //    temporaryTable,
-  // );
 
   // --- Tie-breaking ---
   const grouped: Record<number, TemporaryTableEntry[]> = {};
@@ -150,14 +147,11 @@ export default function calculateBoatScores(
     if (!grouped[entry.totalPoints]) grouped[entry.totalPoints] = [];
     grouped[entry.totalPoints].push(entry);
   });
-  //  console.log('Grouped boats with equal totalPoints:', grouped);
 
   // For any group with more than one boat, apply tie-breaking logic.
   Object.keys(grouped).forEach((totalPointsKey) => {
     const group = grouped[Number(totalPointsKey)];
     if (group.length > 1) {
-      //    console.group(`Tie-breaking Group for Total Points ${totalPointsKey}`);
-
       // Retrieve and log races where tied boats competed together
       const tiedBoats = group.map((entry) => entry.boat_id);
       const racesTogether: { [heat_id: number]: string[] } = {};
@@ -178,45 +172,21 @@ export default function calculateBoatScores(
 
       if (commonHeats.length > 0) {
         // Use scores from common heats to break the tie
-        //     console.log(`Boats tied for ${totalPointsKey} points:`);
-        tiedBoats.forEach((boat_id) => {
-          // const scores = boatScoresByRace.get(boat_id) || [];
-          //   console.log(
-          //     `Boat ${boat_id}: Scores = ${scores
-          //      .map(
-          //       (score) =>
-          //         `${score.points} (${score.heat_name}, ${score.heat_id})`,
-          //     )
-          //     .join(', ')}`,
-          //  );
-        });
-
-        // Collect scores for each boat across all common heats
         const scoresByBoat: { [boat_id: string]: number[] } = {};
         commonHeats.forEach((heatIdStr) => {
           const heatId = Number(heatIdStr);
           const boatsInHeat = racesTogether[heatId];
-          //console.log(
-          //   `Heat ${heatId}: Boats ${boatsInHeat.join(', ')} were together`,
-          // );
           boatsInHeat.forEach((boat_id) => {
             const scores = boatScoresByRace.get(boat_id) || [];
+            // Filter and sort scores in ascending order
             const scoresInHeat = scores
               .filter((score) => score.heat_id === heatId)
-              .sort((a, b) => a.points - b.points); // Sort scores by points in ascending order
-            // console.log(
-            //   `Boat ${boat_id} in Heat ${heatId}: Scores = ${scoresInHeat
-            //     .map(
-            //       (score) =>
-            //         `${score.points} (${score.heat_name}, ${score.heat_id})`,
-            //     )
-            //     .join(', ')}`,
-            //  );
+              .sort((a, b) => Number(a.points) - Number(b.points));
             if (!scoresByBoat[boat_id]) {
               scoresByBoat[boat_id] = [];
             }
             scoresByBoat[boat_id].push(
-              ...scoresInHeat.map((score) => score.points),
+              ...scoresInHeat.map((score) => Number(score.points)),
             );
           });
         });
@@ -226,14 +196,7 @@ export default function calculateBoatScores(
           scoresByBoat[boat_id].sort((a, b) => a - b);
         });
 
-        // Log the scores in array format after processing all heats
-        //   Object.keys(scoresByBoat).forEach((boat_id) => {
-        //  console.log(
-        //   `Boat ${boat_id} scores: [${scoresByBoat[boat_id].join(', ')}]`,
-        //  );
-        //  });
-
-        // Update the places for the boats in this group based on the sorted scores
+        // Update the places for the boats in this group using the sorted scores
         group.sort((a, b) => {
           const scoresA = scoresByBoat[a.boat_id] || [];
           const scoresB = scoresByBoat[b.boat_id] || [];
@@ -249,30 +212,28 @@ export default function calculateBoatScores(
           return 0;
         });
       } else {
-        //  console.log('No common heats found, using default tie-breaking logic');
-        // Use default tie-breaking logic
+        // Use default tie-breaking logic based on race order.
         group.sort((a, b) => {
           const scoresA = boatScoresByRace.get(a.boat_id) || [];
           const scoresB = boatScoresByRace.get(b.boat_id) || [];
           const maxLength = Math.max(scoresA.length, scoresB.length);
           // Compare from the last race backward.
           for (let i = 1; i <= maxLength; i += 1) {
-            const scoreA =
-              scoresA[scoresA.length - i]?.points ?? Number.MAX_SAFE_INTEGER;
-            const scoreB =
-              scoresB[scoresB.length - i]?.points ?? Number.MAX_SAFE_INTEGER;
+            const scoreA = Number(
+              scoresA[scoresA.length - i]?.points ?? Number.MAX_SAFE_INTEGER,
+            );
+            const scoreB = Number(
+              scoresB[scoresB.length - i]?.points ?? Number.MAX_SAFE_INTEGER,
+            );
             if (scoreA !== scoreB) return scoreA - scoreB;
           }
           return 0;
         });
       }
-
-      // Assign places based on the sorted scores
+      // Assign places based on the sorted scores.
       group.forEach((entry, idx) => {
         entry.place = idx + 1;
       });
-      // console.log('Updated Tie-break Places:', group);
-      // console.groupEnd();
       grouped[Number(totalPointsKey)] = group;
     }
   });
@@ -282,7 +243,7 @@ export default function calculateBoatScores(
     if (a.totalPoints === b.totalPoints) {
       return (a.place ?? 0) - (b.place ?? 0);
     }
-    return a.totalPoints - b.totalPoints;
+    return Number(a.totalPoints) - Number(b.totalPoints);
   });
   // Reassign global place ordering.
   finalTable.forEach((boat, index) => {

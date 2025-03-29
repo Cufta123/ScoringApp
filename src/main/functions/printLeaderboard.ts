@@ -33,11 +33,11 @@ export default async function printLeaderboard(
   // instead of printing "Overall Scores".
   const groupsToProcess = [];
 
-  if (groupedLeaderboard['OverallScores']) {
+  if (groupedLeaderboard.OverallScores) {
     groupsToProcess.push({
       header: leaderboardHeader,
       key: 'OverallScores',
-      data: groupedLeaderboard['OverallScores'],
+      data: groupedLeaderboard.OverallScores,
     });
   }
 
@@ -69,7 +69,7 @@ export default async function printLeaderboard(
         0,
       );
 
-      // Build the header row: Rank, Name, Country, etc. plus the needed race columns.
+      // Build the header row: add two columns for Total Points and Total Points Adjustet.
       const groupHeader = [
         'Rank',
         'Name',
@@ -78,6 +78,7 @@ export default async function printLeaderboard(
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
+        'Total Points Adjustet',
       ];
       worksheet.addRow(groupHeader);
 
@@ -93,6 +94,8 @@ export default async function printLeaderboard(
             races: any;
             total_points_combined: any;
             total_points_event: any;
+            total_raw_points_combined: any;
+            total_raw_points: any;
           },
           index: number,
         ) => {
@@ -103,6 +106,9 @@ export default async function printLeaderboard(
             entry.boat_number,
             entry.boat_type,
             ...entry.races,
+            finalSeriesStarted
+              ? entry.total_raw_points_combined
+              : entry.total_raw_points,
             finalSeriesStarted
               ? entry.total_points_combined
               : entry.total_points_event,
@@ -123,18 +129,15 @@ export default async function printLeaderboard(
     const doc = new JsPDF();
     let startY = 20;
 
-    // Large title at the top of the PDF.
     doc.setFontSize(16);
     doc.text(leaderboardHeader, 14, 10);
     startY = 16;
 
-    // For each group in groupsToProcess, create a table.
     groupsToProcess.forEach((groupObj) => {
       doc.setFontSize(14);
       doc.text(groupObj.header, 14, startY);
       startY += 6;
 
-      // Determine max race count for this group.
       const maxRaceCount = Math.max(
         ...groupObj.data.map((entry: { races: string | any[] }) =>
           entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
@@ -142,7 +145,6 @@ export default async function printLeaderboard(
         0,
       );
 
-      // Build the table headers.
       const headerRow = [
         'Rank',
         'Name',
@@ -151,9 +153,9 @@ export default async function printLeaderboard(
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
+        'Total Points Adjustet',
       ];
 
-      // Build the table body.
       const bodyData = groupObj.data.map(
         (
           entry: {
@@ -165,6 +167,8 @@ export default async function printLeaderboard(
             races: { toString: () => any }[];
             total_points_combined: any;
             total_points_event: any;
+            total_raw_points_combined: any;
+            total_raw_points: any;
           },
           idx: number,
         ) => {
@@ -174,17 +178,18 @@ export default async function printLeaderboard(
           row.push(entry.country);
           row.push(entry.boat_number.toString());
           row.push(entry.boat_type);
-
-          // Fill race results (or blank if not present).
-          for (let i = 0; i < maxRaceCount; i++) {
+          for (let i = 0; i < maxRaceCount; i += 1) {
             row.push(
               entry.races && entry.races[i] !== undefined
                 ? entry.races[i].toString()
                 : '',
             );
           }
-
-          // Total points, depending on final series or not.
+          row.push(
+            finalSeriesStarted
+              ? entry.total_raw_points_combined
+              : entry.total_raw_points,
+          );
           row.push(
             finalSeriesStarted
               ? entry.total_points_combined
@@ -194,7 +199,6 @@ export default async function printLeaderboard(
         },
       );
 
-      // Draw the table with jsPDF-AutoTable.
       autoTable(doc, {
         startY,
         head: [headerRow],
@@ -202,15 +206,13 @@ export default async function printLeaderboard(
         theme: 'grid',
       });
 
-      // Update the vertical position for the next table.
-      startY = doc.lastAutoTable.finalY + 10;
+      startY = (doc as any).lastAutoTable.finalY + 10;
       if (startY > 270) {
         doc.addPage();
         startY = 20;
       }
     });
 
-    // Save the PDF.
     doc.save(`${eventName}_${raceType}_race_${raceNumber}.pdf`);
   } else if (format === 'html') {
     // ----- HTML EXPORT -----
@@ -222,10 +224,8 @@ export default async function printLeaderboard(
     </style>
     </head><body>`;
 
-    // Overall page header
     html += `<h1>${leaderboardHeader}</h1>`;
 
-    // For each group, create an HTML table.
     groupsToProcess.forEach((groupObj) => {
       html += `<h2>${groupObj.header}</h2>`;
       html += `<table><thead><tr>
@@ -235,7 +235,6 @@ export default async function printLeaderboard(
       <th>Sail Number</th>
       <th>Boat Type</th>`;
 
-      // Find the max number of races.
       const maxRaceCount = Math.max(
         ...groupObj.data.map((entry: { races: string | any[] }) =>
           entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
@@ -243,15 +242,12 @@ export default async function printLeaderboard(
         0,
       );
 
-      // Add Race 1..Race N headers.
-      for (let i = 0; i < maxRaceCount; i++) {
+      for (let i = 0; i < maxRaceCount; i += 1) {
         html += `<th>Race ${i + 1}</th>`;
       }
 
-      // Total points header
-      html += `<th>Total Points</th></tr></thead><tbody>`;
+      html += `<th>Total Points</th><th>Total Points Adjustet</th></tr></thead><tbody>`;
 
-      // Table rows for each competitor.
       groupObj.data.forEach(
         (
           entry: {
@@ -263,6 +259,8 @@ export default async function printLeaderboard(
             races: any[];
             total_points_combined: any;
             total_points_event: any;
+            total_raw_points_combined: any;
+            total_raw_points: any;
           },
           index: number,
         ) => {
@@ -273,7 +271,7 @@ export default async function printLeaderboard(
           <td>${entry.boat_number}</td>
           <td>${entry.boat_type}</td>`;
 
-          for (let i = 0; i < maxRaceCount; i++) {
+          for (let i = 0; i < maxRaceCount; i += 1) {
             html += `<td>${
               entry.races && entry.races[i] !== undefined ? entry.races[i] : ''
             }</td>`;
@@ -281,10 +279,15 @@ export default async function printLeaderboard(
 
           html += `<td>${
             finalSeriesStarted
+              ? entry.total_raw_points_combined
+              : entry.total_raw_points
+          }</td>
+          <td>${
+            finalSeriesStarted
               ? entry.total_points_combined
               : entry.total_points_event
           }</td>
-        </tr>`;
+          </tr>`;
         },
       );
 
@@ -293,7 +296,6 @@ export default async function printLeaderboard(
 
     html += `</body></html>`;
 
-    // Save the HTML file.
     const blob = new Blob([html], { type: 'text/html' });
     saveAs(blob, `${eventName}_${raceType}_race_${raceNumber}.html`);
   }

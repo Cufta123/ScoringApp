@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage/LandingPage';
 import EventPage from './pages/EventPage/EventPage';
 import HeatRacePage from './pages/HeatRacePage/HeatRacePage';
 import LeaderboardPage from './pages/LeaderboardPage/LeaderBoardPage';
+import LandingSailorPage from './pages/LandingSailorPage/LandingSailorPage';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/event/:name" element={<EventPage />} />
         <Route path="/event/:eventName/heat-race" element={<HeatRacePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/landingSailorList" element={<LandingSailorPage />} />
       </Routes>
     </Router>
   );

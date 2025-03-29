@@ -11,6 +11,17 @@ import './EventPage.css';
 import CSVUpload from '../../components/CSVUpload';
 import printStartingList from '../../../main/functions/printStartingList';
 
+// Update the helper to accept a minimum candidate value
+const findNextFreeNumber = (numbers, minCandidate = 1) => {
+  if (numbers.length === 0) return minCandidate;
+  const numSet = new Set(numbers);
+  const maxNum = Math.max(...numbers, minCandidate);
+  for (let candidate = minCandidate; candidate <= maxNum + 1; candidate += 1) {
+    if (!numSet.has(candidate)) return candidate;
+  }
+  return maxNum + 1;
+};
+
 function EventPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -143,6 +154,31 @@ function EventPage() {
   };
 
   const handleHeatRaceClick = () => {
+    // Map sail numbers to integers (filtering out invalid entries)
+    const sailNums = boats
+      .map((boat) => parseInt(boat.sail_number.toString().trim(), 10))
+      .filter((num) => !Number.isNaN(num));
+    const sailNumberCounts = boats.reduce((acc, boat) => {
+      const number = boat.sail_number.toString().trim();
+      acc[number] = (acc[number] || 0) + 1;
+      return acc;
+    }, {});
+    const duplicates = Object.keys(sailNumberCounts).filter(
+      (number) => sailNumberCounts[number] > 1,
+    );
+    if (duplicates.length > 0) {
+      // Determine the digit length from a sample sail number (assumes uniform digit count)
+      const digitLength =
+        boats.length > 0 ? String(boats[0].sail_number).trim().length : 1;
+      const minCandidate = Math.pow(10, digitLength - 1);
+      const candidate = findNextFreeNumber(sailNums, minCandidate);
+      window.alert(
+        `Error: Duplicate sail numbers detected (${duplicates.join(
+          ', ',
+        )}). Suggested next free sail number is ${candidate}. Please update the entries so that each boat in the event has a unique sail number.`,
+      );
+      return;
+    }
     navigate(`/event/${event.event_name}/heat-race`, { state: { event } });
   };
 
@@ -166,6 +202,27 @@ function EventPage() {
       return;
     }
 
+    // Check for a duplicate sail number in the event using array iteration
+    const allBoatsMap = new Map(allBoats.map((boat) => [boat.boat_id, boat]));
+    const duplicateOption = selectedBoats.find((option) => {
+      const selectedBoat = allBoatsMap.get(option.value);
+      return (
+        selectedBoat &&
+        boats.some(
+          (b) =>
+            b.sail_number.toString().trim() ===
+            String(selectedBoat.sail_number).trim(),
+        )
+      );
+    });
+    if (duplicateOption) {
+      const selectedBoat = allBoatsMap.get(duplicateOption.value);
+      window.alert(
+        `Boat with sail number ${selectedBoat.sail_number} is already associated with this event.`,
+      );
+      return;
+    }
+
     try {
       const boatIds = selectedBoats.map((option) => option.value);
       await Promise.all(
@@ -185,10 +242,8 @@ function EventPage() {
       console.error('Error associating boats with event:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(
-        `An error occurred while associating boats with the event. Details: ${
-          errorMessage
-        }`,
+      window.alert(
+        `An error occurred while associating boats with the event. Details: ${errorMessage}`,
       );
     }
   };

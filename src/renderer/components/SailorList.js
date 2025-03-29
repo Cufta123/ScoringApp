@@ -73,12 +73,49 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       originalName: sailor.name,
       originalSurname: sailor.surname,
       originalClubName: sailor.club,
+      club_country: sailor.club_country, // add club_country here
       birthday: sailor.birthday,
-      gender: sailor.gender, // new field
+      gender: sailor.gender,
     });
   };
 
   const handleSave = async () => {
+    // Check for duplicate sail number among other sailors
+    const duplicateExists = sailors.some(
+      (s) =>
+        s.boat_id !== editedSailor.boat_id &&
+        String(s.sail_number).trim() ===
+          String(editedSailor.sail_number).trim(),
+    );
+    if (duplicateExists) {
+      // Determine digit length from the edited sail number
+      const digitLength = String(editedSailor.sail_number).trim().length;
+      const minCandidate = 10 ** (digitLength - 1);
+      // Build an array of existing sail numbers from props.sailors
+      const existingNums = sailors
+        .map((s) => parseInt(s.sail_number, 10))
+        .filter((num) => !Number.isNaN(num));
+      // Use the same helper function (define it locally if not imported)
+      const findNextFreeNumber = (numbers, startCandidate = 1) => {
+        if (numbers.length === 0) return startCandidate;
+        const numSet = new Set(numbers);
+        const maxNum = Math.max(...numbers, startCandidate);
+        for (
+          let candidate = startCandidate;
+          candidate <= maxNum + 1;
+          candidate += 1
+        ) {
+          if (!numSet.has(candidate)) return candidate;
+        }
+        return maxNum + 1;
+      };
+      const candidate = findNextFreeNumber(existingNums, minCandidate);
+      window.alert(
+        `Error: Duplicate sail number detected. Suggested next free sail number is ${candidate}.`,
+      );
+      return;
+    }
+
     const sailorData = {
       originalName: editedSailor.originalName,
       originalSurname: editedSailor.originalSurname,
@@ -87,8 +124,8 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       surname: editedSailor.surname,
       birthday: editedSailor.birthday,
       gender: editedSailor.gender,
-      category_name: editedSailor.category,
       club_name: editedSailor.club,
+      club_country: editedSailor.club_country, // include club_country in update
       boat_id: editedSailor.boat_id,
       sail_number: editedSailor.sail_number,
       country: editedSailor.country,
@@ -123,11 +160,11 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
 
   // Render sort indicator within a fixed-width span
   const renderSortIndicator = (criteria) => {
-    return (
-      <span className="sort-indicator">
-        {sortCriteria === criteria ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-      </span>
-    );
+    let indicator = '';
+    if (sortCriteria === criteria) {
+      indicator = sortDirection === 'asc' ? '↑' : '↓';
+    }
+    return <span className="sort-indicator">{indicator}</span>;
   };
 
   return (
@@ -198,6 +235,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
               <th onClick={() => handleSort('club')}>
                 Club {renderSortIndicator('club')}
               </th>
+              <th>Club Country</th>
               <th onClick={() => handleSort('birthday')}>
                 Date of birth {renderSortIndicator('birthday')}
               </th>
@@ -307,6 +345,19 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                     />
                   ) : (
                     sailor.club
+                  )}
+                </td>
+                <td>
+                  {editingSailorId === sailor.boat_id ? (
+                    <input
+                      type="text"
+                      name="club_country"
+                      value={editedSailor.club_country || ''}
+                      onChange={handleInputChange}
+                      className="editable-input"
+                    />
+                  ) : (
+                    sailor.club_country
                   )}
                 </td>
                 <td>

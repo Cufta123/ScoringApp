@@ -17,19 +17,19 @@ interface TemporaryTableEntry {
   placement_group: string;
 }
 
-// Update getFinalScores to return both points and status
+// Update getFinalScores to order by race_number ascending
 function getFinalScores(event_id: any, boat_id: any) {
   const scoresQuery = db.prepare(`
-    SELECT points, status
-    FROM Scores
-    JOIN Races ON Scores.race_id = Races.race_id
-    JOIN Heats ON Races.heat_id = Heats.heat_id
-    WHERE Heats.event_id = ? AND Heats.heat_type = 'Final' AND Scores.boat_id = ?
-    ORDER BY points DESC
+    SELECT s.points, s.status, r.race_number
+    FROM Scores s
+    JOIN Races r ON s.race_id = r.race_id
+    JOIN Heats h ON r.heat_id = h.heat_id
+    WHERE h.event_id = ?
+      AND h.heat_type = 'Final'
+      AND s.boat_id = ?
+    ORDER BY r.race_number ASC
   `);
-  return scoresQuery
-    .all(event_id, boat_id)
-    .map((row: { points: number; status: string }) => row);
+  return scoresQuery.all(event_id, boat_id);
 }
 
 export default function calculateFinalBoatScores(
@@ -71,9 +71,8 @@ export default function calculateFinalBoatScores(
       const scores = getFinalScores(event_id, boat_id);
 
       // Determine the number of scores to exclude
-      let excludeCount = 0;
       const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
-      excludeCount = thresholds.filter(
+      const excludeCount = thresholds.filter(
         (threshold) => number_of_races >= threshold,
       ).length;
       console.log(
@@ -82,7 +81,7 @@ export default function calculateFinalBoatScores(
 
       // Exclude the worst scores while skipping DNE scores
       const initialTotalPoints = scores.reduce(
-        (acc: number, score: any) => acc + score.points,
+        (acc: number, score: any) => acc + Number(score.points),
         0,
       );
       const { scoresToInclude } = scores.reduce(
@@ -91,7 +90,7 @@ export default function calculateFinalBoatScores(
             excludedCount: number;
             scoresToInclude: { points: number; status: string }[];
           },
-          score: { status: string },
+          score: { points: any; status: string },
         ) => {
           if (acc.excludedCount < excludeCount && score.status !== 'DNE') {
             return {
@@ -101,19 +100,21 @@ export default function calculateFinalBoatScores(
           }
           return {
             excludedCount: acc.excludedCount,
-            scoresToInclude: [...acc.scoresToInclude, score],
+            scoresToInclude: [
+              ...acc.scoresToInclude,
+              { ...score, points: Number(score.points) },
+            ],
           };
         },
         { excludedCount: 0, scoresToInclude: [] },
       );
       const totalPoints = scoresToInclude.reduce(
-        (acc: number, score: any) => acc + score.points,
+        (acc: number, score: any) => acc + Number(score.points),
         0,
       );
       console.log(
         `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Initial Total Points: ${initialTotalPoints}, Places to Exclude: ${excludeCount}`,
       );
-
       console.log(
         `Boat ID: ${boat_id}, Total Points After Exclusion: ${totalPoints}`,
       );
@@ -182,7 +183,10 @@ export default function calculateFinalBoatScores(
           const excludeCount = thresholds.filter(
             (threshold) => number_of_races >= threshold,
           ).length;
-          const scoresToInclude = scores.slice(excludeCount);
+          const scoresToInclude = scores.slice(excludeCount).map((s: any) => ({
+            ...s,
+            points: Number(s.points),
+          }));
           return {
             boat_id,
             scores: scoresToInclude.sort(
@@ -224,8 +228,14 @@ export default function calculateFinalBoatScores(
             `Tie detected between Boat ${a.boat_id} and Boat ${b.boat_id}. Applying tie-breaking logic.`,
           );
 
-          const scoresA = getFinalScores(event_id, a.boat_id); // Retrieve original scores for boat A
-          const scoresB = getFinalScores(event_id, b.boat_id); // Retrieve original scores for boat B
+          const scoresA = getFinalScores(event_id, a.boat_id).map((s: any) => ({
+            ...s,
+            points: Number(s.points),
+          })); // Retrieve original scores for boat A with conversion
+          const scoresB = getFinalScores(event_id, b.boat_id).map((s: any) => ({
+            ...s,
+            points: Number(s.points),
+          })); // Retrieve original scores for boat B with conversion
 
           const maxLength = Math.max(scoresA.length, scoresB.length);
           for (let i = 1; i <= maxLength; i += 1) {

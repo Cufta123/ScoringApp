@@ -48,7 +48,9 @@ export type Channels =
   | 'calculateAverageScores'
   | 'swapRaceResults'
   | 'getHeatDetails'
-  | 'updateRDGScores';
+  | 'updateRDGScores'
+  | 'readAllScoresForEventQualifying'
+  | 'readAllScoresForEventFinal';
 
 const electronHandler = {
   ipcRenderer: {
@@ -555,6 +557,34 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking updateRDGScores IPC:', error);
+          return false;
+        }
+      },
+      async readAllScoresForEventQualifying(event_id: string) {
+        try {
+          return await ipcRenderer.invoke(
+            'readAllScoresForEventQualifying',
+            event_id,
+          );
+        } catch (error) {
+          console.error(
+            'Error invoking readAllScoresForEventQualifying IPC:',
+            error,
+          );
+          return false;
+        }
+      },
+      async readAllScoresForEventFinal(event_id: string) {
+        try {
+          return await ipcRenderer.invoke(
+            'readAllScoresForEventFinal',
+            event_id,
+          );
+        } catch (error) {
+          console.error(
+            'Error invoking readAllScoresForEventFinal IPC:',
+            error,
+          );
           return false;
         }
       },

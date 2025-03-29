@@ -63,8 +63,8 @@ function LeaderboardComponent({ eventId }) {
 
       // Add this helper to extract the numeric value from a race result.
       const parseRaceValue = (race) => {
-        const sanitized = race.replace(/[^\d]/g, '');
-        return sanitized ? parseInt(sanitized, 10) : 0;
+        const sanitized = race.replace(/[^\d.]/g, '');
+        return sanitized ? parseFloat(sanitized) : 0;
       };
 
       const leaderboardWithRaces = results.map((entry) => {
@@ -112,6 +112,15 @@ function LeaderboardComponent({ eventId }) {
           ? eventResult.total_points_event || 0
           : 0;
         const total_points_combined = total_points_final + total_points_event;
+
+        // NEW: combine raw points in the same way
+        const total_raw_points_final = finalResult.total_raw_points || 0;
+        const total_raw_points_event = eventResult
+          ? eventResult.total_raw_points || 0
+          : 0;
+        const total_raw_points_combined =
+          total_raw_points_final + total_raw_points_event;
+
         return {
           ...finalResult,
           races: finalResult.race_positions
@@ -119,6 +128,7 @@ function LeaderboardComponent({ eventId }) {
             : [],
           race_ids: finalResult.race_ids ? finalResult.race_ids.split(',') : [],
           total_points_combined,
+          total_raw_points_combined, // add combined raw points
         };
       });
 
@@ -126,12 +136,19 @@ function LeaderboardComponent({ eventId }) {
         const combinedEntry = combinedResults.find(
           (combined) => combined.boat_id === entry.boat_id,
         );
-        return combinedEntry
-          ? {
-              ...entry,
-              total_points_combined: combinedEntry.total_points_combined,
-            }
-          : entry;
+        return {
+          ...entry,
+          total_points_combined: finalSeriesStarted
+            ? (combinedEntry?.total_points_combined ??
+              entry.total_points_event ??
+              0)
+            : (entry.total_points_event ?? 0),
+          total_raw_points_combined: finalSeriesStarted
+            ? (combinedEntry?.total_raw_points_combined ??
+              entry.total_raw_points ??
+              0)
+            : (entry.total_raw_points ?? 0),
+        };
       });
 
       mergedResults.sort((a, b) =>
@@ -275,7 +292,10 @@ function LeaderboardComponent({ eventId }) {
         penalty, // new penalty value
       );
       await window.electron.sqlite.heatRaceDB.updateRDGScores(eventId);
-
+      await window.electron.ipcRenderer.invoke(
+        'updateFinalLeaderboard',
+        eventId,
+      );
       // Update local state.
       setPerRacePenalties((prev) => {
         const updatedBoatPenalties = [...(prev[boatId] || [])];
@@ -573,7 +593,9 @@ function LeaderboardComponent({ eventId }) {
                     }
                     return headers;
                   })()}
+
                   <th>Total Points</th>
+                  <th>Total Points Adjustet</th>
                 </tr>
               </thead>
               <tbody>
@@ -744,6 +766,11 @@ function LeaderboardComponent({ eventId }) {
                         );
                       },
                     )}
+                    <td>
+                      {finalSeriesStarted
+                        ? entry.total_raw_points_combined
+                        : entry.total_raw_points}
+                    </td>
                     <td>
                       {finalSeriesStarted
                         ? entry.total_points_combined

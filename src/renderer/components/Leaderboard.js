@@ -291,11 +291,14 @@ function LeaderboardComponent({ eventId }) {
         heat_id, // heat_id
         penalty, // new penalty value
       );
-      await window.electron.sqlite.heatRaceDB.updateRDGScores(eventId);
-      await window.electron.ipcRenderer.invoke(
-        'updateFinalLeaderboard',
-        eventId,
-      );
+      if (penalty === 'RDG') {
+        await window.electron.sqlite.heatRaceDB.updateRDGScores(eventId);
+        await window.electron.ipcRenderer.invoke(
+          'updateFinalLeaderboard',
+          eventId,
+        );
+      }
+
       // Update local state.
       setPerRacePenalties((prev) => {
         const updatedBoatPenalties = [...(prev[boatId] || [])];

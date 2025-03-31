@@ -428,67 +428,74 @@ ipcMain.handle(
 
       const currentPosition = currentResult.position;
 
-      // Update the score – update both position and points.
-      const updateQuery = db.prepare(
-        `UPDATE Scores SET position = ?, points = ?, status = ? WHERE race_id = ? AND boat_id = ?`,
-      );
-      const statusToUpdate = penalty || 'FINISHED';
-      updateQuery.run(
-        new_position,
-        new_position,
-        statusToUpdate,
-        race_id,
-        boat_id,
-      );
+      // Update the score – if penalty is 'RDG', update only status.
+      if (penalty === 'RDG') {
+        const updateStatusOnlyQuery = db.prepare(
+          `UPDATE Scores SET status = ? WHERE race_id = ? AND boat_id = ?`,
+        );
+        updateStatusOnlyQuery.run('RDG', race_id, boat_id);
+      } else {
+        const updateQuery = db.prepare(
+          `UPDATE Scores SET position = ?, points = ?, status = ? WHERE race_id = ? AND boat_id = ?`,
+        );
+        const statusToUpdate = penalty || 'FINISHED';
+        updateQuery.run(
+          new_position,
+          new_position,
+          statusToUpdate,
+          race_id,
+          boat_id,
+        );
 
-      // Shift other boats if required.
-      if (shift_positions) {
-        if (currentPosition > new_position) {
-          // Boat moved up - shift down others that have no penalty (status = 'FINISHED')
-          const shiftQuery = db.prepare(
-            `UPDATE Scores
-             SET position = position + 1,
-                 points = position + 1
-             WHERE race_id = ?
-               AND position >= ?
-               AND position < ?
-               AND boat_id != ?
-               AND status = 'FINISHED'
-               AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
-          );
-          shiftQuery.run(
-            race_id,
-            new_position,
-            currentPosition,
-            boat_id,
-            heat_id,
-          );
-        } else if (currentPosition < new_position) {
-          // Boat moved down - shift up others that have no penalty
-          const shiftQuery = db.prepare(
-            `UPDATE Scores
-             SET position = position - 1,
-                 points = position - 1
-             WHERE race_id = ?
-               AND position <= ?
-               AND position > ?
-               AND boat_id != ?
-               AND status = 'FINISHED'
-               AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
-          );
-          shiftQuery.run(
-            race_id,
-            new_position,
-            currentPosition,
-            boat_id,
-            heat_id,
-          );
+        // Shift other boats if required.
+        if (shift_positions) {
+          if (currentPosition > new_position) {
+            // Boat moved up - shift down others that have no penalty (status = 'FINISHED')
+            const shiftQuery = db.prepare(
+              `UPDATE Scores
+               SET position = position + 1,
+                   points = position + 1
+               WHERE race_id = ?
+                 AND position >= ?
+                 AND position < ?
+                 AND boat_id != ?
+                 AND status = 'FINISHED'
+                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+            );
+            shiftQuery.run(
+              race_id,
+              new_position,
+              currentPosition,
+              boat_id,
+              heat_id,
+            );
+          } else if (currentPosition < new_position) {
+            // Boat moved down - shift up others that have no penalty
+            const shiftQuery = db.prepare(
+              `UPDATE Scores
+               SET position = position - 1,
+                   points = position - 1
+               WHERE race_id = ?
+                 AND position <= ?
+                 AND position > ?
+                 AND boat_id != ?
+                 AND status = 'FINISHED'
+                 AND race_id IN (SELECT race_id FROM Races WHERE heat_id = ?)`,
+            );
+            shiftQuery.run(
+              race_id,
+              new_position,
+              currentPosition,
+              boat_id,
+              heat_id,
+            );
+          }
         }
       }
 
-      // If a penalty was applied and the heat is from the Final series,
+      // If a penalty (other than RDG) was applied and the heat is from the Final series,
       // immediately recalculate the final leaderboard.
-      if (penalty) {
+      if (penalty && penalty !== 'RDG') {
         const heatInfo = db
           .prepare('SELECT heat_type FROM Heats WHERE heat_id = ?')
           .get(heat_id);
@@ -578,8 +585,8 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
         GROUP_CONCAT(
           CASE
             WHEN sc.status <> 'FINISHED'
-              THEN '(' || sc.status || ') ' || sc.position
-            ELSE sc.position
+              THEN '(' || sc.status || ') ' || sc.points
+            ELSE sc.points
           END
           ORDER BY r.race_number
         ) AS race_positions,
@@ -693,8 +700,8 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
         GROUP_CONCAT(
           CASE
             WHEN sc.status <> 'FINISHED'
-              THEN '(' || sc.status || ') ' || sc.position
-            ELSE sc.position
+              THEN '(' || sc.status || ') ' || sc.points
+            ELSE sc.points
           END
           ORDER BY r.race_number
         ) AS race_positions,
@@ -902,7 +909,7 @@ ipcMain.handle('updateRDGScores', async (event, event_id) => {
     );
 
     // For each boat, fetch its scores, group by heat type,
-    // calculate the average points and console log them.
+    // calculate the average points (for RDG scores) and update points only.
     boatIds.forEach((boatId) => {
       const boatScores = boatScoresQuery.all(event_id, boatId);
       console.log(`Boat (${boatId}) all scores:`, boatScores);
@@ -921,9 +928,9 @@ ipcMain.handle('updateRDGScores', async (event, event_id) => {
             a.race_number - b.race_number,
         );
 
-      // Prepare the update query.
+      // Prepare the update query to update only the points column.
       const updateQuery = db.prepare(
-        'UPDATE Scores SET points = ?, position = ? WHERE score_id = ?',
+        'UPDATE Scores SET points = ? WHERE score_id = ?',
       );
 
       // Helper function to process segments for a given set of scores.
@@ -940,7 +947,7 @@ ipcMain.handle('updateRDGScores', async (event, event_id) => {
               const avg = sum / segment.length;
               // Rounding to the nearest tenth (e.g. 3.42 -> 3.4, 3.45 -> 3.5).
               const adjusted = Math.round(avg * 10) / 10;
-              updateQuery.run(adjusted, adjusted, scoresArray[i].score_id);
+              updateQuery.run(adjusted, scoresArray[i].score_id);
               console.log(
                 `Boat (${boatId}) ${heatLabel} RDG score for race ${scoresArray[i].race_id} computed average: ${avg.toFixed(
                   2,
@@ -955,7 +962,7 @@ ipcMain.handle('updateRDGScores', async (event, event_id) => {
       processSegments(qualifyingScores, 'Qualifying');
       processSegments(finalScores, 'Final');
 
-      // For logging, calculate non-RDG averages using all scores that are not marked as 'RDG'.
+      // For logging, calculate non-RDG averages using all scores not marked as 'RDG'
       const validQualifying = qualifyingScores.filter(
         (s: { status: string }) => s.status !== 'RDG',
       );
@@ -965,14 +972,14 @@ ipcMain.handle('updateRDGScores', async (event, event_id) => {
       const qualifyingAvg =
         validQualifying.length > 0
           ? validQualifying.reduce(
-              (acc: any, s: { points: any }) => acc + s.points,
+              (acc: number, s: { points: number }) => acc + s.points,
               0,
             ) / validQualifying.length
           : 0;
       const finalAvg =
         validFinal.length > 0
           ? validFinal.reduce(
-              (acc: any, s: { points: any }) => acc + s.points,
+              (acc: number, s: { points: number }) => acc + s.points,
               0,
             ) / validFinal.length
           : 0;

@@ -161,7 +161,6 @@ function ScoringInputComponent({ heat, onSubmit }) {
       place: index + 1,
       status: 'FINISHED',
     }));
-    await window.electron.sqlite.heatRaceDB.updateRDGScores(heat.event_id);
     // Use LatestHeats to get the latest heats for this event.
     const latestHeats = LatestHeats(existingHeats);
 

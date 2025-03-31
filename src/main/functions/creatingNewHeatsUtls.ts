@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable camelcase */
 import { db } from '../../../public/Database/DBManager';
 
@@ -15,7 +16,7 @@ export function assignBoatsToNewHeats(
 
   // Fetch old heats, their boats, and scores from the database
   const oldHeatsQuery = db.prepare(`
-    SELECT h.heat_id, h.heat_name, b.boat_id, b.sail_number, s.name, s.surname, sc.points
+    SELECT h.heat_id, h.heat_name, b.boat_id, b.sail_number, s.name, s.surname, sc.position
     FROM Heats h
     JOIN Heat_Boat hb ON h.heat_id = hb.heat_id
     JOIN Boats b ON hb.boat_id = b.boat_id
@@ -33,7 +34,7 @@ export function assignBoatsToNewHeats(
       sail_number: number;
       name: string;
       surname: string;
-      points: number;
+      position: number;
     }[]
   > = {};
 
@@ -45,7 +46,7 @@ export function assignBoatsToNewHeats(
       sail_number: any;
       name: any;
       surname: any;
-      points: any;
+      position: any;
     }) => {
       if (!groupedByHeatName[heat.heat_name]) {
         groupedByHeatName[heat.heat_name] = [];
@@ -55,31 +56,15 @@ export function assignBoatsToNewHeats(
         sail_number: heat.sail_number,
         name: heat.name,
         surname: heat.surname,
-        points: heat.points,
+        position: heat.position,
       });
     },
   );
 
-  // Sort the boats within each heat by their points
+  // Sort the boats within each heat by their position
   Object.keys(groupedByHeatName).forEach((heatName) => {
-    groupedByHeatName[heatName].sort((a, b) => a.points - b.points);
+    groupedByHeatName[heatName].sort((a, b) => a.position - b.position);
   });
-
-  // console.log('Grouped by Heat Name:', groupedByHeatName);
-
-  // Create tables with just boat_id and points
-  // const tables = Object.keys(groupedByHeatName).map((heatName) => {
-  // return {
-  //     heatName,
-  //     boats: groupedByHeatName[heatName].map((boat) => ({
-  //       boat_id: boat.boat_id,
-  //       points: boat.points,
-  //  })),
-  //  };
-  // });
-
-  // Log the tables with full details
-  // console.log('Tables:', JSON.stringify(tables, null, 2));
 
   // Number of new heats
   const numHeats = nextHeatNames.length;
@@ -95,10 +80,10 @@ export function assignBoatsToNewHeats(
     if (!matchA || !matchB) return a.localeCompare(b); // fallback
     return matchA[1].localeCompare(matchB[1]);
   });
-  // console.log(
-  //  'Sorted old heat names in alphabetical order:',
-  //  sortedOldHeatNames,
-  // );
+  console.log(
+    'Sorted old heat names in alphabetical order:',
+    sortedOldHeatNames,
+  );
 
   // We'll build a final array of assignments
   // each element is { heatId: number, boatId: number, boatName: string }
@@ -106,12 +91,11 @@ export function assignBoatsToNewHeats(
     heatId: number;
     boatId: number;
   }[] = [];
-
   // 2) For each old heat in alphabetical order, assign finishing positions to new heats
   sortedOldHeatNames.forEach((oldHeatName, oldHeatIndex) => {
-    //  console.log(
-    //    `\nProcessing old heat: "${oldHeatName}" (index ${oldHeatIndex})`,
-    //  );
+    console.log(
+      `\nProcessing old heat: "${oldHeatName}" (index ${oldHeatIndex})`,
+    );
 
     const boats = groupedByHeatName[oldHeatName];
 
@@ -124,15 +108,15 @@ export function assignBoatsToNewHeats(
       const newHeatIndex =
         (((oldHeatIndex - (finishingPos - 1)) % numHeats) + numHeats) %
         numHeats;
-      //   const boatName = `${boat.name} ${boat.surname}`;
+      const boatName = `${boat.name} ${boat.surname}`;
 
-      //  console.log(
-      //     `\tBoat: "${boatName}" (boat_id: ${
-      //       boat.boat_id
-      //    }), finishing position: ${finishingPos}, → newHeatIndex: ${newHeatIndex}, newHeatName: "${
-      //       nextHeatNames[newHeatIndex]
-      //      }"`,
-      //   );
+      console.log(
+        `\tBoat: "${boatName}" (boat_id: ${
+          boat.boat_id
+        }), finishing position: ${finishingPos}, → newHeatIndex: ${newHeatIndex}, newHeatName: "${
+          nextHeatNames[newHeatIndex]
+        }"`,
+      );
 
       // Push the assignment
       assignments.push({

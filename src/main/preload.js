@@ -68,6 +68,7 @@ const electronHandler = {
     updateRDGScores: heatRaceDB.updateRDGScores,
     readAllScoresForEventQualifying: heatRaceDB.readAllScoresForEventQualifying,
     readAllScoresForEventFinal: heatRaceDB.readAllScoresForEventFinal,
+    deleteLastCreatedHeatsWithRaces: heatRaceDB.deleteLastCreatedHeatsWithRaces,
   },
 };
 

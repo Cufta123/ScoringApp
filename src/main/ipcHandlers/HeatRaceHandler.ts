@@ -11,6 +11,7 @@ import {
   generateNextHeatNames,
 } from '../functions/creatingNewHeatsUtls';
 import calculateFinalBoatScores from '../functions/calculateFinalBoatScores';
+import LatestHeats from '../functions/LastestHeats';
 
 console.log('HeatRaceHandler.ts loaded');
 
@@ -1049,6 +1050,66 @@ ipcMain.handle('readAllScoresForEventFinal', async (event, event_id) => {
     return results;
   } catch (error) {
     console.error('Error reading all final scores for event:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('deleteLastCreatedHeatsWithRaces', async (event, event_id) => {
+  try {
+    // Get all heats for the specified event.
+    const heatsQuery = db.prepare(
+      'SELECT heat_id, heat_name FROM Heats WHERE event_id = ?',
+    );
+    const allHeats = heatsQuery.all(event_id);
+    if (!allHeats || allHeats.length === 0) {
+      console.log('No heats found for event', event_id);
+      return { success: true, message: 'No heats found' };
+    }
+
+    // Use the LatestHeats function to filter to last created heats per group.
+    const latestHeats = LatestHeats(allHeats);
+    console.log('Latest heats to delete:', latestHeats);
+
+    latestHeats.forEach((heat) => {
+      // Check for races linked to this heat.
+      const racesQuery = db.prepare(
+        'SELECT race_id FROM Races WHERE heat_id = ?',
+      );
+      const races = racesQuery.all(heat.heat_id);
+      if (races.length > 0) {
+        // Delete scores for each race.
+        const deleteScoresQuery = db.prepare(
+          'DELETE FROM Scores WHERE race_id = ?',
+        );
+        races.forEach((race: { race_id: any }) => {
+          deleteScoresQuery.run(race.race_id);
+        });
+        // Delete the races.
+        const deleteRacesQuery = db.prepare(
+          'DELETE FROM Races WHERE heat_id = ?',
+        );
+        deleteRacesQuery.run(heat.heat_id);
+      }
+      // Clean up any Heat_Boat entries.
+      const deleteHeatBoatQuery = db.prepare(
+        'DELETE FROM Heat_Boat WHERE heat_id = ?',
+      );
+      deleteHeatBoatQuery.run(heat.heat_id);
+      // Finally, delete the heat.
+      const deleteHeatQuery = db.prepare('DELETE FROM Heats WHERE heat_id = ?');
+      deleteHeatQuery.run(heat.heat_id);
+      console.log(
+        `Deleted heat ${heat.heat_name} (ID: ${heat.heat_id}) with its races and scores.`,
+      );
+    });
+
+    return {
+      success: true,
+      message:
+        'Latest heats with associated races and scores deleted successfully.',
+    };
+  } catch (error) {
+    console.error('Error deleting last created heats with races:', error);
     throw error;
   }
 });

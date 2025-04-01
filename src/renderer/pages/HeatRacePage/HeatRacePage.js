@@ -20,6 +20,7 @@ function HeatRacePage() {
   const [heats, setHeats] = useState([]);
   const [allHeatsEqual, setAllHeatsEqual] = useState(false);
   const [exportFormat, setExportFormat] = useState('excel');
+  const [needsLeaderboardUpdate, setNeedsLeaderboardUpdate] = useState(false);
 
   // Fetch or update event data
   useEffect(() => {
@@ -232,6 +233,43 @@ function HeatRacePage() {
     }
   }, [event, exportFormat, finalSeriesStarted]);
 
+  const handleUpdateLeaderboard = useCallback(async () => {
+    if (!finalSeriesStarted) {
+      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
+        event.event_id,
+        false,
+      );
+    } else {
+      console.log('Final series has started. Leaderboard will be updated.');
+      await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
+        event.event_id,
+      );
+    }
+  }, [finalSeriesStarted, event]);
+
+  const handleDeleteLastHeats = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete the last heats?',
+    );
+    if (!confirmed) return;
+    try {
+      await window.electron.sqlite.heatRaceDB.deleteLastCreatedHeatsWithRaces(
+        event.event_id,
+      );
+      fetchHeats();
+      setNeedsLeaderboardUpdate(true);
+    } catch (error) {
+      console.error('Error deleting last heats:', error.message);
+    }
+  }, [event.event_id, fetchHeats]);
+
+  useEffect(() => {
+    if (needsLeaderboardUpdate) {
+      handleUpdateLeaderboard();
+      setNeedsLeaderboardUpdate(false);
+    }
+  }, [needsLeaderboardUpdate, handleUpdateLeaderboard]);
+
   return (
     <div>
       <button
@@ -239,6 +277,9 @@ function HeatRacePage() {
         onClick={isScoring ? handleBackToHeats : () => navigate(-1)}
       >
         {isScoring ? 'Back to Heats' : 'Back'}
+      </button>
+      <button type="button" onClick={handleDeleteLastHeats}>
+        Delete Last Heats
       </button>
       {!isScoring ? (
         <>

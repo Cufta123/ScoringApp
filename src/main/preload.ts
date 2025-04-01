@@ -50,7 +50,8 @@ export type Channels =
   | 'getHeatDetails'
   | 'updateRDGScores'
   | 'readAllScoresForEventQualifying'
-  | 'readAllScoresForEventFinal';
+  | 'readAllScoresForEventFinal'
+  | 'deleteLastCreatedHeatsWithRaces';
 
 const electronHandler = {
   ipcRenderer: {
@@ -604,6 +605,20 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking swapRaceResults IPC:', error);
+          return false;
+        }
+      },
+      async deleteLastCreatedHeatsWithRaces(event_id: string) {
+        try {
+          return await ipcRenderer.invoke(
+            'deleteLastCreatedHeatsWithRaces',
+            event_id,
+          );
+        } catch (error) {
+          console.error(
+            'Error invoking deleteLastCreatedHeatsWithRaces IPC:',
+            error,
+          );
           return false;
         }
       },

@@ -25,14 +25,19 @@ export default async function handleStartFinalSeries({
     const rawScores = await window.electron.sqlite.heatRaceDB.getScoresResult(
       event.event_id,
     );
-    const qualifyingHeats = allHeats.filter(
-      (heat: { heat_type: string }) => heat.heat_type === 'Qualifying',
+    // Filter qualifying heats by checking for the new naming convention "QRace"
+    const qualifyingHeats = allHeats.filter((heat: { heat_name: string }) =>
+      heat.heat_name.startsWith('QRace'),
     );
+    // Extract the letter from "QRace [number], Heat [Letter]" and count unique letters
     const numFinalHeats = new Set(
-      qualifyingHeats.map(
-        (heat: { heat_name: { match: (arg0: RegExp) => any[] } }) =>
-          heat.heat_name.match(/Heat ([A-Z])/)[1],
-      ),
+      qualifyingHeats.map((heat: { heat_name: string }) => {
+        const match = heat.heat_name.match(/QRace\s*\d+,\s*Heat\s+([A-Z])/);
+        if (!match) {
+          throw new Error(`Heat name format unexpected: ${heat.heat_name}`);
+        }
+        return match[1];
+      }),
     ).size;
 
     // Fetch leaderboard and determine number of completed races
@@ -78,9 +83,8 @@ export default async function handleStartFinalSeries({
     // Determine fleet sizes using the ranking order in finalRanking
     const boatsPerFleet = Math.floor(finalRanking.length / numFinalHeats);
     const extraBoats = finalRanking.length % numFinalHeats;
-    const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
 
-    // Build data for each final heat (fleet)
+    // Build data for each final heat using the new naming convention
     let boatIndex = 0;
     const heatsData: {
       heatName: string;
@@ -89,8 +93,8 @@ export default async function handleStartFinalSeries({
     }[] = [];
 
     for (let i = 0; i < numFinalHeats; i += 1) {
-      const fleetName = fleetNames[i] || `Fleet ${i + 1}`;
-      const heatName = `Heat ${fleetName}`;
+      const heatLetter = String.fromCharCode(65 + i); // A, B, C, etc.
+      const heatName = `FRace, Heat ${heatLetter}`;
       const heatType = 'Final';
       const boatsInThisFleet = boatsPerFleet + (i < extraBoats ? 1 : 0);
 

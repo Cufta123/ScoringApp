@@ -133,41 +133,21 @@ export function assignBoatsToNewHeats(
 export function findLatestHeatsBySuffix(
   existingHeats: { heat_name: string; heat_id: number }[],
 ) {
-  const latestHeats = existingHeats.reduce(
-    (
-      acc: Record<
-        string,
-        { suffix: number; heat: { heat_name: string; heat_id: number } }
-      >,
-      heat: { heat_name: string; heat_id: number },
-    ) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [_, base, suffix] = match;
-        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-        acc[base] = acc[base] || { suffix: 0, heat: null };
-        if (numericSuffix > acc[base].suffix) {
-          acc[base] = { suffix: numericSuffix, heat };
-        }
-      }
-      return acc;
-    },
-    {},
-  );
-
-  return Object.values(latestHeats)
-    .map(
-      (entry) =>
-        (
-          entry as {
-            suffix: number;
-            heat: { heat_name: string; heat_id: number };
-          }
-        ).heat,
-    )
-    .filter((heat) => heat !== null); // Filter out null values
+  const latestHeats: Record<string, { heat_name: string; heat_id: number }> =
+    {};
+  console.log('Existing heats:', existingHeats);
+  existingHeats.forEach((heat) => {
+    // Updated regex: removed the $ anchor so that extra text doesn't prevent a match.
+    const match = heat.heat_name.match(/QRace\s+\d+,\s+Heat\s+([A-Z])/);
+    if (match) {
+      const letter = match[1];
+      // In case of duplicates, you can add extra logic if needed.
+      latestHeats[letter] = heat;
+    }
+  });
+  console.log('Latest heats:', latestHeats);
+  return Object.values(latestHeats);
 }
-
 export function checkRaceCountForLatestHeats(
   lastHeats: { heat_name: string; heat_id: number }[],
   database: any,
@@ -189,33 +169,42 @@ export function checkRaceCountForLatestHeats(
     throw new Error('Latest heats do not have the same number of races.');
   }
 }
-
 export function generateNextHeatNames(
   latestHeats: { heat_name: string; heat_id: number }[],
 ) {
-  const heatMap = latestHeats.reduce(
-    (
-      acc: Record<
-        string,
-        { suffix: number; heat: { heat_name: string; heat_id: number } }
-      >,
-      heat: { heat_name: string; heat_id: number },
-    ) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [_, base, suffix] = match;
-        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-        acc[base] = acc[base] || { suffix: 0, heat: null };
-        if (numericSuffix > acc[base].suffix) {
-          acc[base] = { suffix: numericSuffix, heat };
-        }
-      }
-      return acc;
-    },
-    {},
-  );
+  // Determine the current race number by matching without the $ anchor to allow extra text.
+  let currentRaceNumber = 1;
+  if (latestHeats.length > 0) {
+    const match = latestHeats[0].heat_name.match(
+      /QRace\s+(\d+),\s+Heat\s+([A-Z])/,
+    );
+    if (match) {
+      currentRaceNumber = parseInt(match[1], 10);
+    }
+  }
+  // Next race number is current + 1.
+  const nextRaceNumber = currentRaceNumber + 1;
 
-  return Object.keys(heatMap).map(
-    (base) => `Heat ${base}${heatMap[base].suffix + 1}`,
+  // Get all letters from latestHeats (remove duplicates and sort them alphabetically).
+  const letters = latestHeats
+    .map((heat) => {
+      const match = heat.heat_name.match(/QRace\s+\d+,\s+Heat\s+([A-Z])/);
+      return match ? match[1] : null;
+    })
+    .filter((letter) => letter !== null) as string[];
+
+  const uniqueLetters = Array.from(new Set(letters)).sort();
+
+  if (uniqueLetters.length === 0) {
+    // If none available, default to a set of letters.
+    const defaultLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    return defaultLetters.map(
+      (letter) => `QRace ${nextRaceNumber}, Heat ${letter}`,
+    );
+  }
+
+  // Generate the new heat names using the sorted unique letters.
+  return uniqueLetters.map(
+    (letter) => `QRace ${nextRaceNumber}, Heat ${letter}`,
   );
 }

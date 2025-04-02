@@ -320,7 +320,9 @@ ipcMain.handle('createNewHeatsBasedOnLeaderboard', async (event, event_id) => {
     checkRaceCountForLatestHeats(latestHeats, db);
 
     // Define the new race number
-    const heatNameMatch = latestHeats[0].heat_name.match(/(\d+)$/);
+    const heatNameMatch = latestHeats[0].heat_name.match(
+      /QRace\s+(\d+),\s+Heat\s+[A-Z]$/,
+    );
     const lastRaceNumber = heatNameMatch ? parseInt(heatNameMatch[1], 10) : 0;
     const raceNumber = lastRaceNumber + 1;
     console.log(raceNumber);

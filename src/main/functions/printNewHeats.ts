@@ -2,29 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-const getLatestHeats = (heats: any[]) => {
-  const latestHeatsMap = heats.reduce(
-    (
-      acc: { [x: string]: { suffix: number; heat: any } },
-      heat: { heat_name: string },
-    ) => {
-      const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-      if (match) {
-        const [, base, suffix] = match;
-        const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-        if (!acc[base] || numericSuffix > acc[base].suffix) {
-          acc[base] = { suffix: numericSuffix, heat };
-        }
-      }
-      return acc;
-    },
-    {},
-  );
-  return (Object.values(latestHeatsMap) as { suffix: number; heat: any }[]).map(
-    (entry) => entry.heat,
-  );
-};
+import LatestHeats from './LastestHeats';
 
 export default async function printNewHeats(
   event: { event_name: any },
@@ -42,7 +20,7 @@ export default async function printNewHeats(
   const heatsFiltered = finalSeriesStarted
     ? heats.filter((heat) => heat.heat_type === 'Final')
     : heats;
-  const latestHeats = getLatestHeats(heatsFiltered);
+  const latestHeats = LatestHeats(heatsFiltered);
   console.log('Latest heats to print:', latestHeats);
   const heatsToPrint = latestHeats;
 
@@ -107,14 +85,12 @@ export default async function printNewHeats(
       if (finalSeriesStarted) {
         filename = `${eventName}_final_series_heats.xlsx`;
       } else {
-        const heatNumber =
+        const raceMatch =
           heatsToPrint.length > 0
-            ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
-                null,
-                'unknown',
-              ])[1]
-            : 'unknown';
-        filename = `${eventName}_heat_${heatNumber}.xlsx`;
+            ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+            : null;
+        const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
+        filename = `${eventName}_heat_${raceNumber}.xlsx`;
       }
       saveAs(blob, filename);
     } catch (error) {
@@ -153,14 +129,12 @@ export default async function printNewHeats(
     if (finalSeriesStarted) {
       pdfFilename = `${eventName}_final_series_heats.pdf`;
     } else {
-      const heatNumber =
+      const raceMatch =
         heatsToPrint.length > 0
-          ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
-              null,
-              'unknown',
-            ])[1]
-          : 'unknown';
-      pdfFilename = `${eventName}_heat_${heatNumber}.pdf`;
+          ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+          : null;
+      const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
+      pdfFilename = `${eventName}_heat_${raceNumber}.pdf`;
     }
     doc.save(pdfFilename);
   } else if (format === 'html') {
@@ -197,14 +171,12 @@ export default async function printNewHeats(
     if (finalSeriesStarted) {
       htmlFilename = `${eventName}_final_series_heats.html`;
     } else {
-      const heatNumber =
+      const raceMatch =
         heatsToPrint.length > 0
-          ? (heatsToPrint[0].heat_name.match(/Heat [A-Z]*(\d+)$/) || [
-              null,
-              'unknown',
-            ])[1]
-          : 'unknown';
-      htmlFilename = `${eventName}_heat_${heatNumber}.html`;
+          ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+          : null;
+      const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
+      htmlFilename = `${eventName}_heat_${raceNumber}.html`;
     }
     saveAs(blob, htmlFilename);
   }

@@ -112,9 +112,11 @@ function HeatComponent({
         });
       }
 
+      const raceNumber = 1; // or derive this from your event/custom logic
       const heatPromises = [];
       for (let i = 0; i < numHeats; i += 1) {
-        const heatName = `Heat ${String.fromCharCode(65 + i)}1`;
+        const heatLetter = String.fromCharCode(65 + i);
+        const heatName = `QRace ${raceNumber}, Heat ${heatLetter}`;
         heatPromises.push(
           window.electron.sqlite.heatRaceDB.insertHeat(
             event.event_id,
@@ -181,29 +183,28 @@ function HeatComponent({
   };
 
   const getLastHeats = (heatsList) => {
+    // If any finals exist, return those
     const finals = heatsList.filter(
       (heat) => heat.heat_type.toLowerCase() === 'final',
     );
     if (finals.length) return finals;
 
-    // Determine last heat per group based on heat name format
-    const lastSuffixPerGroup = heatsList.reduce((acc, heat) => {
-      const match = heat.heat_name.match(/([A-Z]+)(\d*)$/);
+    const pattern = /QRace\s+(\d+),\s+Heat\s+([A-Z])/;
+    // Group heats by race number (as a number)
+    const groups = {};
+    heatsList.forEach((heat) => {
+      const match = heat.heat_name.match(pattern);
       if (match) {
-        const [, group, suffix] = match;
-        const numSuffix = suffix ? parseInt(suffix, 10) : 0;
-        acc[group] = Math.max(acc[group] || 0, numSuffix);
+        const race = Number(match[1]);
+        if (!groups[race]) {
+          groups[race] = [];
+        }
+        groups[race].push(heat);
       }
-      return acc;
-    }, {});
-
-    return heatsList.filter((heat) => {
-      const match = heat.heat_name.match(/([A-Z]+)(\d*)$/);
-      if (!match) return false;
-      const [, group, suffix] = match;
-      const numSuffix = suffix ? parseInt(suffix, 10) : 0;
-      return numSuffix === lastSuffixPerGroup[group];
     });
+    // Get the highest (latest) race number
+    const latestRace = Math.max(...Object.keys(groups).map(Number));
+    return groups[latestRace] || [];
   };
 
   const initiateFinalSeries = () => {

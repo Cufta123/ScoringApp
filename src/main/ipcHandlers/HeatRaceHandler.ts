@@ -1004,7 +1004,9 @@ ipcMain.handle('readAllScoresForEventQualifying', async (event, event_id) => {
   try {
     const query = `
       SELECT
-        s.*,
+        s.points,
+        s.race_id,
+        s.status,
         r.race_number,
         h.heat_name,
         h.heat_type,

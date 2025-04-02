@@ -49,11 +49,66 @@ function LeaderboardComponent({ eventId }) {
     return iocToFlagCodeMap[iocCode] || iocCode;
   };
 
+  const processQualifyingPoints = (qualifyingPoints) => {
+    const number_of_races = qualifyingPoints.length;
+    let excludeCount = 0;
+
+    if (number_of_races >= 4) {
+      excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
+    }
+
+    // Only consider "FINISHED" races for exclusion.
+
+    const validRaceValues = qualifyingPoints
+      .map((point) => point.points)
+      .sort((a, b) => b - a);
+
+    // Create a copy of the worst places to track exclusions.
+    const worstPlaces = validRaceValues.slice(0, excludeCount);
+    const worstPlacesTracker = [...worstPlaces];
+
+    let excludeCounter = 0;
+    const markedQualifyingPoints = qualifyingPoints.map((point) => {
+      // Check if the point is among the worst places to exclude.
+      const isWorstPlace =
+        worstPlacesTracker.includes(point.points) &&
+        excludeCounter < excludeCount;
+
+      if (isWorstPlace) {
+        excludeCounter += 1;
+        // Remove the point from the tracker to avoid duplicate exclusions.
+        worstPlacesTracker.splice(worstPlacesTracker.indexOf(point.points), 1);
+      }
+
+      // Format based on status and whether it's a worst place.
+      if (point.status !== 'FINISHED') {
+        return {
+          ...point,
+          formatted: isWorstPlace
+            ? `(${point.status} ${point.points})`
+            : `${point.status} ${point.points}`,
+        };
+      }
+
+      return {
+        ...point,
+        formatted: isWorstPlace ? `(${point.points})` : `${point.points}`,
+      };
+    });
+
+    return markedQualifyingPoints;
+  };
+
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const [finalResults, eventResults] = await Promise.all([
+      const [finalResults, eventResults, qualifyingScores] = await Promise.all([
         window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId),
         window.electron.sqlite.heatRaceDB.readLeaderboard(eventId),
+        finalSeriesStarted
+          ? window.electron.sqlite.heatRaceDB.readAllScoresForEventQualifying(
+              eventId,
+            )
+          : [],
       ]);
       const results = finalSeriesStarted
         ? await window.electron.sqlite.heatRaceDB.readFinalLeaderboard(eventId)
@@ -61,6 +116,18 @@ function LeaderboardComponent({ eventId }) {
 
       console.log('Fetched results:', results);
 
+      const qualifyingScoresGrouped = qualifyingScores.reduce((acc, score) => {
+        if (!acc[score.boat_id]) {
+          acc[score.boat_id] = [];
+        }
+        acc[score.boat_id].push({
+          points: score.points,
+          status: score.status,
+        });
+        acc[score.boat_id] = processQualifyingPoints(acc[score.boat_id]); // Process the points
+        return acc;
+      }, {});
+      console.log('Qualifying scores:', qualifyingScoresGrouped);
       // Add this helper to extract the numeric value from a race result.
       const parseRaceValue = (race) => {
         const sanitized = race.replace(/[^\d.]/g, '');
@@ -112,8 +179,10 @@ function LeaderboardComponent({ eventId }) {
           ? eventResult.total_points_event || 0
           : 0;
         const total_points_combined = total_points_final + total_points_event;
+        const qualifyingPoints =
+          qualifyingScoresGrouped[finalResult.boat_id] || []; // Use qualifyingScoresGrouped directly
 
-        // NEW: combine raw points in the same way
+        // Combine raw points in the same way
         const total_raw_points_final = finalResult.total_raw_points || 0;
         const total_raw_points_event = eventResult
           ? eventResult.total_raw_points || 0
@@ -123,12 +192,13 @@ function LeaderboardComponent({ eventId }) {
 
         return {
           ...finalResult,
+          qualifyingPoints, // Include qualifyingPoints here
           races: finalResult.race_positions
             ? finalResult.race_positions.split(',')
             : [],
           race_ids: finalResult.race_ids ? finalResult.race_ids.split(',') : [],
           total_points_combined,
-          total_raw_points_combined, // add combined raw points
+          total_raw_points_combined,
         };
       });
 
@@ -138,6 +208,7 @@ function LeaderboardComponent({ eventId }) {
         );
         return {
           ...entry,
+          qualifyingPoints: combinedEntry?.qualifyingPoints || [],
           total_points_combined: finalSeriesStarted
             ? (combinedEntry?.total_points_combined ??
               entry.total_points_event ??
@@ -407,22 +478,20 @@ function LeaderboardComponent({ eventId }) {
       return acc;
     }, {}) || {};
 
-  const groupOrder = ['Gold', 'Silver', 'Bronze', 'Copper', 'Iron', 'Tin'];
   const sortedGroups = Object.keys(groupedLeaderboard).sort((a, b) => {
-    // Create a regex that matches any of the group names
-    const regex = new RegExp(groupOrder.join('|'), 'i');
-    const extractGroup = (group) => {
-      const match = group.match(regex);
-      return match ? match[0] : group;
+    const extractHeatOrder = (group) => {
+      const match = group.match(/Heat ([A-Z])/i);
+      return match ? match[1].charCodeAt(0) : Infinity; // Convert 'A', 'B', etc., to their ASCII values
     };
-    const aGroup = extractGroup(a);
-    const bGroup = extractGroup(b);
-    // Normalize to proper case to match the order array
-    const normalize = (s) =>
-      s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-    const indexA = groupOrder.indexOf(normalize(aGroup));
-    const indexB = groupOrder.indexOf(normalize(bGroup));
-    return indexA - indexB;
+
+    const isFRace = (group) => group.startsWith('FRace');
+
+    if (isFRace(a) && isFRace(b)) {
+      return extractHeatOrder(a) - extractHeatOrder(b);
+    }
+    if (isFRace(a)) return -1; // Ensure FRace groups come first
+    if (isFRace(b)) return 1;
+    return a.localeCompare(b); // Fallback to alphabetical order for other groups
   });
   const handlePrintLeaderboard = async () => {
     try {
@@ -583,11 +652,44 @@ function LeaderboardComponent({ eventId }) {
                   <th>Country</th>
                   <th>Sail Number</th>
                   <th>Boat Type</th>
+
+                  <th>Total Points</th>
+                  <th>Total Points Adjusted</th>
+
+                  {(() => {
+                    const maxQualifyingPoints = Math.max(
+                      ...groupedLeaderboard[group].map(
+                        (entry) => entry.qualifyingPoints?.length || 0, // Safely access length
+                      ),
+                    );
+                    return Array.from({ length: maxQualifyingPoints }).map(
+                      (_, index) => {
+                        // eslint-disable-next-line react/no-array-index-key
+                        return (
+                          <th
+                            key={`qualifying-header-Q${index + 1}`}
+                            style={{ width: '60px', minWidth: '60px' }}
+                          >
+                            {' '}
+                            Q{index + 1}
+                          </th>
+                        );
+                      },
+                    );
+                  })()}
+
                   {(() => {
                     const headers = [];
                     for (let j = 1; j <= groupRacesCount; j += 1) {
                       // Only add Race and Penalty headers
-                      headers.push(<th key={`race-${j}`}>Race {j}</th>);
+                      headers.push(
+                        <th
+                          key={`race-${j}`}
+                          style={{ width: '60px', minWidth: '60px' }}
+                        >
+                          F {j}
+                        </th>,
+                      );
                       if (editMode && !swapMode) {
                         headers.push(
                           <th key={`penalty-${j}`}>Penalty Race {j}</th>,
@@ -596,27 +698,45 @@ function LeaderboardComponent({ eventId }) {
                     }
                     return headers;
                   })()}
-
-                  <th>Total Points</th>
-                  <th>Total Points Adjustet</th>
                 </tr>
               </thead>
               <tbody>
                 {groupedLeaderboard[group]?.map((entry, index) => (
                   <tr key={`boat-${entry.boat_id}`}>
-                    <td>{index + 1}</td>
-                    <td>
+                    <td style={{ width: '50px', minWidth: '50px' }}>
+                      {index + 1}
+                    </td>
+                    <td style={{ width: '120px', minWidth: '90px' }}>
                       {entry.name} {entry.surname}
                     </td>
-                    <td>
+                    <td style={{ width: '70px', minWidth: '60px' }}>
                       <Flag
                         code={getFlagCode(entry.country)}
                         style={{ width: '30px', marginRight: '5px' }}
                       />
                       {entry.country}
                     </td>
-                    <td>{entry.boat_number}</td>
-                    <td>{entry.boat_type}</td>
+                    <td style={{ width: '70px', minWidth: '60px' }}>
+                      {entry.boat_number}
+                    </td>
+                    <td style={{ width: '70px' }}>{entry.boat_type}</td>
+                    <td style={{ width: '70px' }}>
+                      {finalSeriesStarted
+                        ? entry.total_raw_points_combined
+                        : entry.total_raw_points}
+                    </td>
+                    <td style={{ width: '70px' }}>
+                      {finalSeriesStarted
+                        ? entry.total_points_combined
+                        : entry.total_points_event}
+                    </td>
+                    {(entry.qualifyingPoints || []).map(
+                      (qualifyingPoint, qIndex) => (
+                        <td key={`qualifying-${entry.boat_id}-${qIndex}`}>
+                          {qualifyingPoint.formatted}
+                        </td>
+                      ),
+                    )}
                     {Array.from({ length: groupRacesCount }).map(
                       (_, raceIndex) => {
                         // Compute cell's raceId from entry.race_ids (handle string or array)
@@ -769,16 +889,6 @@ function LeaderboardComponent({ eventId }) {
                         );
                       },
                     )}
-                    <td>
-                      {finalSeriesStarted
-                        ? entry.total_raw_points_combined
-                        : entry.total_raw_points}
-                    </td>
-                    <td>
-                      {finalSeriesStarted
-                        ? entry.total_points_combined
-                        : entry.total_points_event}
-                    </td>
                   </tr>
                 ))}
               </tbody>

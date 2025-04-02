@@ -2,6 +2,7 @@
 import { ipcMain } from 'electron';
 import { parse } from 'csv-parse/sync';
 import * as fs from 'fs/promises';
+import * as iconv from 'iconv-lite';
 import { db } from '../../../public/Database/DBManager';
 
 const calculateCategory = (birthday: string): number => {
@@ -38,8 +39,11 @@ ipcMain.handle(
   async (event, args: { filePath: string; eventId: number }) => {
     try {
       const { filePath, eventId } = args;
-      // Read CSV file content
-      const csvData = await fs.readFile(filePath, 'utf8');
+      // Read CSV file as a Buffer
+      const buffer = await fs.readFile(filePath);
+      // Decode using appropriate source encoding; adjust 'win1250' if necessary.
+      const csvData = iconv.decode(buffer, 'utf-8');
+
       // Parse the CSV using delimiter ";" and skipping the header row.
       const records = parse(csvData, {
         delimiter: ';',

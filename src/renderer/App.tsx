@@ -5,6 +5,7 @@ import EventPage from './pages/EventPage/EventPage';
 import HeatRacePage from './pages/HeatRacePage/HeatRacePage';
 import LeaderboardPage from './pages/LeaderboardPage/LeaderBoardPage';
 import LandingSailorPage from './pages/LandingSailorPage/LandingSailorPage';
+import './App.css';
 
 function App() {
   return (

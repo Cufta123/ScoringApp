@@ -2,6 +2,28 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
+import iocCountries from '../../renderer/constants/iocCountries.json'; // new import
+
+// Helper to return the flag based on the provided country value.
+function countryCodeToEmoji(code: string): string {
+  const codePoints = Array.from(code.toUpperCase()).map(
+    (char) => 127397 + char.charCodeAt(0),
+  );
+  return String.fromCodePoint(...codePoints);
+}
+
+// Helper to return the flag icon (emoji) based on the provided country value.
+function getFlag(country: string): string {
+  // If the value is already an IOC code, return the mapped flag emoji.
+  const iocCode = iocToFlagCodeMap[country];
+  if (iocCode) return countryCodeToEmoji(iocCode);
+  // Otherwise, search for a matching country name (case-insensitive)
+  const key = Object.keys(iocCountries).find(
+    (k) => iocCountries[k].toLowerCase() === country.toLowerCase(),
+  );
+  return key ? countryCodeToEmoji(iocToFlagCodeMap[key] || country) : country;
+}
 
 export default async function printStartingList(
   event: any,
@@ -36,12 +58,15 @@ export default async function printStartingList(
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Competitor List');
 
-    // Define columns
+    // Define columns in the new order:
     worksheet.columns = [
       { key: 'name', header: 'Name', width: 20 },
       { key: 'surname', header: 'Surname', width: 20 },
+      { key: 'category', header: 'Category', width: 15 },
+
       { key: 'country', header: 'Country', width: 20 },
       { key: 'sail_number', header: 'Sail Number', width: 15 },
+      { key: 'model', header: 'Model', width: 15 },
       { key: 'club', header: 'Club', width: 20 },
     ];
 
@@ -49,15 +74,16 @@ export default async function printStartingList(
     worksheet.insertRow(1, [eventName]);
     // Insert a blank row for spacing
     worksheet.insertRow(2, []);
-    // Insert the header row manually so it appears below the event name row
-
     // Add data rows starting at row 4
     sortedSailors.forEach((sailor) => {
       worksheet.addRow({
         name: sailor.name || 'N/A',
         surname: sailor.surname || 'N/A',
-        country: sailor.country || sailor.boat_country || 'N/A',
+        category: sailor.category || 'N/A',
+        country: sailor.country || 'N/A',
         sail_number: sailor.sail_number || 'N/A',
+        model: sailor.model || 'N/A',
+
         club: sailor.club || sailor.club_name || 'N/A',
       });
     });
@@ -79,12 +105,25 @@ export default async function printStartingList(
     doc.text(`Event: ${eventName}`, 14, 16);
     const startY = 22;
 
-    const header = ['Name', 'Surname', 'Country', 'Sail Number', 'Club'];
+    // Define header in the new order
+    const header = [
+      'Name',
+      'Surname',
+      'Flag',
+      'Category',
+      'Country',
+      'Sail Number',
+      'Model',
+      'Club',
+    ];
     const body = sortedSailors.map((sailor) => [
       sailor.name || 'N/A',
       sailor.surname || 'N/A',
-      sailor.country || sailor.boat_country || 'N/A',
+      getFlag(sailor.country || 'N/A'),
+      sailor.category || 'N/A',
+      sailor.country || 'N/A',
       sailor.sail_number || 'N/A',
+      sailor.model || 'N/A',
       sailor.club || sailor.club_name || 'N/A',
     ]);
 
@@ -97,6 +136,7 @@ export default async function printStartingList(
 
     doc.save(`${eventName}_starting_list.pdf`);
   } else if (format === 'html') {
+    // Build HTML table with new column order
     let html = `<html><head><title>${eventName} Starting List</title>
     <style>
       table { border-collapse: collapse; width: 100%; }
@@ -109,16 +149,22 @@ export default async function printStartingList(
     html += `<table><thead><tr>
       <th>Name</th>
       <th>Surname</th>
+      <th>Flag</th>
+      <th>Category</th>
       <th>Country</th>
       <th>Sail Number</th>
+      <th>Model</th>
       <th>Club</th>
       </tr></thead><tbody>`;
     sortedSailors.forEach((sailor) => {
       html += `<tr>
         <td>${sailor.name || 'N/A'}</td>
         <td>${sailor.surname || 'N/A'}</td>
-        <td>${sailor.country || sailor.boat_country || 'N/A'}</td>
+        <td>${getFlag(sailor.country || 'N/A')}</td>
+        <td>${sailor.category || 'N/A'}</td>
+        <td>${sailor.country || 'N/A'}</td>
         <td>${sailor.sail_number || 'N/A'}</td>
+        <td>${sailor.model || 'N/A'}</td>
         <td>${sailor.club || sailor.club_name || 'N/A'}</td>
         </tr>`;
     });

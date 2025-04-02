@@ -15,6 +15,9 @@ function HeatComponent({
   selectedHeatId = null,
   handleStartScoring = () => {},
   handleFinalSeriesStarted = () => {},
+  showDeleteModal,
+  deleteRaceMode,
+  deleteHeatMode, // new prop
 }) {
   const [heats, setHeats] = useState([]);
   const [numHeats, setNumHeats] = useState(5); // Default number of heats
@@ -235,58 +238,63 @@ function HeatComponent({
   return (
     <div>
       <div>
-        {!showCustomAssignment && !raceHappened && !finalSeriesStarted && (
-          <>
-            <label htmlFor="numHeats">Select Number of Heats:</label>
-            <select
-              id="numHeats"
-              style={{ maxWidth: '70px' }}
-              value={numHeats}
-              onChange={(e) => setNumHeats(Number(e.target.value))}
-              disabled={raceHappened || finalSeriesStarted}
-            >
-              {[...Array(10).keys()].map((i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
-              disabled={raceHappened || finalSeriesStarted}
-            >
-              {heatsCreated ? 'Reset and Generate Heats' : 'Generate New Heats'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCustomAssignment(true)}
-              disabled={raceHappened || finalSeriesStarted}
-            >
-              {customAssignment.length > 0
-                ? 'Edit Custom Assignment (Active)'
-                : 'Custom Heat Assignment'}
-            </button>
-            {customAssignment.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'Are you sure you want to clear the custom assignment?',
-                    )
-                  ) {
-                    setCustomAssignment([]);
-                    alert('Custom assignment cleared.');
-                  }
-                }}
+        {!showCustomAssignment &&
+          !raceHappened &&
+          !finalSeriesStarted &&
+          !showDeleteModal && (
+            <>
+              <label htmlFor="numHeats">Select Number of Heats:</label>
+              <select
+                id="numHeats"
+                style={{ maxWidth: '70px' }}
+                value={numHeats}
+                onChange={(e) => setNumHeats(Number(e.target.value))}
                 disabled={raceHappened || finalSeriesStarted}
               >
-                Clear Custom Assignment
+                {[...Array(10).keys()].map((i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={heatsCreated ? handleRecreateHeats : handleCreateHeats}
+                disabled={raceHappened || finalSeriesStarted}
+              >
+                {heatsCreated
+                  ? 'Reset and Generate Heats'
+                  : 'Generate New Heats'}
               </button>
-            )}
-          </>
-        )}
+              <button
+                type="button"
+                onClick={() => setShowCustomAssignment(true)}
+                disabled={raceHappened || finalSeriesStarted}
+              >
+                {customAssignment.length > 0
+                  ? 'Edit Custom Assignment (Active)'
+                  : 'Custom Heat Assignment'}
+              </button>
+              {customAssignment.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Are you sure you want to clear the custom assignment?',
+                      )
+                    ) {
+                      setCustomAssignment([]);
+                      alert('Custom assignment cleared.');
+                    }
+                  }}
+                  disabled={raceHappened || finalSeriesStarted}
+                >
+                  Clear Custom Assignment
+                </button>
+              )}
+            </>
+          )}
       </div>
 
       {showCustomAssignment && (
@@ -297,17 +305,20 @@ function HeatComponent({
         />
       )}
 
-      {raceHappened && (
+      {raceHappened && !showDeleteModal && !deleteRaceMode && (
         <button type="button" onClick={toggleDisplayMode}>
           {displayLastHeats ? 'View All Heats' : 'View Final Heats'}
         </button>
       )}
 
-      {raceHappened && !finalSeriesStarted && (
-        <button type="button" onClick={initiateFinalSeries}>
-          Begin Final Series
-        </button>
-      )}
+      {raceHappened &&
+        !finalSeriesStarted &&
+        !showDeleteModal &&
+        !deleteRaceMode && (
+          <button type="button" onClick={initiateFinalSeries}>
+            Begin Final Series
+          </button>
+        )}
 
       {/* Only show heats if custom assignment panel is not active */}
       {!showCustomAssignment && heatsToDisplay.length > 0 && (
@@ -320,6 +331,9 @@ function HeatComponent({
           handleDisplayHeats={handleDisplayHeats}
           selectedHeatId={selectedHeatId}
           handleStartScoring={handleStartScoring}
+          deleteRaceMode={deleteRaceMode}
+          deleteHeatMode={deleteHeatMode} // pass along
+          deleteOptionsActive={showDeleteModal} // pass modal status as extra flag
         />
       )}
     </div>
@@ -336,6 +350,9 @@ HeatComponent.propTypes = {
   selectedHeatId: PropTypes.number,
   handleStartScoring: PropTypes.func,
   handleFinalSeriesStarted: PropTypes.func,
+  showDeleteModal: PropTypes.bool,
+  deleteRaceMode: PropTypes.bool,
+  deleteHeatMode: PropTypes.bool, // new prop type
 };
 
 export default HeatComponent;

@@ -21,8 +21,10 @@ function HeatRacePage() {
   const [allHeatsEqual, setAllHeatsEqual] = useState(false);
   const [exportFormat, setExportFormat] = useState('excel');
   const [needsLeaderboardUpdate, setNeedsLeaderboardUpdate] = useState(false);
+  const [deleteHeatMode, setDeleteHeatMode] = useState(false);
+  const [deleteRaceMode, setDeleteRaceMode] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Fetch or update event data
   useEffect(() => {
     if (!eventData && event) {
       window.electron.sqlite.eventDB
@@ -117,9 +119,75 @@ function HeatRacePage() {
     evaluateHeatsEquality();
   }, [heats, event, evaluateHeatsEquality]);
 
-  const handleHeatSelect = useCallback((heat) => {
-    setSelectedHeat(heat);
-  }, []);
+  const handleHeatDelete = useCallback(
+    async (heat) => {
+      const confirmed = window.confirm(
+        `Are you sure you want to delete heat "${heat.heat_name}"?`,
+      );
+      if (!confirmed) return;
+      try {
+        await window.electron.sqlite.heatRaceDB.deleteHeatById(heat.heat_id);
+        fetchHeats();
+        setDeleteHeatMode(false);
+      } catch (error) {
+        console.error('Error deleting heat:', error.message);
+      }
+    },
+    [fetchHeats],
+  );
+  const cancelDeleteMode = () => {
+    setDeleteHeatMode(false);
+    setDeleteRaceMode(false);
+    setShowDeleteModal(false);
+  };
+  const handleDeleteLastHeats = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete the last heats?',
+    );
+    if (!confirmed) return;
+    try {
+      await window.electron.sqlite.heatRaceDB.deleteLastCreatedHeatsWithRaces(
+        event.event_id,
+      );
+      fetchHeats();
+      setNeedsLeaderboardUpdate(true);
+    } catch (error) {
+      console.error('Error deleting last heats:', error.message);
+    }
+  }, [event.event_id, fetchHeats]);
+
+  const handleRaceDelete = useCallback(
+    async (heat) => {
+      const confirmed = window.confirm(
+        `Are you sure you want to delete the last race for heat "${heat.heat_name}"?`,
+      );
+      if (!confirmed) return;
+      try {
+        await window.electron.sqlite.heatRaceDB.deleteLastRaceForHeat(
+          heat.heat_id,
+        );
+        fetchHeats();
+        setNeedsLeaderboardUpdate(true);
+        cancelDeleteMode(); // Exit delete mode on successful deletion
+      } catch (error) {
+        console.error('Error deleting race:', error.message);
+      }
+    },
+    [fetchHeats], // cancelDeleteMode is defined within the same scope so it can be called here.
+  );
+
+  const handleHeatSelect = useCallback(
+    (heat) => {
+      if (deleteHeatMode) {
+        handleHeatDelete(heat);
+      } else if (deleteRaceMode) {
+        handleRaceDelete(heat);
+      } else {
+        setSelectedHeat(heat);
+      }
+    },
+    [deleteHeatMode, deleteRaceMode, handleHeatDelete, handleRaceDelete],
+  );
 
   const handleStartScoring = useCallback(() => {
     setIsScoring(true);
@@ -165,7 +233,6 @@ function HeatRacePage() {
           }),
         );
 
-        // Update leaderboards after RDG scores have been updated.
         if (!finalSeriesStarted) {
           const allEqual = await evaluateHeatsEquality();
           if (allEqual) {
@@ -247,22 +314,6 @@ function HeatRacePage() {
     }
   }, [finalSeriesStarted, event]);
 
-  const handleDeleteLastHeats = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete the last heats?',
-    );
-    if (!confirmed) return;
-    try {
-      await window.electron.sqlite.heatRaceDB.deleteLastCreatedHeatsWithRaces(
-        event.event_id,
-      );
-      fetchHeats();
-      setNeedsLeaderboardUpdate(true);
-    } catch (error) {
-      console.error('Error deleting last heats:', error.message);
-    }
-  }, [event.event_id, fetchHeats]);
-
   useEffect(() => {
     if (needsLeaderboardUpdate) {
       handleUpdateLeaderboard();
@@ -270,39 +321,136 @@ function HeatRacePage() {
     }
   }, [needsLeaderboardUpdate, handleUpdateLeaderboard]);
 
+  const toggleDeleteOptionsModal = () => {
+    setShowDeleteModal((prev) => !prev);
+    setSelectedHeat(null); // clear selection so blue border is removed
+  };
+
+  const selectDeleteRaceMode = () => {
+    setDeleteRaceMode(true);
+    setDeleteHeatMode(false);
+    setShowDeleteModal(false);
+  };
+
   return (
-    <div>
-      <button
-        type="button"
-        onClick={isScoring ? handleBackToHeats : () => navigate(-1)}
-      >
-        {isScoring ? 'Back to Heats' : 'Back'}
-      </button>
-      <button type="button" onClick={handleDeleteLastHeats}>
-        Delete Last Heats
-      </button>
-      {!isScoring ? (
-        <>
-          <HeatComponent
-            key={JSON.stringify(heats)}
-            event={event}
-            heats={heats}
-            onHeatSelect={handleHeatSelect}
-            clickable
-            selectedHeatId={selectedHeat?.heat_id}
-            handleStartScoring={handleStartScoring}
-            handleFinalSeriesStarted={() => setFinalSeriesStarted(true)}
-          />
-          {!finalSeriesStarted && allHeatsEqual && (
+    <div className="heat-race-page">
+      <header className="header-buttons">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={isScoring ? handleBackToHeats : () => navigate(-1)}
+        >
+          {isScoring ? 'Back to Heats' : 'Back'}
+        </button>
+        {!isScoring &&
+          !showDeleteModal &&
+          !deleteRaceMode &&
+          !deleteHeatMode && (
             <button
               type="button"
-              onClick={handleCreateNewHeatsBasedOnLeaderboard}
+              className="btn btn-danger"
+              onClick={toggleDeleteOptionsModal}
             >
-              Create New Heats
+              Delete Options
             </button>
           )}
+      </header>
+
+      {showDeleteModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Deletion Options</h3>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleDeleteLastHeats}
+            >
+              Delete Heats
+            </button>
+            <button
+              type="button"
+              className="btn btn-warning"
+              onClick={selectDeleteRaceMode}
+            >
+              Delete Last Race
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={cancelDeleteMode}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="content-container">
+        {!isScoring ? (
+          <>
+            <HeatComponent
+              key={JSON.stringify(heats)}
+              event={event}
+              heats={heats}
+              onHeatSelect={handleHeatSelect}
+              clickable
+              selectedHeatId={selectedHeat?.heat_id}
+              handleStartScoring={handleStartScoring}
+              handleFinalSeriesStarted={() => setFinalSeriesStarted(true)}
+              showDeleteModal={showDeleteModal}
+              deleteRaceMode={deleteRaceMode}
+              deleteHeatMode={deleteHeatMode} // newly passed
+            />
+            {deleteRaceMode && (
+              <div className="delete-mode-prompt">
+                Delete Mode Active: Click on a heat table to delete its last
+                race.
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={cancelDeleteMode}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {deleteHeatMode && (
+              <div className="delete-mode-prompt">
+                Delete Mode Active: Click on a heat table to delete the entire
+                heat.
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={cancelDeleteMode}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {!finalSeriesStarted && allHeatsEqual && !showDeleteModal && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateNewHeatsBasedOnLeaderboard}
+              >
+                Create New Heats
+              </button>
+            )}
+          </>
+        ) : (
+          <ScoringInputComponent
+            heat={selectedHeat}
+            onSubmit={handleSubmitScores}
+            onBack={handleBackToHeats}
+          />
+        )}
+      </main>
+
+      {!isScoring && !showDeleteModal && !deleteRaceMode && (
+        <footer className="footer-controls">
           <select
             id="exportFormat"
+            className="form-select"
             value={exportFormat}
             onChange={(e) => setExportFormat(e.target.value)}
             style={{ maxWidth: '80px' }}
@@ -312,21 +460,23 @@ function HeatRacePage() {
             <option value="html">HTML</option>
           </select>
           {!finalSeriesStarted ? (
-            <button type="button" onClick={handlePrintNewHeats}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handlePrintNewHeats}
+            >
               Print new heats
             </button>
           ) : (
-            <button type="button" onClick={handlePrintNewHeats}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handlePrintNewHeats}
+            >
               Print Final Series
             </button>
           )}
-        </>
-      ) : (
-        <ScoringInputComponent
-          heat={selectedHeat}
-          onSubmit={handleSubmitScores}
-          onBack={handleBackToHeats}
-        />
+        </footer>
       )}
     </div>
   );

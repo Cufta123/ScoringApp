@@ -69,6 +69,9 @@ const electronHandler = {
     readAllScoresForEventQualifying: heatRaceDB.readAllScoresForEventQualifying,
     readAllScoresForEventFinal: heatRaceDB.readAllScoresForEventFinal,
     deleteLastCreatedHeatsWithRaces: heatRaceDB.deleteLastCreatedHeatsWithRaces,
+    deleteHeatById: heatRaceDB.deleteHeatById,
+    deleteLastRaceForHeat: heatRaceDB.deleteLastRaceForHeat,
+    deleteRaceById: heatRaceDB.deleteRaceById,
   },
 };
 

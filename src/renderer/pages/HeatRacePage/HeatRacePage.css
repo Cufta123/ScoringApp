@@ -18,25 +18,82 @@
   border-collapse: collapse;
 }
 
-.heat-column th, .heat-column td {
+.heat-column th,
+.heat-column td {
   border: 1px solid #ccc;
   padding: 8px;
   text-align: left;
 }
-.boat-list, .search-results {
+.boat-list,
+.search-results {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.boat-list button, .search-results button {
+.boat-list button,
+.search-results button {
   padding: 10px;
   background-color: #f0f0f0;
   border: 1px solid #ccc;
   cursor: pointer;
 }
 
-.boat-list button:disabled, .search-results button:disabled {
+.boat-list button:disabled,
+.search-results button:disabled {
   background-color: #ddd;
   cursor: not-allowed;
+}
+
+.heat-column.delete-hover:hover {
+  border-color: red !important;
+  box-shadow: 0 4px 8px rgba(255, 0, 0, 0.5);
+}
+
+/* Primary action: Create New Heats */
+.btn-primary {
+  background-color: #007bff;
+  border: 1px solid #007bff;
+  color: #fff;
+}
+.btn-primary:hover {
+  background-color: #0069d9; /* slightly darker */
+  border-color: #0062cc;
+  color: #fff;
+}
+
+/* Secondary actions: View All Heats and Print New Heats */
+.btn-secondary {
+  background-color: #6c757d;
+  border: 1px solid #6c757d;
+  color: #fff;
+}
+.btn-secondary:hover {
+  background-color: #5a6268; /* slightly darker */
+  border-color: #545b62;
+  color: #fff;
+}
+
+/* Delete buttons in red */
+.btn-danger {
+  background-color: #dc3545;
+  border: 1px solid #dc3545;
+  color: #fff;
+}
+.btn-danger:hover {
+  background-color: #c82333; /* slightly darker */
+  border-color: #bd2130;
+  color: #fff;
+}
+
+/* Warning buttons (if needed, e.g. for "Delete Last Race") */
+.btn-warning {
+  background-color: #ffc107;
+  border: 1px solid #ffc107;
+  color: #212529;
+}
+.btn-warning:hover {
+  background-color: #e0a800; /* slightly darker */
+  border-color: #d39e00;
+  color: #212529;
 }

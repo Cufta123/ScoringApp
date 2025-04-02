@@ -14,7 +14,11 @@ export default function HeatTables({
   handleDisplayHeats,
   selectedHeatId = null,
   handleStartScoring = () => {},
+  deleteRaceMode = false, // <-- new prop with default value
+  deleteOptionsActive = false,
 }) {
+  const isDeleteActive = deleteOptionsActive || deleteRaceMode;
+
   const handleBoatTransfer = useCallback(
     async (boat, fromHeatId, toHeatId) => {
       if (raceHappened || finalSeriesStarted) {
@@ -108,53 +112,63 @@ export default function HeatTables({
 
   return (
     <div style={heatsContainerStyle} className="heats-container">
-      {heatsToDisplay.map((heat) => (
-        <div
-          key={heat.heat_id}
-          style={
-            heat.heat_id === selectedHeatId
-              ? selectedHeatColumnStyle
-              : heatColumnStyle
-          }
-          className="heat-column"
-          onClick={() => handleHeatClick(heat)}
-          role="button"
-          tabIndex={0}
-          onKeyPress={(e) => {
-            if (e.key === 'Enter') {
-              handleHeatClick(heat);
-            }
-          }}
-          onDrop={(e) => handleDrop(e, heat.heat_id)}
-          onDragOver={(e) => e.preventDefault()}
-        >
-          <h4>
-            {heat.heat_name} (Race {heat.raceNumber})
-          </h4>
-          <table>
-            <thead>
-              <tr>
-                <th style={sailorNameColumnStyle}>Sailor Name</th>
-                <th>Country</th>
-                <th style={boatNumberColumnStyle}>Sail Number</th>
-              </tr>
-            </thead>
-            <HeatRows
-              heat={heat}
-              raceHappened={raceHappened}
-              finalSeriesStarted={finalSeriesStarted}
-              boatNumberColumnStyle={boatNumberColumnStyle}
-              sailorNameColumnStyle={sailorNameColumnStyle}
-            />
-          </table>
-          {heat.heat_id === selectedHeatId &&
-            (heat.raceNumber === 0 || finalSeriesStarted) && (
-              <button type="button" onClick={handleStartScoring}>
-                Start Scoring
-              </button>
-            )}
-        </div>
-      ))}
+      {heatsToDisplay.map((heat) => {
+        let styleToApply;
+        // If delete mode/modal active, show default style with no blue border:
+        if (isDeleteActive) {
+          styleToApply = heatColumnStyle;
+        } else if (heat.heat_id === selectedHeatId) {
+          styleToApply = selectedHeatColumnStyle;
+        } else {
+          styleToApply = heatColumnStyle;
+        }
+
+        return (
+          <div
+            key={heat.heat_id}
+            style={styleToApply}
+            className={`heat-column ${deleteRaceMode ? 'delete-hover' : ''}`}
+            onClick={() => handleHeatClick(heat)}
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleHeatClick(heat);
+              }
+            }}
+            onDrop={(e) => handleDrop(e, heat.heat_id)}
+            onDragOver={(e) => e.preventDefault()}
+          >
+            <h4>
+              {heat.heat_name} (Race {heat.raceNumber})
+            </h4>
+            <table>
+              <thead>
+                <tr>
+                  <th style={sailorNameColumnStyle}>Sailor Name</th>
+                  <th>Country</th>
+                  <th style={boatNumberColumnStyle}>Sail Number</th>
+                </tr>
+              </thead>
+              <HeatRows
+                heat={heat}
+                raceHappened={raceHappened}
+                finalSeriesStarted={finalSeriesStarted}
+                boatNumberColumnStyle={boatNumberColumnStyle}
+                sailorNameColumnStyle={sailorNameColumnStyle}
+              />
+            </table>
+            {/* Only show "Start Scoring" when not in delete mode */}
+            {!isDeleteActive &&
+              heat.heat_id === selectedHeatId &&
+              (heat.raceNumber === 0 || finalSeriesStarted) && (
+                <button type="button" onClick={handleStartScoring}>
+                  Start Scoring
+                </button>
+              )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -183,4 +197,6 @@ HeatTables.propTypes = {
   handleDisplayHeats: PropTypes.func.isRequired,
   selectedHeatId: PropTypes.number, // This may be null if no heat is selected
   handleStartScoring: PropTypes.func,
+  deleteRaceMode: PropTypes.bool, // new prop
+  deleteOptionsActive: PropTypes.bool,
 };

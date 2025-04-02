@@ -348,7 +348,11 @@ function EventPage() {
       ) : (
         <>
           <h2>Register New Sailors</h2>
-          <button type="button" onClick={toggleSailorFormVisibility}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={toggleSailorFormVisibility}
+          >
             {isSailorFormVisible
               ? 'Close Registration Form'
               : 'Open Registration Form'}
@@ -368,7 +372,9 @@ function EventPage() {
               options={boatOptions}
               closeMenuOnSelect={false}
             />
-            <button type="submit">Add Boat(s) to Event</button>
+            <button type="submit" className="btn-primary">
+              Add Boat(s) to Event
+            </button>
           </form>
         </>
       )}
@@ -386,7 +392,11 @@ function EventPage() {
         <option value="pdf">PDF</option>
         <option value="html">HTML</option>
       </select>
-      <button type="button" onClick={handlePrintStartingList}>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={handlePrintStartingList}
+      >
         Generate Competitor List Printout
       </button>
 
@@ -399,8 +409,8 @@ function EventPage() {
       />
       <button
         type="button"
+        className="btn-danger"
         onClick={handleLockEventClick}
-        style={{ backgroundColor: 'red', color: 'white' }}
       >
         {isEventLocked ? 'Unlock Event' : 'Lock Event'}
       </button>

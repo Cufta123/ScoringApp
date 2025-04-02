@@ -51,7 +51,8 @@ export type Channels =
   | 'updateRDGScores'
   | 'readAllScoresForEventQualifying'
   | 'readAllScoresForEventFinal'
-  | 'deleteLastCreatedHeatsWithRaces';
+  | 'deleteLastCreatedHeatsWithRaces'
+  | 'deleteHeatById';
 
 const electronHandler = {
   ipcRenderer: {
@@ -619,6 +620,30 @@ const electronHandler = {
             'Error invoking deleteLastCreatedHeatsWithRaces IPC:',
             error,
           );
+          return false;
+        }
+      },
+      async deleteHeatById(heat_id: string) {
+        try {
+          return await ipcRenderer.invoke('deleteHeatById', heat_id);
+        } catch (error) {
+          console.error('Error invoking deleteHeatById IPC:', error);
+          return false;
+        }
+      },
+      async deleteLastRaceForHeat(heat_id: number) {
+        try {
+          return await ipcRenderer.invoke('deleteLastRaceForHeat', heat_id);
+        } catch (error) {
+          console.error('Error invoking deleteLastRaceForHeat IPC:', error);
+          return false;
+        }
+      },
+      async deleteRaceById(race_id: number) {
+        try {
+          return await ipcRenderer.invoke('deleteRaceById', race_id);
+        } catch (error) {
+          console.error('Error invoking deleteRaceById IPC:', error);
           return false;
         }
       },

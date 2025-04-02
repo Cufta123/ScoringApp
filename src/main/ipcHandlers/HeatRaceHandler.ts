@@ -1113,3 +1113,87 @@ ipcMain.handle('deleteLastCreatedHeatsWithRaces', async (event, event_id) => {
     throw error;
   }
 });
+
+ipcMain.handle('deleteHeatById', async (event, heat_id: number) => {
+  try {
+    // Check for races linked to this heat.
+    const racesQuery = db.prepare(
+      'SELECT race_id FROM Races WHERE heat_id = ?',
+    );
+    const races = racesQuery.all(heat_id);
+    if (races.length > 0) {
+      // Delete scores for each race.
+      const deleteScoresQuery = db.prepare(
+        'DELETE FROM Scores WHERE race_id = ?',
+      );
+      races.forEach((race: { race_id: any }) => {
+        deleteScoresQuery.run(race.race_id);
+      });
+      // Delete the races.
+      const deleteRacesQuery = db.prepare(
+        'DELETE FROM Races WHERE heat_id = ?',
+      );
+      deleteRacesQuery.run(heat_id);
+    }
+    // Clean up any Heat_Boat entries.
+    const deleteHeatBoatQuery = db.prepare(
+      'DELETE FROM Heat_Boat WHERE heat_id = ?',
+    );
+    deleteHeatBoatQuery.run(heat_id);
+    // Finally, delete the heat.
+    const deleteHeatQuery = db.prepare('DELETE FROM Heats WHERE heat_id = ?');
+    deleteHeatQuery.run(heat_id);
+    console.log(`Deleted heat (ID: ${heat_id}) with its races and scores.`);
+    return { success: true, message: 'Heat deleted successfully.' };
+  } catch (error) {
+    console.error('Error deleting heat by ID:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('deleteLastRaceForHeat', async (event, heat_id: number) => {
+  try {
+    // Find the race with the highest race_number (i.e. the last race)
+    const lastRace = db
+      .prepare(
+        'SELECT race_id, race_number FROM Races WHERE heat_id = ? ORDER BY race_number DESC LIMIT 1',
+      )
+      .get(heat_id);
+    if (!lastRace) {
+      return { success: false, message: 'No race found for this heat' };
+    }
+    // Delete scores linked to this race.
+    const deleteScoresQuery = db.prepare(
+      'DELETE FROM Scores WHERE race_id = ?',
+    );
+    deleteScoresQuery.run(lastRace.race_id);
+    // Delete the race.
+    const deleteRaceQuery = db.prepare('DELETE FROM Races WHERE race_id = ?');
+    deleteRaceQuery.run(lastRace.race_id);
+    console.log(
+      `Deleted last race (ID: ${lastRace.race_id}) from heat ${heat_id}`,
+    );
+    return { success: true, message: 'Last race deleted successfully.' };
+  } catch (error) {
+    console.error('Error deleting last race for heat:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('deleteRaceById', async (event, race_id: number) => {
+  try {
+    // Delete scores for this race.
+    const deleteScoresQuery = db.prepare(
+      'DELETE FROM Scores WHERE race_id = ?',
+    );
+    deleteScoresQuery.run(race_id);
+    // Delete the race.
+    const deleteRaceQuery = db.prepare('DELETE FROM Races WHERE race_id = ?');
+    deleteRaceQuery.run(race_id);
+    console.log(`Deleted race with ID: ${race_id}`);
+    return { success: true, message: 'Race deleted successfully.' };
+  } catch (error) {
+    console.error('Error deleting race by ID:', error);
+    throw error;
+  }
+});

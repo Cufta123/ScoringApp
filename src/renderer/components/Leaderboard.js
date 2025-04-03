@@ -27,6 +27,10 @@ function LeaderboardComponent({ eventId }) {
   const [swapMode, setSwapMode] = useState(false);
   // Each selected cell is recorded as an object: { boatId, raceIndex, raceId }
   const [selectedSwapCells, setSelectedSwapCells] = useState([]);
+  const [rdgModalOpen, setRdgModalOpen] = useState(false);
+  const [rdgModalBoatId, setRdgModalBoatId] = useState(null);
+  const [rdgModalRaceId, setRdgModalRaceId] = useState(null);
+  const [rdgModalPoints, setRdgModalPoints] = useState('');
   const { state: { event } = {} } = useLocation();
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -362,10 +366,6 @@ function LeaderboardComponent({ eventId }) {
         penalty, // new penalty value
       );
       if (penalty === 'RDG') {
-        await window.electron.sqlite.heatRaceDB.updateRDGScores(
-          eventId,
-          raceId,
-        );
         await window.electron.ipcRenderer.invoke(
           'updateFinalLeaderboard',
           eventId,
@@ -741,7 +741,9 @@ function LeaderboardComponent({ eventId }) {
                     </td>
                     {(entry.qualifyingPoints || []).map(
                       (qualifyingPoint, qIndex) => (
-                        <td key={`qualifying-${entry.boat_id}-${qIndex}`}>
+                        <td
+                          key={`qualifying-${entry.boat_id}-${qualifyingPoint.points}-${qualifyingPoint.status}`}
+                        >
                           {qualifyingPoint.formatted}
                         </td>
                       ),
@@ -865,6 +867,14 @@ function LeaderboardComponent({ eventId }) {
                                   }
                                   onChange={(e) => {
                                     const { value } = e.target;
+                                    // Reuse the outer scoped cellRaceId computed earlier
+                                    if (value === 'RDG') {
+                                      // Instead of window.prompt, open our custom modal
+                                      setRdgModalBoatId(entry.boat_id);
+                                      setRdgModalRaceId(cellRaceId);
+                                      setRdgModalPoints('');
+                                      setRdgModalOpen(true);
+                                    }
                                     setPerRacePenalties((prev) => {
                                       const updated = [
                                         ...(prev[entry.boat_id] || []),
@@ -905,6 +915,73 @@ function LeaderboardComponent({ eventId }) {
           </div>
         );
       })}
+      {/* RDG Modal */}
+      {rdgModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              padding: '20px',
+              borderRadius: '5px',
+              minWidth: '300px',
+            }}
+          >
+            <h3>Update RDG Points</h3>
+            <input
+              type="number"
+              value={rdgModalPoints}
+              onChange={(e) => setRdgModalPoints(e.target.value)}
+              placeholder="Enter new points"
+              style={{ width: '100%', marginBottom: '10px' }}
+            />
+            <div style={{ textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={() => setRdgModalOpen(false)}
+                style={{ marginRight: '10px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const newPoints = parseFloat(rdgModalPoints);
+                  window.electron.ipcRenderer
+                    .invoke(
+                      'updateScorePoints',
+                      rdgModalBoatId,
+                      rdgModalRaceId,
+                      newPoints,
+                    )
+                    .then((res) => {
+                      console.log('Update result:', res);
+                      setRdgModalOpen(false);
+                      return res;
+                    })
+                    .catch((err) => {
+                      console.error(err);
+                      setRdgModalOpen(false);
+                    });
+                }}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

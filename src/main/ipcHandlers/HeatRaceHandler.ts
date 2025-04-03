@@ -399,6 +399,25 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  'updateScorePoints',
+  async (event, boat_id, race_id, new_points) => {
+    try {
+      const updateQuery = db.prepare(
+        `UPDATE Scores SET points = ? WHERE race_id = ? AND boat_id = ?`,
+      );
+      const result = updateQuery.run(new_points, race_id, boat_id);
+      console.log(
+        `Updated points for boat_id: ${boat_id}, race_id: ${race_id} to ${new_points}`,
+      );
+      return { success: true, changes: result.changes };
+    } catch (error) {
+      console.error('Error updating points for score:', error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
   'updateRaceResult',
   async (
     event,
@@ -433,6 +452,17 @@ ipcMain.handle(
 
       // Update the score – if penalty is 'RDG', update only status.
       if (penalty === 'RDG') {
+        // Retrieve and log the score id
+        const scoreRow = db
+          .prepare(
+            'SELECT score_id FROM Scores WHERE race_id = ? AND boat_id = ?',
+          )
+          .get(race_id, boat_id);
+        if (scoreRow) {
+          console.log(`RDG clicked. Score id: ${scoreRow.score_id}`);
+        } else {
+          console.log('RDG clicked but no matching score found.');
+        }
         const updateStatusOnlyQuery = db.prepare(
           `UPDATE Scores SET status = ? WHERE race_id = ? AND boat_id = ?`,
         );

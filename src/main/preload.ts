@@ -550,6 +550,25 @@ const electronHandler = {
           return false;
         }
       },
+      async updateScorePoints(
+        event: any,
+        boat_id: any,
+        race_id: any,
+        new_points: any,
+      ) {
+        try {
+          return await ipcRenderer.invoke(
+            'updateScorePoints',
+            event,
+            boat_id,
+            race_id,
+            new_points,
+          );
+        } catch (error) {
+          console.error('Error invoking updateScorePoints IPC:', error);
+          return false;
+        }
+      },
       async updateRDGScores(
         event_id: string,
         finalSeriesStarted: boolean,

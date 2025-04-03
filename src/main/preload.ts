@@ -550,12 +550,17 @@ const electronHandler = {
           return false;
         }
       },
-      async updateRDGScores(event_id: string, finalSeriesStarted: boolean) {
+      async updateRDGScores(
+        event_id: string,
+        finalSeriesStarted: boolean,
+        race_id: number,
+      ) {
         try {
           return await ipcRenderer.invoke(
             'updateRDGScores',
             event_id,
             finalSeriesStarted,
+            race_id,
           );
         } catch (error) {
           console.error('Error invoking updateRDGScores IPC:', error);

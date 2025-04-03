@@ -13,8 +13,7 @@ export default async function printLeaderboard(
 ) {
   const eventName = await window.electron.sqlite.eventDB.getEventName(eventId);
 
-  // If finalSeriesStarted is false, we'll label the leaderboard "Qualifying Leaderboard".
-  // If finalSeriesStarted is true, we'll label it "Final Leaderboard".
+  // Leaderboard header title.
   const leaderboardHeader = finalSeriesStarted
     ? 'Final Leaderboard'
     : 'Qualifying Leaderboard';
@@ -29,10 +28,7 @@ export default async function printLeaderboard(
       : 'unknown';
 
   // Build an array of groups to process.
-  // If "OverallScores" exists, we include it but label it with our new header
-  // instead of printing "Overall Scores".
   const groupsToProcess = [];
-
   if (groupedLeaderboard.OverallScores) {
     groupsToProcess.push({
       header: leaderboardHeader,
@@ -40,8 +36,6 @@ export default async function printLeaderboard(
       data: groupedLeaderboard.OverallScores,
     });
   }
-
-  // Add other groups (excluding "OverallScores") if needed.
   sortedGroups.forEach((group: string) => {
     if (group !== 'OverallScores') {
       groupsToProcess.push({
@@ -61,28 +55,39 @@ export default async function printLeaderboard(
       // Add a row with the group header.
       worksheet.addRow([groupObj.header]);
 
-      // Determine the maximum number of races in this group.
+      // Determine maximum counts for qualifying points and races.
+      const maxQualifyingCount = Math.max(
+        ...groupObj.data.map((entry: any) =>
+          entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+            ? entry.qualifyingPoints.length
+            : 0,
+        ),
+        0,
+      );
       const maxRaceCount = Math.max(
-        ...groupObj.data.map((entry: { races: string | any[] }) =>
+        ...groupObj.data.map((entry: any) =>
           entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
         ),
         0,
       );
 
-      // Build the header row: add two columns for Total Points and Total Points Adjustet.
-      const groupHeader = [
+      // Build the header row.
+      const headerRow = [
         'Rank',
         'Name',
         'Country',
         'Sail Number',
         'Boat Type',
-        ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
-        'Total Points Adjustet',
+        'Total Points Adjusted',
+        ...Array.from({ length: maxQualifyingCount }, (_, i) => `Q${i + 1}`),
+        ...Array.from({ length: maxRaceCount }, (_, i) =>
+          finalSeriesStarted ? `F ${i + 1}` : `Q ${i + 1}`,
+        ),
       ];
-      worksheet.addRow(groupHeader);
+      worksheet.addRow(headerRow);
 
-      // Fill rows for each competitor.
+      // Add each competitor row.
       groupObj.data.forEach(
         (
           entry: {
@@ -92,6 +97,7 @@ export default async function printLeaderboard(
             boat_number: any;
             boat_type: any;
             races: any;
+            qualifyingPoints?: any[];
             total_points_combined: any;
             total_points_event: any;
             total_raw_points_combined: any;
@@ -105,7 +111,6 @@ export default async function printLeaderboard(
             entry.country,
             entry.boat_number,
             entry.boat_type,
-            ...entry.races,
             finalSeriesStarted
               ? entry.total_raw_points_combined
               : entry.total_raw_points,
@@ -113,6 +118,24 @@ export default async function printLeaderboard(
               ? entry.total_points_combined
               : entry.total_points_event,
           ];
+
+          // Process qualifying points.
+          const qualifyingPoints =
+            entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+              ? entry.qualifyingPoints.map((q) => q.formatted)
+              : [];
+          while (qualifyingPoints.length < maxQualifyingCount) {
+            qualifyingPoints.push('');
+          }
+
+          // Process race values.
+          const races =
+            entry.races && Array.isArray(entry.races) ? [...entry.races] : [];
+          while (races.length < maxRaceCount) {
+            races.push('');
+          }
+
+          row.push(...qualifyingPoints, ...races);
           worksheet.addRow(row);
         },
       );
@@ -138,8 +161,16 @@ export default async function printLeaderboard(
       doc.text(groupObj.header, 14, startY);
       startY += 6;
 
+      const maxQualifyingCount = Math.max(
+        ...groupObj.data.map((entry: any) =>
+          entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+            ? entry.qualifyingPoints.length
+            : 0,
+        ),
+        0,
+      );
       const maxRaceCount = Math.max(
-        ...groupObj.data.map((entry: { races: string | any[] }) =>
+        ...groupObj.data.map((entry: any) =>
           entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
         ),
         0,
@@ -151,9 +182,12 @@ export default async function printLeaderboard(
         'Country',
         'Sail Number',
         'Boat Type',
-        ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
         'Total Points',
-        'Total Points Adjustet',
+        'Total Points Adjusted',
+        ...Array.from({ length: maxQualifyingCount }, (_, i) => `Q${i + 1}`),
+        ...Array.from({ length: maxRaceCount }, (_, i) =>
+          finalSeriesStarted ? `F ${i + 1}` : `Q ${i + 1}`,
+        ),
       ];
 
       const bodyData = groupObj.data.map(
@@ -164,7 +198,8 @@ export default async function printLeaderboard(
             country: any;
             boat_number: { toString: () => any };
             boat_type: any;
-            races: { toString: () => any }[];
+            races: any[];
+            qualifyingPoints?: any[];
             total_points_combined: any;
             total_points_event: any;
             total_raw_points_combined: any;
@@ -178,13 +213,6 @@ export default async function printLeaderboard(
           row.push(entry.country);
           row.push(entry.boat_number.toString());
           row.push(entry.boat_type);
-          for (let i = 0; i < maxRaceCount; i += 1) {
-            row.push(
-              entry.races && entry.races[i] !== undefined
-                ? entry.races[i].toString()
-                : '',
-            );
-          }
           row.push(
             finalSeriesStarted
               ? entry.total_raw_points_combined
@@ -195,6 +223,21 @@ export default async function printLeaderboard(
               ? entry.total_points_combined
               : entry.total_points_event,
           );
+
+          const qualifyingPoints =
+            entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+              ? entry.qualifyingPoints.map((q) => q.formatted)
+              : [];
+          while (qualifyingPoints.length < maxQualifyingCount) {
+            qualifyingPoints.push('');
+          }
+
+          const races =
+            entry.races && Array.isArray(entry.races) ? [...entry.races] : [];
+          while (races.length < maxRaceCount) {
+            races.push('');
+          }
+          row.push(...qualifyingPoints, ...races);
           return row;
         },
       );
@@ -228,25 +271,36 @@ export default async function printLeaderboard(
 
     groupsToProcess.forEach((groupObj) => {
       html += `<h2>${groupObj.header}</h2>`;
-      html += `<table><thead><tr>
-      <th>Rank</th>
-      <th>Name</th>
-      <th>Country</th>
-      <th>Sail Number</th>
-      <th>Boat Type</th>`;
-
+      const maxQualifyingCount = Math.max(
+        ...groupObj.data.map((entry: any) =>
+          entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+            ? entry.qualifyingPoints.length
+            : 0,
+        ),
+        0,
+      );
       const maxRaceCount = Math.max(
-        ...groupObj.data.map((entry: { races: string | any[] }) =>
+        ...groupObj.data.map((entry: any) =>
           entry.races && Array.isArray(entry.races) ? entry.races.length : 0,
         ),
         0,
       );
 
-      for (let i = 0; i < maxRaceCount; i += 1) {
-        html += `<th>Race ${i + 1}</th>`;
+      html += `<table><thead><tr>
+        <th>Rank</th>
+        <th>Name</th>
+        <th>Country</th>
+        <th>Sail Number</th>
+        <th>Boat Type</th>
+        <th>Total Points</th>
+        <th>Total Points Adjusted</th>`;
+      for (let i = 0; i < maxQualifyingCount; i += 1) {
+        html += `<th>Q${i + 1}</th>`;
       }
-
-      html += `<th>Total Points</th><th>Total Points Adjustet</th></tr></thead><tbody>`;
+      for (let i = 0; i < maxRaceCount; i += 1) {
+        html += `<th>${finalSeriesStarted ? `F ${i + 1}` : `Q ${i + 1}`}</th>`;
+      }
+      html += `</tr></thead><tbody>`;
 
       groupObj.data.forEach(
         (
@@ -257,6 +311,7 @@ export default async function printLeaderboard(
             boat_number: any;
             boat_type: any;
             races: any[];
+            qualifyingPoints?: any[];
             total_points_combined: any;
             total_points_event: any;
             total_raw_points_combined: any;
@@ -265,32 +320,42 @@ export default async function printLeaderboard(
           index: number,
         ) => {
           html += `<tr>
-          <td>${index + 1}</td>
-          <td>${entry.name} ${entry.surname}</td>
-          <td>${entry.country}</td>
-          <td>${entry.boat_number}</td>
-          <td>${entry.boat_type}</td>`;
-
-          for (let i = 0; i < maxRaceCount; i += 1) {
-            html += `<td>${
-              entry.races && entry.races[i] !== undefined ? entry.races[i] : ''
+            <td>${index + 1}</td>
+            <td>${entry.name} ${entry.surname}</td>
+            <td>${entry.country}</td>
+            <td>${entry.boat_number}</td>
+            <td>${entry.boat_type}</td>
+            <td>${
+              finalSeriesStarted
+                ? entry.total_raw_points_combined
+                : entry.total_raw_points
+            }</td>
+            <td>${
+              finalSeriesStarted
+                ? entry.total_points_combined
+                : entry.total_points_event
             }</td>`;
+          const qualifyingPoints =
+            entry.qualifyingPoints && Array.isArray(entry.qualifyingPoints)
+              ? entry.qualifyingPoints.map((q) => q.formatted)
+              : [];
+          while (qualifyingPoints.length < maxQualifyingCount) {
+            qualifyingPoints.push('');
           }
-
-          html += `<td>${
-            finalSeriesStarted
-              ? entry.total_raw_points_combined
-              : entry.total_raw_points
-          }</td>
-          <td>${
-            finalSeriesStarted
-              ? entry.total_points_combined
-              : entry.total_points_event
-          }</td>
-          </tr>`;
+          qualifyingPoints.forEach((qp: string) => {
+            html += `<td>${qp}</td>`;
+          });
+          const races =
+            entry.races && Array.isArray(entry.races) ? [...entry.races] : [];
+          while (races.length < maxRaceCount) {
+            races.push('');
+          }
+          races.forEach((race: any) => {
+            html += `<td>${race}</td>`;
+          });
+          html += `</tr>`;
         },
       );
-
       html += `</tbody></table>`;
     });
 

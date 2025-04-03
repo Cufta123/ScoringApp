@@ -362,7 +362,10 @@ function LeaderboardComponent({ eventId }) {
         penalty, // new penalty value
       );
       if (penalty === 'RDG') {
-        await window.electron.sqlite.heatRaceDB.updateRDGScores(eventId);
+        await window.electron.sqlite.heatRaceDB.updateRDGScores(
+          eventId,
+          raceId,
+        );
         await window.electron.ipcRenderer.invoke(
           'updateFinalLeaderboard',
           eventId,
@@ -617,11 +620,18 @@ function LeaderboardComponent({ eventId }) {
               });
               await Promise.all(penaltyPromises);
               // Force recalculation of leaderboard totals.
-              await window.electron.ipcRenderer.invoke(
-                'updateEventLeaderboard',
-                eventId,
-                finalSeriesStarted,
-              );
+              if (finalSeriesStarted) {
+                await window.electron.ipcRenderer.invoke(
+                  'updateFinalLeaderboard',
+                  eventId,
+                );
+              } else {
+                await window.electron.ipcRenderer.invoke(
+                  'updateEventLeaderboard',
+                  eventId,
+                  finalSeriesStarted,
+                );
+              }
               // Then fetch the refreshed leaderboard.
               await fetchLeaderboard();
             }}

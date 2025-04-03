@@ -25,12 +25,13 @@ function HeatRows({
 
   return (
     <tbody>
-      {heat.boats.map((boat) => (
+      {heat.boats.map((boat, index) => (
         <tr
           key={boat.boat_id}
           draggable={!raceHappened && !finalSeriesStarted}
           onDragStart={(e) => handleDragStart(e, boat, heat.heat_id)}
         >
+          <td>{index + 1}</td>
           <td style={sailorNameColumnStyle}>
             {boat.name} {boat.surname}
           </td>

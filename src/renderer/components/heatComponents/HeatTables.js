@@ -1,7 +1,7 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable no-console */
 /* eslint-disable no-alert */
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import HeatRows from './HeatRows';
 
@@ -14,9 +14,11 @@ export default function HeatTables({
   handleDisplayHeats,
   selectedHeatId = null,
   handleStartScoring = () => {},
-  deleteRaceMode = false, // <-- new prop with default value
+  deleteRaceMode = false,
   deleteOptionsActive = false,
 }) {
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
   const isDeleteActive = deleteOptionsActive || deleteRaceMode;
 
   const handleBoatTransfer = useCallback(
@@ -61,7 +63,6 @@ export default function HeatTables({
     [],
   );
 
-  // Inline style objects can be memoized if they are computed dynamically.
   const heatColumnStyle = useMemo(
     () => ({
       backgroundColor: '#f0f0f0',
@@ -110,11 +111,37 @@ export default function HeatTables({
     [clickable, onHeatSelect],
   );
 
+  const handleSort = (key) => {
+    setSortConfig((prevConfig) => {
+      const direction =
+        prevConfig.key === key && prevConfig.direction === 'asc'
+          ? 'desc'
+          : 'asc';
+      return { key, direction };
+    });
+  };
+
+  const sortedHeats = useMemo(() => {
+    if (!sortConfig.key) return heatsToDisplay;
+
+    return heatsToDisplay.map((heat) => {
+      const sortedBoats = [...heat.boats].sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+      return { ...heat, boats: sortedBoats };
+    });
+  }, [heatsToDisplay, sortConfig]);
+
   return (
     <div style={heatsContainerStyle} className="heats-container">
-      {heatsToDisplay.map((heat) => {
+      {sortedHeats.map((heat) => {
         let styleToApply;
-        // If delete mode/modal active, show default style with no blue border:
         if (isDeleteActive) {
           styleToApply = heatColumnStyle;
         } else if (heat.heat_id === selectedHeatId) {
@@ -145,9 +172,20 @@ export default function HeatTables({
             <table>
               <thead>
                 <tr>
-                  <th style={sailorNameColumnStyle}>Sailor Name</th>
-                  <th>Country</th>
-                  <th style={boatNumberColumnStyle}>Sail Number</th>
+                  <th onClick={() => handleSort('position')}>#</th>
+                  <th
+                    style={sailorNameColumnStyle}
+                    onClick={() => handleSort('name')}
+                  >
+                    Sailor Name
+                  </th>
+                  <th onClick={() => handleSort('country')}>Country</th>
+                  <th
+                    style={boatNumberColumnStyle}
+                    onClick={() => handleSort('sail_number')}
+                  >
+                    Sail Number
+                  </th>
                 </tr>
               </thead>
               <HeatRows
@@ -158,7 +196,6 @@ export default function HeatTables({
                 sailorNameColumnStyle={sailorNameColumnStyle}
               />
             </table>
-            {/* Only show "Start Scoring" when not in delete mode */}
             {!isDeleteActive &&
               heat.heat_id === selectedHeatId &&
               (heat.raceNumber === 0 || finalSeriesStarted) && (
@@ -195,8 +232,8 @@ HeatTables.propTypes = {
   clickable: PropTypes.bool.isRequired,
   onHeatSelect: PropTypes.func.isRequired,
   handleDisplayHeats: PropTypes.func.isRequired,
-  selectedHeatId: PropTypes.number, // This may be null if no heat is selected
+  selectedHeatId: PropTypes.number,
   handleStartScoring: PropTypes.func,
-  deleteRaceMode: PropTypes.bool, // new prop
+  deleteRaceMode: PropTypes.bool,
   deleteOptionsActive: PropTypes.bool,
 };

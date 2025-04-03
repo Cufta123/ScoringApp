@@ -89,7 +89,6 @@ function LeaderboardComponent({ eventId }) {
             : `${point.status} ${point.points}`,
         };
       }
-
       return {
         ...point,
         formatted: isWorstPlace ? `(${point.points})` : `${point.points}`,
@@ -687,7 +686,7 @@ function LeaderboardComponent({ eventId }) {
                           key={`race-${j}`}
                           style={{ width: '60px', minWidth: '60px' }}
                         >
-                          F {j}
+                          {finalSeriesStarted ? `F ${j}` : `Q ${j}`}
                         </th>,
                       );
                       if (editMode && !swapMode) {

@@ -169,9 +169,8 @@ export default function calculateBoatScores(
   Object.keys(grouped).forEach((totalPointsKey) => {
     const group = grouped[Number(totalPointsKey)];
     if (group.length > 1) {
-      console.log(`Tie detected for total points: ${totalPointsKey}`);
       console.log(
-        'Tied boats:',
+        '[DEBUG] Processing tie-break for boats:',
         group.map((entry) => entry.boat_id),
       );
 
@@ -200,138 +199,79 @@ export default function calculateBoatScores(
         ),
       );
 
-      console.log('Heats with all tied boats:', heatsWithAllTiedBoats);
+      console.log('[DEBUG] Heats with all tied boats:', heatsWithAllTiedBoats);
 
       if (heatsWithAllTiedBoats.length > 0) {
         console.log(
-          'Common heats found for tied boats:',
+          '[DEBUG] Common heats found for tied boats:',
           heatsWithAllTiedBoats,
         );
 
-        // Use included scores (not the excluded ones) for tie-breaking.
-        // Perform pairwise comparisons for tie-breaking using included scores.
-        for (let i = 0; i < group.length; i += 1) {
-          const boatA = group[i];
-          for (let j = i + 1; j < group.length; j += 1) {
-            const boatB = group[j];
-            console.log(
-              `Comparing boat ${boatA.boat_id} with boat ${boatB.boat_id}`,
-            );
-
-            // Use only included scores from heats where all tied boats competed
-            let scoresA = heatsWithAllTiedBoats.flatMap((heatId) =>
+        // Tie-break sorting using common heats.
+        group.sort((boatA, boatB) => {
+          const scoresA = heatsWithAllTiedBoats
+            .flatMap((heatId) =>
               (boatScoresByRace.get(boatA.boat_id) || [])
                 .filter((score) => score.heat_id === Number(heatId))
                 .map((score) => Number(score.points)),
-            );
-            let scoresB = heatsWithAllTiedBoats.flatMap((heatId) =>
+            )
+            .sort((a, b) => a - b);
+          const scoresB = heatsWithAllTiedBoats
+            .flatMap((heatId) =>
               (boatScoresByRace.get(boatB.boat_id) || [])
                 .filter((score) => score.heat_id === Number(heatId))
                 .map((score) => Number(score.points)),
-            );
+            )
+            .sort((a, b) => a - b);
 
-            scoresA.sort((a, b) => a - b);
-            scoresB.sort((a, b) => a - b);
-
-            console.log(
-              `Scores for boat ${boatA.boat_id} (sorted):`,
-              scoresA,
-              `Scores for boat ${boatB.boat_id} (sorted):`,
-              scoresB,
-            );
-
-            let tieBroken = false;
-            for (
-              let k = 0;
-              k < Math.max(scoresA.length, scoresB.length);
-              k += 1
-            ) {
-              const scoreA = scoresA[k] ?? Number.MAX_SAFE_INTEGER;
-              const scoreB = scoresB[k] ?? Number.MAX_SAFE_INTEGER;
-              if (scoreA !== scoreB) {
-                console.log(
-                  `Tie broken between boat ${boatA.boat_id} and boat ${boatB.boat_id}:`,
-                  `Boat ${scoreA < scoreB ? boatA.boat_id : boatB.boat_id} wins this comparison`,
-                );
-                tieBroken = true;
-                break;
-              }
-            }
-
-            if (!tieBroken) {
-              console.log(
-                `No difference found between boat ${boatA.boat_id} and boat ${boatB.boat_id} in common heats included scores. Falling back to raw race scores.`,
-              );
-
-              // Retrieve full raw race details sorted in chronological order (by race_id ascending)
-              const fullRawArrayA = (boatScoresByRace.get(boatA.boat_id) || [])
-                .filter((score) =>
-                  heatsWithAllTiedBoats.includes(String(score.heat_id)),
-                )
-                .slice()
-                .sort((s1, s2) => s1.race_id - s2.race_id);
-              const fullRawArrayB = (boatScoresByRace.get(boatB.boat_id) || [])
-                .filter((score) =>
-                  heatsWithAllTiedBoats.includes(String(score.heat_id)),
-                )
-                .slice()
-                .sort((s1, s2) => s1.race_id - s2.race_id);
-              console.log(
-                `Boat ${boatA.boat_id} raw race scores in chronological order (first to last):`,
-                fullRawArrayA.map((s) => Number(s.points)),
-              );
-              console.log(
-                `Boat ${boatB.boat_id} raw race scores in chronological order (first to last):`,
-                fullRawArrayB.map((s) => Number(s.points)),
-              );
-
-              // Now sort raw scores descending (by race_id) for fallback comparison (last race first)
-              const rawScoresA = fullRawArrayA
-                .slice()
-                .sort((s1, s2) => s2.race_id - s1.race_id)
-                .map((s) => Number(s.points));
-              const rawScoresB = fullRawArrayB
-                .slice()
-                .sort((s1, s2) => s2.race_id - s1.race_id)
-                .map((s) => Number(s.points));
-              console.log(
-                `Boat ${boatA.boat_id} raw race scores sorted descending (last race first):`,
-                rawScoresA,
-              );
-              console.log(
-                `Boat ${boatB.boat_id} raw race scores sorted descending (last race first):`,
-                rawScoresB,
-              );
-
-              // Compare raw race scores one by one starting from the last race backward.
-              for (
-                let r = 0;
-                r < Math.max(rawScoresA.length, rawScoresB.length);
-                r += 1
-              ) {
-                const ptA = rawScoresA[r] ?? Number.MAX_SAFE_INTEGER;
-                const ptB = rawScoresB[r] ?? Number.MAX_SAFE_INTEGER;
-                console.log(
-                  `Race comparison at index ${r} (i.e., race ${r + 1} from last): Boat ${boatA.boat_id} score: ${ptA}, Boat ${boatB.boat_id} score: ${ptB}`,
-                );
-                if (ptA !== ptB) {
-                  console.log(
-                    `Tie broken between boat ${boatA.boat_id} and boat ${boatB.boat_id} using raw race scores (last race first): Boat ${
-                      ptA < ptB ? boatA.boat_id : boatB.boat_id
-                    } wins this comparison`,
-                  );
-                  tieBroken = true;
-                  break;
-                }
-              }
-              if (!tieBroken) {
-                console.log(
-                  `No difference found between boat ${boatA.boat_id} and boat ${boatB.boat_id} after fallback raw race scores.`,
-                );
-              }
+          for (
+            let k = 0;
+            k < Math.max(scoresA.length, scoresB.length);
+            k += 1
+          ) {
+            const ptA = scoresA[k] ?? Number.MAX_SAFE_INTEGER;
+            const ptB = scoresB[k] ?? Number.MAX_SAFE_INTEGER;
+            if (ptA !== ptB) {
+              return ptA - ptB;
             }
           }
-        }
+          // Fallback if still tied: compare raw race scores descending (last race first)
+          const fullRawArrayA = (boatScoresByRace.get(boatA.boat_id) || [])
+            .filter((score) =>
+              heatsWithAllTiedBoats.includes(String(score.heat_id)),
+            )
+            .slice()
+            .sort((s1, s2) => s1.race_id - s2.race_id);
+          const fullRawArrayB = (boatScoresByRace.get(boatB.boat_id) || [])
+            .filter((score) =>
+              heatsWithAllTiedBoats.includes(String(score.heat_id)),
+            )
+            .slice()
+            .sort((s1, s2) => s1.race_id - s2.race_id);
+
+          const rawScoresA = fullRawArrayA
+            .slice()
+            .sort((s1, s2) => s2.race_id - s1.race_id)
+            .map((s) => Number(s.points));
+          const rawScoresB = fullRawArrayB
+            .slice()
+            .sort((s1, s2) => s2.race_id - s1.race_id)
+            .map((s) => Number(s.points));
+
+          for (
+            let i = 0;
+            i < Math.max(rawScoresA.length, rawScoresB.length);
+            i += 1
+          ) {
+            const ptA = rawScoresA[i] ?? Number.MAX_SAFE_INTEGER;
+            const ptB = rawScoresB[i] ?? Number.MAX_SAFE_INTEGER;
+            if (ptA !== ptB) {
+              return ptA - ptB;
+            }
+          }
+          return 0;
+        });
+        console.log('Tie-break sorting result for group:', group);
       } else {
         console.log(
           'No common heats found. Applying default tie-breaking logic for the following boats:',
@@ -341,20 +281,21 @@ export default function calculateBoatScores(
         group.forEach((boat) => {
           const scores = boatIncludedScores.get(boat.boat_id) || [];
           console.log(
-            `Scores for boat ${boat.boat_id}:`,
+            `Scores for boat ${boat.boat_id} (sorted):`,
             scores.map((score) => Number(score.points)),
           );
         });
 
-        // Use default tie-breaking logic with included scores.
         group.sort((a, b) => {
-          // Compare included scores first...
+          console.log(`Comparing boat ${a.boat_id} with boat ${b.boat_id}`);
           const scoresA = (boatIncludedScores.get(a.boat_id) || [])
             .map((score) => Number(score.points))
             .sort((x, y) => x - y);
           const scoresB = (boatIncludedScores.get(b.boat_id) || [])
             .map((score) => Number(score.points))
             .sort((x, y) => x - y);
+          console.log(`Scores for boat ${a.boat_id} (sorted):`, scoresA);
+          console.log(`Scores for boat ${b.boat_id} (sorted):`, scoresB);
           for (
             let i = 0;
             i < Math.max(scoresA.length, scoresB.length);
@@ -364,9 +305,7 @@ export default function calculateBoatScores(
             const scoreB = scoresB[i] ?? Number.MAX_SAFE_INTEGER;
             if (scoreA !== scoreB) {
               console.log(
-                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id}: Boat ${
-                  scoreA < scoreB ? a.boat_id : b.boat_id
-                } wins by included scores comparison`,
+                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id}: Boat ${scoreA < scoreB ? a.boat_id : b.boat_id} wins by included scores comparison`,
               );
               return scoreA - scoreB;
             }
@@ -375,8 +314,6 @@ export default function calculateBoatScores(
             `No difference found between boat ${a.boat_id} and boat ${b.boat_id} in included scores. Falling back to raw race scores.`,
           );
 
-          // Retrieve full raw race details sorted in chronological order (by race_id ascending)
-          // This ensures the race that happened first (lowest race_id) is first in the array.
           const fullRawArrayA = (boatScoresByRace.get(a.boat_id) || [])
             .slice()
             .sort((s1, s2) => s1.race_id - s2.race_id);
@@ -391,8 +328,6 @@ export default function calculateBoatScores(
             `Boat ${b.boat_id} full raw race details (chronological order by race_id):`,
             fullRawArrayB,
           );
-
-          // Log the race scores only (chronological order of points)
           console.log(
             `Boat ${a.boat_id} raw race scores in chronological order (first to last):`,
             fullRawArrayA.map((s) => Number(s.points)),
@@ -402,7 +337,6 @@ export default function calculateBoatScores(
             fullRawArrayB.map((s) => Number(s.points)),
           );
 
-          // Now sort raw scores descending (by race_id) for fallback comparison (last race first)
           const rawScoresA = fullRawArrayA
             .slice()
             .sort((s1, s2) => s2.race_id - s1.race_id)
@@ -420,7 +354,6 @@ export default function calculateBoatScores(
             rawScoresB,
           );
 
-          // Compare raw race scores one by one starting from the last race backward.
           for (
             let i = 0;
             i < Math.max(rawScoresA.length, rawScoresB.length);
@@ -433,9 +366,7 @@ export default function calculateBoatScores(
             );
             if (ptA !== ptB) {
               console.log(
-                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id} using raw race scores (last race first): Boat ${
-                  ptA < ptB ? a.boat_id : b.boat_id
-                } wins this comparison`,
+                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id} using raw race scores (last race first): Boat ${ptA < ptB ? a.boat_id : b.boat_id} wins this comparison`,
               );
               return ptA - ptB;
             }
@@ -444,7 +375,7 @@ export default function calculateBoatScores(
         });
       }
 
-      console.log('Updated group after tie-breaking:', group);
+      // Update group places accordingly
       group.forEach((entry, idx) => {
         entry.place = idx + 1;
       });

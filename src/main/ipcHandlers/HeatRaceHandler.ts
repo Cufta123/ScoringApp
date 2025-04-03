@@ -217,7 +217,7 @@ ipcMain.handle(
 
       // 2. Fetch all raw scores for the event.
       const scoresQuery = db.prepare(`
-      SELECT s.boat_id, s.points, s.status, r.race_number, h.heat_name, h.heat_id
+SELECT s.boat_id, s.points, s.status, r.race_id AS race_id, h.heat_name, h.heat_id
       FROM Scores s
       JOIN Races r ON s.race_id = r.race_id
       JOIN Heats h ON r.heat_id = h.heat_id
@@ -752,7 +752,7 @@ ipcMain.handle('getSummaryResults', async (event, event_id) => {
 ipcMain.handle('getScoresResult', async (event, event_id) => {
   try {
     const query = `
-      SELECT s.boat_id, s.points, r.race_number, h.heat_name, h.heat_id
+      SELECT s.boat_id, s.points, s.status, r.race_id AS race_id, h.heat_name, h.heat_id
       FROM Scores s
       JOIN Races r ON s.race_id = r.race_id
       JOIN Heats h ON r.heat_id = h.heat_id

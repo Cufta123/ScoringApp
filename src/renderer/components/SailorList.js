@@ -415,9 +415,22 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                       aria-label="Remove Boat"
                       role="button"
                       tabIndex="0"
-                      onClick={() => onRemoveBoat(sailor.boat_id)}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Are you sure you want to delete this boat?',
+                          )
+                        ) {
+                          onRemoveBoat(sailor.boat_id);
+                        }
+                      }}
                       onKeyPress={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ')
+                        if (
+                          (e.key === 'Enter' || e.key === ' ') &&
+                          window.confirm(
+                            'Are you sure you want to delete this boat?',
+                          )
+                        )
                           onRemoveBoat(sailor.boat_id);
                       }}
                       style={{

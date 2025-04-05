@@ -2,7 +2,24 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
+import iocCountries from '../../renderer/constants/iocCountries.json';
 
+function countryCodeToEmoji(code: string): string {
+  const codePoints = Array.from(code.toUpperCase()).map(
+    (char) => 127397 + char.charCodeAt(0),
+  );
+  return String.fromCodePoint(...codePoints);
+}
+
+function getFlag(country: string): string {
+  const iocCode = iocToFlagCodeMap[country];
+  if (iocCode) return countryCodeToEmoji(iocCode);
+  const key = Object.keys(iocCountries).find(
+    (k) => iocCountries[k].toLowerCase() === country.toLowerCase(),
+  );
+  return key ? countryCodeToEmoji(iocToFlagCodeMap[key] || country) : country;
+}
 export default async function printLeaderboard(
   leaderboard: string | any[],
   finalSeriesStarted: boolean,
@@ -71,12 +88,14 @@ export default async function printLeaderboard(
         0,
       );
 
-      // Build the header row.
+      // Updated header row order: Rank, Name, Flag, Category, Sail Number, Country, Boat Type, Total Points, Total Points Adjusted, ...
       const headerRow = [
         'Rank',
         'Name',
-        'Country',
+        'Flag',
+        'Category',
         'Sail Number',
+        'Country',
         'Boat Type',
         'Total Points',
         'Total Points Adjusted',
@@ -96,6 +115,7 @@ export default async function printLeaderboard(
             country: any;
             boat_number: any;
             boat_type: any;
+            category?: any;
             races: any;
             qualifyingPoints?: any[];
             total_points_combined: any;
@@ -108,8 +128,10 @@ export default async function printLeaderboard(
           const row = [
             index + 1,
             `${entry.name} ${entry.surname}`,
-            entry.country,
+            getFlag(entry.country),
+            entry.category || 'N/A',
             entry.boat_number,
+            entry.country,
             entry.boat_type,
             finalSeriesStarted
               ? entry.total_raw_points_combined
@@ -176,11 +198,14 @@ export default async function printLeaderboard(
         0,
       );
 
+      // Updated header row order for PDF export.
       const headerRow = [
         'Rank',
         'Name',
-        'Country',
+
+        'Category',
         'Sail Number',
+        'Country',
         'Boat Type',
         'Total Points',
         'Total Points Adjusted',
@@ -198,6 +223,7 @@ export default async function printLeaderboard(
             country: any;
             boat_number: { toString: () => any };
             boat_type: any;
+            category?: any;
             races: any[];
             qualifyingPoints?: any[];
             total_points_combined: any;
@@ -210,8 +236,10 @@ export default async function printLeaderboard(
           const row = [];
           row.push((idx + 1).toString());
           row.push(`${entry.name} ${entry.surname}`);
-          row.push(entry.country);
+
+          row.push(entry.category || 'N/A');
           row.push(entry.boat_number.toString());
+          row.push(entry.country);
           row.push(entry.boat_type);
           row.push(
             finalSeriesStarted
@@ -286,11 +314,14 @@ export default async function printLeaderboard(
         0,
       );
 
+      // Updated header row for HTML export.
       html += `<table><thead><tr>
         <th>Rank</th>
         <th>Name</th>
-        <th>Country</th>
+        <th>Flag</th>
+        <th>Category</th>
         <th>Sail Number</th>
+        <th>Country</th>
         <th>Boat Type</th>
         <th>Total Points</th>
         <th>Total Points Adjusted</th>`;
@@ -310,6 +341,7 @@ export default async function printLeaderboard(
             country: any;
             boat_number: any;
             boat_type: any;
+            category?: any;
             races: any[];
             qualifyingPoints?: any[];
             total_points_combined: any;
@@ -322,8 +354,10 @@ export default async function printLeaderboard(
           html += `<tr>
             <td>${index + 1}</td>
             <td>${entry.name} ${entry.surname}</td>
-            <td>${entry.country}</td>
+            <td>${getFlag(entry.country)}</td>
+            <td>${entry.category || 'N/A'}</td>
             <td>${entry.boat_number}</td>
+            <td>${entry.country}</td>
             <td>${entry.boat_type}</td>
             <td>${
               finalSeriesStarted

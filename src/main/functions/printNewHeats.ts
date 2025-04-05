@@ -3,6 +3,28 @@ import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import LatestHeats from './LastestHeats';
+import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
+import iocCountries from '../../renderer/constants/iocCountries.json'; // new import
+
+// Helper to return the flag based on the provided country value.
+function countryCodeToEmoji(code: string): string {
+  const codePoints = Array.from(code.toUpperCase()).map(
+    (char) => 127397 + char.charCodeAt(0),
+  );
+  return String.fromCodePoint(...codePoints);
+}
+
+// Helper to return the flag icon (emoji) based on the provided country value.
+function getFlag(country: string): string {
+  // If the value is already an IOC code, return the mapped flag emoji.
+  const iocCode = iocToFlagCodeMap[country];
+  if (iocCode) return countryCodeToEmoji(iocCode);
+  // Otherwise, search for a matching country name (case-insensitive)
+  const key = Object.keys(iocCountries).find(
+    (k) => iocCountries[k].toLowerCase() === country.toLowerCase(),
+  );
+  return key ? countryCodeToEmoji(iocToFlagCodeMap[key] || country) : country;
+}
 
 export default async function printNewHeats(
   event: { event_name: any },
@@ -87,7 +109,7 @@ export default async function printNewHeats(
       } else {
         const raceMatch =
           heatsToPrint.length > 0
-            ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+            ? heatsToPrint[0].heat_name.match(/(?:Q|F)Race\s+(\d+),/)
             : null;
         const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
         filename = `${eventName}_heat_${raceNumber}.xlsx`;
@@ -131,7 +153,7 @@ export default async function printNewHeats(
     } else {
       const raceMatch =
         heatsToPrint.length > 0
-          ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+          ? heatsToPrint[0].heat_name.match(/(?:Q|F)Race\s+(\d+),/)
           : null;
       const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
       pdfFilename = `${eventName}_heat_${raceNumber}.pdf`;
@@ -150,7 +172,7 @@ export default async function printNewHeats(
     heatsToPrint.forEach((heat) => {
       html += `<h2>Heat: ${heat.heat_name}</h2>`;
       html += `<table><thead><tr>
-        <th>Sailor Name</th>
+        <th>Sailor Name </th>
         <th>Country</th>
         <th>Sail Number</th>
         </tr></thead><tbody>`;
@@ -158,7 +180,8 @@ export default async function printNewHeats(
         (boat: { name: any; surname: any; country: any; sail_number: any }) => {
           html += `<tr>
         <td>${boat.name} ${boat.surname}</td>
-        <td>${boat.country}</td>
+                <td>${getFlag(boat.country || 'N/A')} ${boat.country || 'N/A'}</td>
+
         <td>${boat.sail_number}</td>
         </tr>`;
         },
@@ -173,7 +196,7 @@ export default async function printNewHeats(
     } else {
       const raceMatch =
         heatsToPrint.length > 0
-          ? heatsToPrint[0].heat_name.match(/QRace\s+(\d+),/)
+          ? heatsToPrint[0].heat_name.match(/(?:Q|F)Race\s+(\d+),/)
           : null;
       const raceNumber = raceMatch ? raceMatch[1] : 'unknown';
       htmlFilename = `${eventName}_heat_${raceNumber}.html`;

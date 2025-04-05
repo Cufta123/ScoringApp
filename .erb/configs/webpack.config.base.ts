@@ -23,8 +23,7 @@ const configuration: webpack.Configuration = {
             // Remove this line to enable type checking in webpack builds
             transpileOnly: true,
             compilerOptions: {
-              module: 'nodenext',
-              moduleResolution: 'nodenext',
+              module: 'esnext',
             },
           },
         },
@@ -35,7 +34,9 @@ const configuration: webpack.Configuration = {
   output: {
     path: webpackPaths.srcPath,
     // https://github.com/webpack/webpack/issues/1114
-    library: { type: 'commonjs2' },
+    library: {
+      type: 'commonjs2',
+    },
   },
 
   /**
@@ -48,7 +49,11 @@ const configuration: webpack.Configuration = {
     plugins: [new TsconfigPathsPlugins()],
   },
 
-  plugins: [new webpack.EnvironmentPlugin({ NODE_ENV: 'production' })],
+  plugins: [
+    new webpack.EnvironmentPlugin({
+      NODE_ENV: 'production',
+    }),
+  ],
 };
 
 export default configuration;

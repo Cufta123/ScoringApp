@@ -614,6 +614,7 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
         s.name,
         s.surname,
         b.country,
+        cat.category_name AS category,
         SUM(sc.points) AS total_raw_points,
         GROUP_CONCAT(
           CASE
@@ -627,6 +628,7 @@ ipcMain.handle('readLeaderboard', async (event, event_id) => {
       FROM Leaderboard lb
       LEFT JOIN Boats b ON lb.boat_id = b.boat_id
       LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      LEFT JOIN Categories cat ON s.category_id = cat.category_id
       LEFT JOIN Heat_Boat hb ON b.boat_id = hb.boat_id
       LEFT JOIN Heats h ON hb.heat_id = h.heat_id
       LEFT JOIN Races r ON hb.heat_id = r.heat_id
@@ -729,6 +731,7 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
         s.name,
         s.surname,
         b.country,
+        cat.category_name AS category,
         SUM(sc.points) AS total_raw_points,
         GROUP_CONCAT(
           CASE
@@ -742,6 +745,7 @@ ipcMain.handle('readFinalLeaderboard', async (event, event_id) => {
       FROM FinalLeaderboard fl
       LEFT JOIN Boats b ON fl.boat_id = b.boat_id
       LEFT JOIN Sailors s ON b.sailor_id = s.sailor_id
+      LEFT JOIN Categories cat ON s.category_id = cat.category_id
       LEFT JOIN Heat_Boat hb ON b.boat_id = hb.boat_id
       LEFT JOIN Heats h ON hb.heat_id = h.heat_id
       LEFT JOIN Races r ON hb.heat_id = r.heat_id

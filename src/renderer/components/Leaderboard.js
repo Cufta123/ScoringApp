@@ -641,7 +641,7 @@ function LeaderboardComponent({ eventId }) {
           </button>
         )}
       </div>
-      {sortedGroups.map((group) => {
+      {sortedGroups.map((group, groupIndex) => {
         // Determine how many races this group has.
         const groupRacesCount = Math.max(
           ...groupedLeaderboard[group].map((entry) => entry.races.length),
@@ -661,36 +661,28 @@ function LeaderboardComponent({ eventId }) {
                   <th>Country</th>
                   <th>Sail Number</th>
                   <th>Boat Type</th>
-
                   <th>Total Points</th>
                   <th>Total Points Adjusted</th>
-
                   {(() => {
                     const maxQualifyingPoints = Math.max(
                       ...groupedLeaderboard[group].map(
-                        (entry) => entry.qualifyingPoints?.length || 0, // Safely access length
+                        (entry) => entry.qualifyingPoints?.length || 0,
                       ),
                     );
                     return Array.from({ length: maxQualifyingPoints }).map(
-                      (_, index) => {
-                        // eslint-disable-next-line react/no-array-index-key
-                        return (
-                          <th
-                            key={`qualifying-header-Q${index + 1}`}
-                            style={{ width: '60px', minWidth: '60px' }}
-                          >
-                            {' '}
-                            Q{index + 1}
-                          </th>
-                        );
-                      },
+                      (_, index) => (
+                        <th
+                          key={`qualifying-header-Q${index + 1}`}
+                          style={{ width: '60px', minWidth: '60px' }}
+                        >
+                          Q{index + 1}
+                        </th>
+                      ),
                     );
                   })()}
-
                   {(() => {
                     const headers = [];
                     for (let j = 1; j <= groupRacesCount; j += 1) {
-                      // Only add Race and Penalty headers
                       headers.push(
                         <th
                           key={`race-${j}`}
@@ -710,206 +702,213 @@ function LeaderboardComponent({ eventId }) {
                 </tr>
               </thead>
               <tbody>
-                {groupedLeaderboard[group]?.map((entry, index) => (
-                  <tr key={`boat-${entry.boat_id}`}>
-                    <td style={{ width: '50px', minWidth: '50px' }}>
-                      {index + 1}
-                    </td>
-                    <td style={{ width: '120px', minWidth: '90px' }}>
-                      {entry.name} {entry.surname}
-                    </td>
-                    <td style={{ width: '70px', minWidth: '60px' }}>
-                      <Flag
-                        code={getFlagCode(entry.country)}
-                        style={{ width: '30px', marginRight: '5px' }}
-                      />
-                      {entry.country}
-                    </td>
-                    <td style={{ width: '70px', minWidth: '60px' }}>
-                      {entry.boat_number}
-                    </td>
-                    <td style={{ width: '70px' }}>{entry.boat_type}</td>
-                    <td style={{ width: '70px' }}>
-                      {finalSeriesStarted
-                        ? entry.total_raw_points_combined
-                        : entry.total_raw_points}
-                    </td>
-                    <td style={{ width: '70px' }}>
-                      {finalSeriesStarted
-                        ? entry.total_points_combined
-                        : entry.total_points_event}
-                    </td>
-                    {(entry.qualifyingPoints || []).map(
-                      (qualifyingPoint, qIndex) => (
-                        <td
-                          key={`qualifying-${entry.boat_id}-${qualifyingPoint.points}-${qualifyingPoint.status}`}
-                        >
-                          {qualifyingPoint.formatted}
-                        </td>
-                      ),
-                    )}
-                    {Array.from({ length: groupRacesCount }).map(
-                      (_, raceIndex) => {
-                        // Compute cell's raceId from entry.race_ids (handle string or array)
-                        const cellRaceId =
-                          typeof entry.race_ids === 'string'
-                            ? entry.race_ids.split(',')[raceIndex]
-                            : entry.race_ids[raceIndex];
-                        // Determine if this cell should be highlighted.
-                        const isHighlighted =
-                          swapMode &&
-                          selectedSwapCells.some(
-                            (cell) => cell.raceId === cellRaceId,
-                          );
-
-                        return (
-                          <React.Fragment
-                            key={`race-fragment-${entry.boat_id}-${cellRaceId}`}
-                          >
-                            <td
-                              style={{
-                                position: 'relative',
-                                backgroundColor: (() => {
-                                  if (isHighlighted) {
-                                    return '#ADD8E6';
-                                  }
-                                  if (editMode) {
-                                    return '#f9f9f9';
-                                  }
-                                  return 'transparent';
-                                })(),
-                              }}
-                            >
-                              {editMode ? (
-                                <input
-                                  type="number"
-                                  value={
-                                    typeof entry.races[raceIndex] === 'string'
-                                      ? (entry.races[raceIndex].match(
-                                          /\d+/,
-                                        ) || [''])[0]
-                                      : entry.races[raceIndex] || ''
-                                  }
-                                  onChange={(e) =>
-                                    setEditableLeaderboard(
-                                      HandleRaceChange({
-                                        boatId: entry.boat_id,
-                                        raceIndex,
-                                        newHandleRaceChangeValue:
-                                          e.target.value,
-                                        editableLeaderboard,
-                                        shiftPositions,
-                                        finalSeriesStarted, // <-- add this line
-                                      }),
-                                    )
-                                  }
-                                  style={{ width: '50px' }}
-                                />
-                              ) : (
-                                entry.races[raceIndex] || ''
-                              )}
-                              {/* When swap mode is enabled, render a small interactive button */}
-                              {editMode && swapMode && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    toggleSwapCell(entry, raceIndex)
-                                  }
-                                  style={{
-                                    position: 'absolute',
-                                    right: '5px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    width: '15px',
-                                    height: '15px',
-                                    border: '1px solid #000',
-                                    backgroundColor: (() => {
-                                      const isSelected =
-                                        !!selectedSwapCells.find(
-                                          (cell) =>
-                                            cell.boatId.toString() ===
-                                              entry.boat_id.toString() &&
-                                            cell.raceIndex === raceIndex,
-                                        );
-                                      return isSelected ? '#cce5ff' : '#fff';
-                                    })(),
-                                    padding: 0,
-                                    margin: 0,
-                                    borderRadius: 0,
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    lineHeight: '15px',
-                                    textAlign: 'center',
-                                  }}
-                                  aria-label="Select cell for swap"
-                                >
-                                  {selectedSwapCells.some(
-                                    (cell) =>
-                                      cell.boatId.toString() ===
-                                        entry.boat_id.toString() &&
-                                      cell.raceIndex === raceIndex,
-                                  ) && (
-                                    <span style={{ color: 'blue' }}>✔</span>
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                            {editMode && !swapMode && (
-                              <td>
-                                <select
-                                  value={
-                                    perRacePenalties[entry.boat_id] &&
-                                    perRacePenalties[entry.boat_id][raceIndex]
-                                      ? perRacePenalties[entry.boat_id][
-                                          raceIndex
-                                        ]
-                                      : ''
-                                  }
-                                  onChange={(e) => {
-                                    const { value } = e.target;
-                                    // Reuse the outer scoped cellRaceId computed earlier
-                                    if (value === 'RDG') {
-                                      // Instead of window.prompt, open our custom modal
-                                      setRdgModalBoatId(entry.boat_id);
-                                      setRdgModalRaceId(cellRaceId);
-                                      setRdgModalPoints('');
-                                      setRdgModalOpen(true);
-                                    }
-                                    setPerRacePenalties((prev) => {
-                                      const updated = [
-                                        ...(prev[entry.boat_id] || []),
-                                      ];
-                                      updated[raceIndex] = value;
-                                      return {
-                                        ...prev,
-                                        [entry.boat_id]: updated,
-                                      };
-                                    });
-                                  }}
-                                  style={{ width: '80px' }}
-                                >
-                                  <option value="">None</option>
-                                  <option value="DNS">DNS</option>
-                                  <option value="DNF">DNF</option>
-                                  <option value="RET">RET</option>
-                                  <option value="NSC">NSC</option>
-                                  <option value="OCS">OCS</option>
-                                  <option value="DNC">DNC</option>
-                                  <option value="WTH">WTH</option>
-                                  <option value="UFD">UFD</option>
-                                  <option value="BFD">BFD</option>
-                                  <option value="DSQ">DSQ</option>
-                                  <option value="DNE">DNE</option>
-                                  <option value="RDG">RDG</option>
-                                </select>
-                              </td>
-                            )}
-                          </React.Fragment>
+                {groupedLeaderboard[group]?.map((entry, index) => {
+                  // For final leaderboard, calculate the cumulative offset from previous groups.
+                  const groupOffset = finalSeriesStarted
+                    ? sortedGroups
+                        .slice(0, groupIndex)
+                        .reduce(
+                          (acc, grp) =>
+                            acc + (groupedLeaderboard[grp]?.length || 0),
+                          0,
+                        )
+                    : 0;
+                  return (
+                    <tr key={`boat-${entry.boat_id}`}>
+                      <td style={{ width: '50px', minWidth: '50px' }}>
+                        {groupOffset + index + 1}
+                      </td>
+                      <td style={{ width: '120px', minWidth: '90px' }}>
+                        {entry.name} {entry.surname}
+                      </td>
+                      <td style={{ width: '70px', minWidth: '60px' }}>
+                        <Flag
+                          code={getFlagCode(entry.country)}
+                          style={{ width: '30px', marginRight: '5px' }}
+                        />
+                        {entry.country}
+                      </td>
+                      <td style={{ width: '70px', minWidth: '60px' }}>
+                        {entry.boat_number}
+                      </td>
+                      <td style={{ width: '70px' }}>{entry.boat_type}</td>
+                      <td style={{ width: '70px' }}>
+                        {finalSeriesStarted
+                          ? entry.total_raw_points_combined
+                          : entry.total_raw_points}
+                      </td>
+                      <td style={{ width: '70px' }}>
+                        {finalSeriesStarted
+                          ? entry.total_points_combined
+                          : entry.total_points_event}
+                      </td>
+                      {(() => {
+                        const occurrenceMap = {};
+                        return (entry.qualifyingPoints || []).map(
+                          (qualifyingPoint) => {
+                            const keyBase = `${entry.boat_id}-${qualifyingPoint.points}-${qualifyingPoint.status}`;
+                            occurrenceMap[keyBase] =
+                              (occurrenceMap[keyBase] || 0) + 1;
+                            const key = `qualifying-${keyBase}-${occurrenceMap[keyBase]}`;
+                            return (
+                              <td key={key}>{qualifyingPoint.formatted}</td>
+                            );
+                          },
                         );
-                      },
-                    )}
-                  </tr>
-                ))}
+                      })()}
+                      {Array.from({ length: groupRacesCount }).map(
+                        (_, raceIndex) => {
+                          const cellRaceId =
+                            typeof entry.race_ids === 'string'
+                              ? entry.race_ids.split(',')[raceIndex]
+                              : entry.race_ids[raceIndex];
+                          const isHighlighted =
+                            swapMode &&
+                            selectedSwapCells.some(
+                              (cell) => cell.raceId === cellRaceId,
+                            );
+                          return (
+                            <React.Fragment
+                              key={`race-fragment-${entry.boat_id}-${cellRaceId}`}
+                            >
+                              <td
+                                style={{
+                                  position: 'relative',
+                                  backgroundColor: (() => {
+                                    if (isHighlighted) return '#ADD8E6';
+                                    if (editMode) return '#f9f9f9';
+                                    return 'transparent';
+                                  })(),
+                                }}
+                              >
+                                {editMode ? (
+                                  <input
+                                    type="number"
+                                    value={
+                                      typeof entry.races[raceIndex] === 'string'
+                                        ? (entry.races[raceIndex].match(
+                                            /\d+/,
+                                          ) || [''])[0]
+                                        : entry.races[raceIndex] || ''
+                                    }
+                                    onChange={(e) =>
+                                      setEditableLeaderboard(
+                                        HandleRaceChange({
+                                          boatId: entry.boat_id,
+                                          raceIndex,
+                                          newHandleRaceChangeValue:
+                                            e.target.value,
+                                          editableLeaderboard,
+                                          shiftPositions,
+                                          finalSeriesStarted,
+                                        }),
+                                      )
+                                    }
+                                    style={{ width: '50px' }}
+                                  />
+                                ) : (
+                                  entry.races[raceIndex] || ''
+                                )}
+                                {editMode && swapMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      toggleSwapCell(entry, raceIndex)
+                                    }
+                                    style={{
+                                      position: 'absolute',
+                                      right: '5px',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      width: '15px',
+                                      height: '15px',
+                                      border: '1px solid #000',
+                                      backgroundColor: (() => {
+                                        const isSelected =
+                                          selectedSwapCells.some(
+                                            (cell) =>
+                                              cell.boatId.toString() ===
+                                                entry.boat_id.toString() &&
+                                              cell.raceIndex === raceIndex,
+                                          );
+                                        return isSelected ? '#cce5ff' : '#fff';
+                                      })(),
+                                      padding: 0,
+                                      margin: 0,
+                                      borderRadius: 0,
+                                      cursor: 'pointer',
+                                      fontSize: '12px',
+                                      lineHeight: '15px',
+                                      textAlign: 'center',
+                                    }}
+                                    aria-label="Select cell for swap"
+                                  >
+                                    {selectedSwapCells.some(
+                                      (cell) =>
+                                        cell.boatId.toString() ===
+                                          entry.boat_id.toString() &&
+                                        cell.raceIndex === raceIndex,
+                                    ) && (
+                                      <span style={{ color: 'blue' }}>✔</span>
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+                              {editMode && !swapMode && (
+                                <td>
+                                  <select
+                                    value={
+                                      perRacePenalties[entry.boat_id] &&
+                                      perRacePenalties[entry.boat_id][raceIndex]
+                                        ? perRacePenalties[entry.boat_id][
+                                            raceIndex
+                                          ]
+                                        : ''
+                                    }
+                                    onChange={(e) => {
+                                      const { value } = e.target;
+                                      if (value === 'RDG') {
+                                        setRdgModalBoatId(entry.boat_id);
+                                        setRdgModalRaceId(cellRaceId);
+                                        setRdgModalPoints('');
+                                        setRdgModalOpen(true);
+                                      }
+                                      setPerRacePenalties((prev) => {
+                                        const updated = [
+                                          ...(prev[entry.boat_id] || []),
+                                        ];
+                                        updated[raceIndex] = value;
+                                        return {
+                                          ...prev,
+                                          [entry.boat_id]: updated,
+                                        };
+                                      });
+                                    }}
+                                    style={{ width: '80px' }}
+                                  >
+                                    <option value="">None</option>
+                                    <option value="DNS">DNS</option>
+                                    <option value="DNF">DNF</option>
+                                    <option value="RET">RET</option>
+                                    <option value="NSC">NSC</option>
+                                    <option value="OCS">OCS</option>
+                                    <option value="DNC">DNC</option>
+                                    <option value="WTH">WTH</option>
+                                    <option value="UFD">UFD</option>
+                                    <option value="BFD">BFD</option>
+                                    <option value="DSQ">DSQ</option>
+                                    <option value="DNE">DNE</option>
+                                    <option value="RDG">RDG</option>
+                                  </select>
+                                </td>
+                              )}
+                            </React.Fragment>
+                          );
+                        },
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

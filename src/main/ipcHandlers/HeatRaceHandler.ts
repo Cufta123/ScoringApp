@@ -451,7 +451,7 @@ ipcMain.handle(
       const currentPosition = currentResult.position;
 
       // Update the score – if penalty is 'RDG', update only status.
-      if (penalty === 'RDG') {
+      if (penalty === 'RDG' || penalty === 'DP' || penalty === 'SP') {
         // Retrieve and log the score id
         const scoreRow = db
           .prepare(
@@ -459,14 +459,16 @@ ipcMain.handle(
           )
           .get(race_id, boat_id);
         if (scoreRow) {
-          console.log(`RDG clicked. Score id: ${scoreRow.score_id}`);
+          console.log(
+            `Penalty ${penalty} clicked. Score id: ${scoreRow.score_id}`,
+          );
         } else {
-          console.log('RDG clicked but no matching score found.');
+          console.log(`${penalty} clicked but no matching score found.`);
         }
         const updateStatusOnlyQuery = db.prepare(
           `UPDATE Scores SET status = ? WHERE race_id = ? AND boat_id = ?`,
         );
-        updateStatusOnlyQuery.run('RDG', race_id, boat_id);
+        updateStatusOnlyQuery.run(penalty, race_id, boat_id);
       } else {
         const updateQuery = db.prepare(
           `UPDATE Scores SET position = ?, points = ?, status = ? WHERE race_id = ? AND boat_id = ?`,

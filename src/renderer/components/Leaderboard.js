@@ -31,6 +31,7 @@ function LeaderboardComponent({ eventId }) {
   const [rdgModalBoatId, setRdgModalBoatId] = useState(null);
   const [rdgModalRaceId, setRdgModalRaceId] = useState(null);
   const [rdgModalPoints, setRdgModalPoints] = useState('');
+  const [rdgModalPenalty, setRdgModalPenalty] = useState('RDG'); // new state for dynamic penalty text
   const { state: { event } = {} } = useLocation();
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
@@ -365,7 +366,7 @@ function LeaderboardComponent({ eventId }) {
         heat_id, // heat_id
         penalty, // new penalty value
       );
-      if (penalty === 'RDG') {
+      if (penalty === 'RDG' || penalty === 'DP' || penalty === 'SP') {
         await window.electron.ipcRenderer.invoke(
           'updateFinalLeaderboard',
           eventId,
@@ -661,8 +662,8 @@ function LeaderboardComponent({ eventId }) {
                   <th>Country</th>
                   <th>Sail Number</th>
                   <th>Boat Type</th>
-                  <th>Total Points</th>
-                  <th>Total Points Adjusted</th>
+                  <th>Total</th>
+                  <th>Nett </th>
                   {(() => {
                     const maxQualifyingPoints = Math.max(
                       ...groupedLeaderboard[group].map(
@@ -867,10 +868,15 @@ function LeaderboardComponent({ eventId }) {
                                     }
                                     onChange={(e) => {
                                       const { value } = e.target;
-                                      if (value === 'RDG') {
+                                      if (
+                                        value === 'RDG' ||
+                                        value === 'DP' ||
+                                        value === 'SP'
+                                      ) {
                                         setRdgModalBoatId(entry.boat_id);
                                         setRdgModalRaceId(cellRaceId);
                                         setRdgModalPoints('');
+                                        setRdgModalPenalty(value); // update modal penalty based on selection
                                         setRdgModalOpen(true);
                                       }
                                       setPerRacePenalties((prev) => {
@@ -899,6 +905,8 @@ function LeaderboardComponent({ eventId }) {
                                     <option value="DSQ">DSQ</option>
                                     <option value="DNE">DNE</option>
                                     <option value="RDG">RDG</option>
+                                    <option value="DP">DP</option>
+                                    <option value="SP">SP</option>
                                   </select>
                                 </td>
                               )}
@@ -937,7 +945,7 @@ function LeaderboardComponent({ eventId }) {
               minWidth: '300px',
             }}
           >
-            <h3>Update RDG Points</h3>
+            <h3>Update {rdgModalPenalty} Points</h3>
             <input
               type="number"
               value={rdgModalPoints}

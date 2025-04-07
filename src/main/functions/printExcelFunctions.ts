@@ -154,7 +154,7 @@ export async function exportToExcel(
     ...(leaderboard[0]?.races?.map(
       (_: any, index: number) => `Race ${index + 1}`,
     ) || []),
-    'Total Points',
+    'Total',
   ];
   worksheet.addRow(header);
 
@@ -301,7 +301,7 @@ export async function exportToPDF(
         'Sail Number',
         'Boat Type',
         ...Array.from({ length: maxRaceCount }, (_, i) => `Race ${i + 1}`),
-        'Total Points',
+        'Total',
       ];
 
       doc.setFontSize(14);
@@ -353,7 +353,7 @@ export async function exportToPDF(
       'Sail Number',
       'Boat Type',
       ...Array.from({ length: raceCount }, (_, i) => `Race ${i + 1}`),
-      'Total Points',
+      'Total',
     ];
 
     const bodyData = leaderboard.map((entry, idx) => {
@@ -417,7 +417,7 @@ export async function exportToHTML(
       <th>Sail Number</th>
       <th>Boat Type</th>
       <th>Races</th>
-      <th>Total Points</th>
+      <th>Total</th>
       </tr></thead><tbody>`;
       groupedLeaderboard[group]?.forEach((entry, index) => {
         html += `<tr>
@@ -440,7 +440,7 @@ export async function exportToHTML(
       <th>Sail Number</th>
       <th>Boat Type</th>
       <th>Races</th>
-      <th>Total Points</th>
+      <th>Total</th>
       </tr></thead><tbody>`;
     leaderboard.forEach((entry, index) => {
       html += `<tr>

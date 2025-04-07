@@ -97,8 +97,8 @@ export default async function printLeaderboard(
         'Sail Number',
         'Country',
         'Boat Type',
-        'Total Points',
-        'Total Points Adjusted',
+        'Total',
+        'Nett',
         ...Array.from({ length: maxQualifyingCount }, (_, i) => `Q${i + 1}`),
         ...Array.from({ length: maxRaceCount }, (_, i) =>
           finalSeriesStarted ? `F ${i + 1}` : `Q ${i + 1}`,
@@ -207,8 +207,8 @@ export default async function printLeaderboard(
         'Sail Number',
         'Country',
         'Boat Type',
-        'Total Points',
-        'Total Points Adjusted',
+        'Total',
+        'Nett',
         ...Array.from({ length: maxQualifyingCount }, (_, i) => `Q${i + 1}`),
         ...Array.from({ length: maxRaceCount }, (_, i) =>
           finalSeriesStarted ? `F ${i + 1}` : `Q ${i + 1}`,
@@ -323,8 +323,8 @@ export default async function printLeaderboard(
         <th>Sail Number</th>
         <th>Country</th>
         <th>Boat Type</th>
-        <th>Total Points</th>
-        <th>Total Points Adjusted</th>`;
+        <th>Total </th>
+        <th>Nett</th>`;
       for (let i = 0; i < maxQualifyingCount; i += 1) {
         html += `<th>Q${i + 1}</th>`;
       }

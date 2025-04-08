@@ -71,6 +71,8 @@ export default async function printNewHeats(
     // Insert event header row before listing heats
     worksheet.insertRow(1, [eventName]);
     worksheet.insertRow(2, []);
+    // Postavite A4 format (u ExcelJS, paperSize 9 označava A4)
+    worksheet.pageSetup = { paperSize: 9 };
 
     worksheet.columns = [
       { key: 'col1', width: 30 },

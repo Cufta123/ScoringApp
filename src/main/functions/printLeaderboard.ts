@@ -70,6 +70,9 @@ export default async function printLeaderboard(
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Leaderboard');
 
+    // Postavite A4 format (u ExcelJS, paperSize 9 označava A4)
+    worksheet.pageSetup = { paperSize: 9 };
+
     groupsToProcess.forEach((groupObj) => {
       // Add a row with the group header.
       worksheet.addRow([groupObj.header]);

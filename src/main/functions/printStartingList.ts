@@ -58,6 +58,8 @@ export default async function printStartingList(
   if (format === 'excel') {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Competitor List');
+    // Postavite A4 format (u ExcelJS, paperSize 9 označava A4)
+    worksheet.pageSetup = { paperSize: 9 };
 
     // Updated column order: Name, Surname, Flag, Category, Sail Number, Country, Model, Club
     worksheet.columns = [

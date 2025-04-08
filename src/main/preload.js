@@ -38,6 +38,7 @@ const electronHandler = {
     removeBoatFromEvent: eventDB.removeBoatFromEvent,
     lockEvent: eventDB.lockEvent,
     unlockEvent: eventDB.unlockEvent,
+    nukeDatabase: eventDB.nukeDatabase,
   },
   heatRaceDB: {
     readAllHeats: heatRaceDB.readAllHeats,

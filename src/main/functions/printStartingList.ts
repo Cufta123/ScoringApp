@@ -4,6 +4,7 @@ import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
 import iocCountries from '../../renderer/constants/iocCountries.json'; // new import
+import NotoSansBlack from '../../renderer/constants/NotoSansBlack.json'; // <-- add this import
 
 // Helper to return the flag based on the provided country value.
 function countryCodeToEmoji(code: string): string {
@@ -94,6 +95,13 @@ export default async function printStartingList(
     }
   } else if (format === 'pdf') {
     const doc = new JsPDF();
+
+    // Embed custom NotosansBlack font
+    const notosansBlackBase64 = NotoSansBlack.fontBase64;
+    doc.addFileToVFS('NotosansBlack.ttf', notosansBlackBase64);
+    doc.addFont('NotosansBlack.ttf', 'NotosansBlack', 'normal');
+    doc.setFont('NotosansBlack', 'normal');
+
     doc.setFontSize(16);
     doc.text('Starting List', 14, 10);
     doc.setFontSize(12);
@@ -125,6 +133,12 @@ export default async function printStartingList(
       head: [header],
       body,
       theme: 'grid',
+      styles: {
+        cellWidth: 'wrap',
+        font: 'NotosansBlack',
+        fontStyle: 'normal',
+      },
+      headStyles: { font: 'NotosansBlack', fontStyle: 'normal' },
     });
 
     doc.save(`${eventName}_starting_list.pdf`);

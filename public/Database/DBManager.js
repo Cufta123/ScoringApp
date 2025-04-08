@@ -527,4 +527,4 @@ checkEventsTable();
 checkDatabaseIntegrity();
 console.log(`Database path: ${dbPath}`);
 
-module.exports = { db };
+module.exports = { db, dbPath };

@@ -33,6 +33,15 @@ function LeaderboardComponent({ eventId }) {
   const [rdgModalPoints, setRdgModalPoints] = useState('');
   const [rdgModalPenalty, setRdgModalPenalty] = useState('RDG'); // new state for dynamic penalty text
   const { state: { event } = {} } = useLocation();
+  // New state for custom alert
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
   const checkFinalSeriesStarted = useCallback(async () => {
     try {
       const heats =
@@ -416,20 +425,20 @@ function LeaderboardComponent({ eventId }) {
       if (selectedSwapCells.length < 2) {
         setSelectedSwapCells((prev) => [...prev, cell]);
       } else {
-        alert('Maximum of two selections allowed.');
+        displayAlert('Maximum of two selections allowed.');
       }
     }
   };
 
   const handleSaveSwappedChanges = async () => {
     if (selectedSwapCells.length !== 2) {
-      alert('Please select exactly two cells.');
+      displayAlert('Please select exactly two cells.');
       return;
     }
     // Check both cells belong to the same race.
     const [cell1, cell2] = selectedSwapCells;
     if (cell1.raceId !== cell2.raceId) {
-      alert('Both cells must be from the same race.');
+      displayAlert('Both cells must be from the same race.');
       return;
     }
     try {
@@ -454,13 +463,13 @@ function LeaderboardComponent({ eventId }) {
           finalSeriesStarted,
         );
       }
-      alert('Swap completed successfully.');
+      displayAlert('Swap completed successfully!');
       setSelectedSwapCells([]);
       setSwapMode(false);
       fetchLeaderboard();
     } catch (error) {
       console.error('Swap failed:', error);
-      alert('Swap failed. See console for details.');
+      displayAlert('Swap failed. See console for details.');
     }
   };
   if (loading) {
@@ -509,6 +518,14 @@ function LeaderboardComponent({ eventId }) {
     } catch (error) {
       console.error('Error printing leaderboard:', error);
     }
+  };
+
+  const stickyHeaderStyle = {
+    position: 'sticky',
+    top: 0,
+    backgroundColor: '#fff',
+    zIndex: 2,
+    borderBottom: '1px solid #ccc',
   };
 
   return (
@@ -655,15 +672,15 @@ function LeaderboardComponent({ eventId }) {
           <div key={`group-${group}`}>
             <h3>{groupHeader}</h3>
             <table>
-              <thead>
+              <thead style={stickyHeaderStyle}>
                 <tr>
-                  <th>Rank</th>
-                  <th>Name</th>
-                  <th>Country</th>
-                  <th>Sail Number</th>
-                  <th>Boat Type</th>
-                  <th>Total</th>
-                  <th>Nett </th>
+                  <th style={stickyHeaderStyle}>Rank</th>
+                  <th style={stickyHeaderStyle}>Name</th>
+                  <th style={stickyHeaderStyle}>Country</th>
+                  <th style={stickyHeaderStyle}>Sail Number</th>
+                  <th style={stickyHeaderStyle}>Boat Type</th>
+                  <th style={stickyHeaderStyle}>Total</th>
+                  <th style={stickyHeaderStyle}>Nett</th>
                   {(() => {
                     const maxQualifyingPoints = Math.max(
                       ...groupedLeaderboard[group].map(
@@ -674,7 +691,11 @@ function LeaderboardComponent({ eventId }) {
                       (_, index) => (
                         <th
                           key={`qualifying-header-Q${index + 1}`}
-                          style={{ width: '60px', minWidth: '60px' }}
+                          style={{
+                            ...stickyHeaderStyle,
+                            width: '60px',
+                            minWidth: '60px',
+                          }}
                         >
                           Q{index + 1}
                         </th>
@@ -687,14 +708,20 @@ function LeaderboardComponent({ eventId }) {
                       headers.push(
                         <th
                           key={`race-${j}`}
-                          style={{ width: '60px', minWidth: '60px' }}
+                          style={{
+                            ...stickyHeaderStyle,
+                            width: '60px',
+                            minWidth: '60px',
+                          }}
                         >
                           {finalSeriesStarted ? `F ${j}` : `Q ${j}`}
                         </th>,
                       );
                       if (editMode && !swapMode) {
                         headers.push(
-                          <th key={`penalty-${j}`}>Penalty Race {j}</th>,
+                          <th key={`penalty-${j}`} style={stickyHeaderStyle}>
+                            Penalty Race {j}
+                          </th>,
                         );
                       }
                     }
@@ -986,6 +1013,38 @@ function LeaderboardComponent({ eventId }) {
                 Submit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
           </div>
         </div>
       )}

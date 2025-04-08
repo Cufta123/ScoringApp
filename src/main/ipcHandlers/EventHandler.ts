@@ -1,6 +1,7 @@
 /* eslint-disable camelcase */
 import { ipcMain } from 'electron';
-import { db } from '../../../public/Database/DBManager';
+import fs from 'fs';
+import { db, dbPath } from '../../../public/Database/DBManager';
 
 interface SqliteError extends Error {
   code: string;
@@ -15,6 +16,18 @@ ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
   log(msgTemplate(arg));
   event.reply('ipc-example', msgTemplate('pongSailor'));
+});
+
+ipcMain.handle('nukeDatabase', async () => {
+  try {
+    db.close();
+    fs.unlinkSync(dbPath);
+    console.log('Database nuked successfully.');
+    return { success: true };
+  } catch (error) {
+    console.error('Error nuking database:', error);
+    throw error;
+  }
 });
 
 const checkEventLocked = (event_id: any) => {

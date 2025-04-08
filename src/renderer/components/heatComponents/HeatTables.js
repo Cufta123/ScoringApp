@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable no-console */
-/* eslint-disable no-alert */
+
 import React, { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import HeatRows from './HeatRows';
@@ -20,11 +20,17 @@ export default function HeatTables({
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const isDeleteActive = deleteOptionsActive || deleteRaceMode;
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
 
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
   const handleBoatTransfer = useCallback(
     async (boat, fromHeatId, toHeatId) => {
       if (raceHappened || finalSeriesStarted) {
-        alert('Cannot transfer boats after a race has happened.');
+        displayAlert('Cannot transfer boats after a race has happened.');
         return;
       }
       try {
@@ -33,11 +39,11 @@ export default function HeatTables({
           toHeatId,
           boat.boat_id,
         );
-        alert('Boat transferred successfully!');
+        displayAlert('Boat transferred successfully!');
         handleDisplayHeats();
       } catch (error) {
         console.error('Error transferring boat:', error);
-        alert(`Error transferring boat. ${error.message}`);
+        displayAlert(`Error transferring boat. ${error.message}`);
       }
     },
     [raceHappened, finalSeriesStarted, handleDisplayHeats],
@@ -206,6 +212,38 @@ export default function HeatTables({
           </div>
         );
       })}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

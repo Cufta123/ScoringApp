@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { jsPDF as JsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import NotoSansBlack from '../../renderer/constants/NotoSansBlack.json';
 import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
 import iocCountries from '../../renderer/constants/iocCountries.json';
 
@@ -20,6 +21,7 @@ function getFlag(country: string): string {
   );
   return key ? countryCodeToEmoji(iocToFlagCodeMap[key] || country) : country;
 }
+
 export default async function printLeaderboard(
   leaderboard: string | any[],
   finalSeriesStarted: boolean,
@@ -171,9 +173,15 @@ export default async function printLeaderboard(
     saveAs(blob, `${eventName}_${raceType}_race_${raceNumber}.xlsx`);
   } else if (format === 'pdf') {
     // ----- PDF EXPORT -----
-    const doc = new JsPDF();
-    let startY = 20;
+    const doc = new JsPDF({ orientation: 'landscape' });
 
+    // Embed custom Notosans-Black font from JSON.
+    const notosansBlackBase64 = NotoSansBlack.fontBase64;
+    doc.addFileToVFS('NotosansBlack.ttf', notosansBlackBase64);
+    doc.addFont('NotosansBlack.ttf', 'NotosansBlack', 'normal');
+    doc.setFont('NotosansBlack', 'normal');
+
+    let startY = 20;
     doc.setFontSize(16);
     doc.text(leaderboardHeader, 14, 10);
     startY = 16;
@@ -202,7 +210,6 @@ export default async function printLeaderboard(
       const headerRow = [
         'Rank',
         'Name',
-
         'Category',
         'Sail Number',
         'Country',
@@ -236,7 +243,6 @@ export default async function printLeaderboard(
           const row = [];
           row.push((idx + 1).toString());
           row.push(`${entry.name} ${entry.surname}`);
-
           row.push(entry.category || 'N/A');
           row.push(entry.boat_number.toString());
           row.push(entry.country);
@@ -275,6 +281,12 @@ export default async function printLeaderboard(
         head: [headerRow],
         body: bodyData,
         theme: 'grid',
+        styles: {
+          cellWidth: 'wrap',
+          font: 'NotosansBlack',
+          fontStyle: 'normal',
+        },
+        headStyles: { font: 'NotosansBlack', fontStyle: 'normal' },
       });
 
       startY = (doc as any).lastAutoTable.finalY + 10;

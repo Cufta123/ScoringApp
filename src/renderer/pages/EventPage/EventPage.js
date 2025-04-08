@@ -1,15 +1,17 @@
 /* eslint-disable no-console */
-/* eslint-disable no-alert */
+/* eslint-disable no-displayAlert */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SailorForm from '../../components/SailorForm';
 import SailorList from '../../components/SailorList';
 import Navbar from '../../components/Navbar';
+import ConfirmDialog from '../../components/ConfirmDialog'; // new import
 import './EventPage.css';
 
 import CSVUpload from '../../components/CSVUpload';
 import printStartingList from '../../../main/functions/printStartingList';
+// Add alert state and helper at the top (after your imports)
 
 // Update the helper to accept a minimum candidate value
 const findNextFreeNumber = (numbers, minCandidate = 1) => {
@@ -42,7 +44,14 @@ function EventPage() {
   const [raceHappened, setRaceHappened] = useState(false);
   const [isEventLocked, setIsEventLocked] = useState(event?.is_locked === 1);
   const [exportFormat, setExportFormat] = useState('excel');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [lockConfirmVisible, setLockConfirmVisible] = useState(false);
 
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
   // Fetch functions
   const fetchBoatsWithSailors = useCallback(async () => {
     try {
@@ -60,7 +69,7 @@ function EventPage() {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(
+      displayAlert(
         `An error occurred while fetching boat and sailor data. Details: ${
           errorMessage
         }`,
@@ -172,7 +181,7 @@ function EventPage() {
         boats.length > 0 ? String(boats[0].sail_number).trim().length : 1;
       const minCandidate = Math.pow(10, digitLength - 1);
       const candidate = findNextFreeNumber(sailNums, minCandidate);
-      window.alert(
+      displayAlert(
         `Error: Duplicate sail numbers detected (${duplicates.join(
           ', ',
         )}). Suggested next free sail number is ${candidate}. Please update the entries so that each boat in the event has a unique sail number.`,
@@ -184,7 +193,7 @@ function EventPage() {
 
   const toggleSailorFormVisibility = () => {
     if (raceHappened) {
-      alert(
+      displayAlert(
         'Registration error: A race has already been conducted, so new sailors cannot be added.',
       );
       return;
@@ -196,7 +205,7 @@ function EventPage() {
     e.preventDefault();
 
     if (raceHappened) {
-      alert(
+      displayAlert(
         'Registration error: A race has already occurred, so you cannot add new boats.',
       );
       return;
@@ -217,7 +226,7 @@ function EventPage() {
     });
     if (duplicateOption) {
       const selectedBoat = allBoatsMap.get(duplicateOption.value);
-      window.alert(
+      displayAlert(
         `Boat with sail number ${selectedBoat.sail_number} is already associated with this event.`,
       );
       return;
@@ -242,7 +251,7 @@ function EventPage() {
       console.error('Error associating boats with event:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      window.alert(
+      displayAlert(
         `An error occurred while associating boats with the event. Details: ${errorMessage}`,
       );
     }
@@ -285,13 +294,13 @@ function EventPage() {
       if (isEventLocked) {
         await window.electron.sqlite.eventDB.unlockEvent(event.event_id);
         setIsEventLocked(false);
-        alert(
+        displayAlert(
           'Success: The event has been unlocked. Registrations are now enabled.',
         );
       } else {
         await window.electron.sqlite.eventDB.lockEvent(event.event_id);
         setIsEventLocked(true);
-        alert(
+        displayAlert(
           'Success: The event has been locked. No further registrations are allowed.',
         );
       }
@@ -299,7 +308,7 @@ function EventPage() {
       console.error('Error locking/unlocking event:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(
+      displayAlert(
         `An error occurred while updating the event lock status. Details: ${
           errorMessage
         }`,
@@ -308,12 +317,12 @@ function EventPage() {
   };
 
   const handleLockEventClick = () => {
-    const userConfirmed = window.confirm(
-      'Warning: Locking the event will prevent any further registrations. Do you wish to continue?',
-    );
-    if (userConfirmed) {
-      handleLockEvent();
-    }
+    setLockConfirmVisible(true);
+  };
+
+  const confirmLockEvent = () => {
+    handleLockEvent();
+    setLockConfirmVisible(false);
   };
 
   if (!event) {
@@ -414,6 +423,45 @@ function EventPage() {
       >
         {isEventLocked ? 'Unlock Event' : 'Lock Event'}
       </button>
+      {lockConfirmVisible && (
+        <ConfirmDialog
+          message="Warning: Locking the event will prevent any further registrations. Do you wish to continue?"
+          onConfirm={confirmLockEvent}
+          onCancel={() => setLockConfirmVisible(false)}
+        />
+      )}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 import LatestHeats from './LastestHeats';
 import iocToFlagCodeMap from '../../renderer/constants/iocToFlagCodeMap';
 import iocCountries from '../../renderer/constants/iocCountries.json'; // new import
-
+import NotoSansBlack from '../../renderer/constants/NotoSansBlack.json';
 // Helper to return the flag based on the provided country value.
 function countryCodeToEmoji(code: string): string {
   const codePoints = Array.from(code.toUpperCase()).map(
@@ -120,6 +120,13 @@ export default async function printNewHeats(
     }
   } else if (format === 'pdf') {
     const doc = new JsPDF();
+
+    // Embed custom NotosansBlack font
+    const notosansBlackBase64 = NotoSansBlack.fontBase64;
+    doc.addFileToVFS('NotosansBlack.ttf', notosansBlackBase64);
+    doc.addFont('NotosansBlack.ttf', 'NotosansBlack', 'normal');
+    doc.setFont('NotosansBlack', 'normal');
+
     // Removed "New Heats" text; only showing event name as header.
     doc.setFontSize(16);
     doc.text(eventName, 14, 10);
@@ -140,6 +147,12 @@ export default async function printNewHeats(
         head: [header],
         body,
         theme: 'grid',
+        styles: {
+          cellWidth: 'wrap',
+          font: 'NotosansBlack',
+          fontStyle: 'normal',
+        },
+        headStyles: { font: 'NotosansBlack', fontStyle: 'normal' },
         startY: finalY + 10,
         didDrawPage: (data) => {
           finalY = data.cursor ? data.cursor.y + 10 : finalY + 10;

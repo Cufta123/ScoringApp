@@ -5,6 +5,7 @@ import PropTypes from 'prop-types';
 import 'font-awesome/css/font-awesome.min.css';
 import Flag from 'react-world-flags';
 import iocToFlagCodeMap from '../constants/iocToFlagCodeMap';
+import ConfirmDialog from './ConfirmDialog';
 
 function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [sortCriteria, setSortCriteria] = useState('name');
@@ -12,6 +13,31 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
   const [editingSailorId, setEditingSailorId] = useState(null);
   const [editedSailor, setEditedSailor] = useState({});
   const [isExpanded, setIsExpanded] = useState(true);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [boatIdToRemove, setBoatIdToRemove] = useState(null);
+
+  const handleRemoveClick = (boatId) => {
+    setBoatIdToRemove(boatId);
+    setConfirmVisible(true);
+  };
+
+  const handleConfirmRemove = () => {
+    onRemoveBoat(boatIdToRemove);
+    setConfirmVisible(false);
+    setBoatIdToRemove(null);
+  };
+
+  const handleCancelRemove = () => {
+    setConfirmVisible(false);
+    setBoatIdToRemove(null);
+  };
+
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   // Add a helper to format the date as dd/mm/yyyy
   const formatDate = (dateStr) => {
@@ -110,7 +136,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
         return maxNum + 1;
       };
       const candidate = findNextFreeNumber(existingNums, minCandidate);
-      window.alert(
+      displayAlert(
         `Error: Duplicate sail number detected. Suggested next free sail number is ${candidate}.`,
       );
       return;
@@ -141,7 +167,7 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
       setEditingSailorId(null);
     } catch (error) {
       console.error('Error updating sailor:', error);
-      window.alert(`Error updating sailor: ${error.message || error}`);
+      displayAlert(`Error updating sailor: ${error.message || error}`);
     }
   };
 
@@ -415,23 +441,10 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
                       aria-label="Remove Boat"
                       role="button"
                       tabIndex="0"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            'Are you sure you want to delete this boat?',
-                          )
-                        ) {
-                          onRemoveBoat(sailor.boat_id);
-                        }
-                      }}
+                      onClick={() => handleRemoveClick(sailor.boat_id)}
                       onKeyPress={(e) => {
-                        if (
-                          (e.key === 'Enter' || e.key === ' ') &&
-                          window.confirm(
-                            'Are you sure you want to delete this boat?',
-                          )
-                        )
-                          onRemoveBoat(sailor.boat_id);
+                        if (e.key === 'Enter' || e.key === ' ')
+                          handleRemoveClick(sailor.boat_id);
                       }}
                       style={{
                         color: 'red',
@@ -445,6 +458,45 @@ function SailorList({ sailors, onRemoveBoat, onRefreshSailors }) {
             ))}
           </tbody>
         </table>
+      )}
+      {confirmVisible && (
+        <ConfirmDialog
+          message="Are you sure you want to delete this boat?"
+          onConfirm={handleConfirmRemove}
+          onCancel={handleCancelRemove}
+        />
+      )}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

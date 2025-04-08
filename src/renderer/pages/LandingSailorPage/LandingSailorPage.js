@@ -11,7 +11,13 @@ function LandingSailorPage() {
   const [editedSailor, setEditedSailor] = useState({});
   const [sortCriteria, setSortCriteria] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
 
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
   const loadSailors = async () => {
     try {
       const data = await window.electron.sqlite.sailorDB.readAllSailors();
@@ -142,7 +148,7 @@ function LandingSailorPage() {
       loadSailors();
     } catch (error) {
       console.error('Error updating sailor:', error);
-      window.alert(`Error updating sailor: ${error.message || error}`);
+      displayAlert(`Error updating sailor: ${error.message || error}`);
     }
   };
 
@@ -416,6 +422,38 @@ function LandingSailorPage() {
               </tr>
             );
           })}
+          {alertVisible && (
+            <div
+              className="custom-alert-overlay"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+              }}
+            >
+              <div
+                className="custom-alert-window"
+                style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '5px',
+                  textAlign: 'center',
+                }}
+              >
+                <p>{alertMessage}</p>
+                <button type="button" onClick={() => setAlertVisible(false)}>
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
         </tbody>
       </table>
     </div>

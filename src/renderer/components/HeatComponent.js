@@ -7,6 +7,7 @@ import assignBoatsToNewHeatsZigZag from '../../main/functions/creatingNewHeatsZi
 import HeatTables from './heatComponents/HeatTables';
 import handleStartFinalSeries from '../../main/functions/handleStartFinalSeries';
 import CustomHeatAssignment from './CustomHeatsAssignment';
+import ConfirmDialog from './ConfirmDialog';
 
 function HeatComponent({
   event,
@@ -27,6 +28,17 @@ function HeatComponent({
   const [finalSeriesStarted, setFinalSeriesStarted] = useState(false);
   const [showCustomAssignment, setShowCustomAssignment] = useState(false);
   const [customAssignment, setCustomAssignment] = useState([]);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [finalSeriesConfirmVisible, setFinalSeriesConfirmVisible] =
+    useState(false);
+  const [clearCustomConfirmVisible, setClearCustomConfirmVisible] =
+    useState(false);
+
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const fetchHeatsDetails = useCallback(async () => {
     const heatsRaw = await window.electron.sqlite.heatRaceDB.readAllHeats(
@@ -78,7 +90,7 @@ function HeatComponent({
 
   const createHeats = async () => {
     if (raceHappened || finalSeriesStarted) {
-      alert(
+      displayAlert(
         'Heats cannot be generated because a race has been conducted or the final series has already started.',
       );
       return;
@@ -97,7 +109,7 @@ function HeatComponent({
         await window.electron.sqlite.heatRaceDB.readAllHeats(event.event_id);
 
       if (existingHeats.length > 0) {
-        alert(
+        displayAlert(
           'Heats already exist for this event. Use the reset option to generate new heats.',
         );
         setHeatsCreated(true);
@@ -138,14 +150,14 @@ function HeatComponent({
       );
       await Promise.all(heatBoatPromises);
 
-      alert('Heats have been generated successfully!');
+      displayAlert('Heats have been generated successfully!');
       setHeatsCreated(true);
       await handleDisplayHeats();
     } catch (error) {
       console.error('Error generating heats:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(`Error generating heats: ${errorMessage}`);
+      displayAlert(`Error generating heats: ${errorMessage}`);
     }
   };
 
@@ -155,7 +167,7 @@ function HeatComponent({
 
   const handleRecreateHeats = async () => {
     if (raceHappened || finalSeriesStarted) {
-      alert(
+      displayAlert(
         'Heats cannot be reset because a race has been conducted or the final series has already started.',
       );
       return;
@@ -169,7 +181,7 @@ function HeatComponent({
       console.error('Error generating heats:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(`Error generating heats: ${errorMessage}`);
+      displayAlert(`Error generating heats: ${errorMessage}`);
     }
   };
 
@@ -208,32 +220,39 @@ function HeatComponent({
   };
 
   const initiateFinalSeries = () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to begin the final series? This action cannot be undone.',
-    );
-    if (confirmed) {
-      handleFinalSeriesStarted();
-      handleStartFinalSeries({
-        event,
-        setFinalSeriesStarted,
-        handleDisplayHeats,
-      });
-    }
+    setFinalSeriesConfirmVisible(true);
+  };
+
+  const confirmFinalSeries = () => {
+    handleFinalSeriesStarted();
+    handleStartFinalSeries({
+      event,
+      setFinalSeriesStarted,
+      handleDisplayHeats,
+    });
+    setFinalSeriesConfirmVisible(false);
   };
 
   const handleCustomAssignment = async (customBoats) => {
     try {
       // Instead of deleting/recreating heats here, simply store the custom assignment array.
       setCustomAssignment(customBoats);
-      alert('Custom assignment saved.');
+      displayAlert('Custom assignment saved.');
     } catch (error) {
       console.error('Error applying custom assignment:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(`Error applying custom assignment: ${errorMessage}`);
+      displayAlert(`Error applying custom assignment: ${errorMessage}`);
     }
     setShowCustomAssignment(false);
   };
+
+  const confirmClearCustom = () => {
+    setCustomAssignment([]);
+    displayAlert('Custom assignment cleared.');
+    setClearCustomConfirmVisible(false);
+  };
+
   const heatsToDisplay = displayLastHeats ? getLastHeats(heats) : heats;
 
   return (
@@ -279,16 +298,7 @@ function HeatComponent({
               {customAssignment.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        'Are you sure you want to clear the custom assignment?',
-                      )
-                    ) {
-                      setCustomAssignment([]);
-                      alert('Custom assignment cleared.');
-                    }
-                  }}
+                  onClick={() => setClearCustomConfirmVisible(true)}
                   disabled={raceHappened || finalSeriesStarted}
                 >
                   Clear Custom Assignment
@@ -297,6 +307,18 @@ function HeatComponent({
             </>
           )}
       </div>
+
+      {/* The custom alert modal */}
+      {alertVisible && (
+        <div className="custom-alert-overlay">
+          <div className="custom-alert-window">
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {showCustomAssignment && (
         <CustomHeatAssignment
@@ -320,6 +342,22 @@ function HeatComponent({
             Begin Final Series
           </button>
         )}
+
+      {finalSeriesConfirmVisible && (
+        <ConfirmDialog
+          message="Are you sure you want to begin the final series? This action cannot be undone."
+          onConfirm={confirmFinalSeries}
+          onCancel={() => setFinalSeriesConfirmVisible(false)}
+        />
+      )}
+
+      {clearCustomConfirmVisible && (
+        <ConfirmDialog
+          message="Are you sure you want to clear the custom assignment?"
+          onConfirm={confirmClearCustom}
+          onCancel={() => setClearCustomConfirmVisible(false)}
+        />
+      )}
 
       {/* Only show heats if custom assignment panel is not active */}
       {!showCustomAssignment && heatsToDisplay.length > 0 && (

@@ -7,6 +7,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import HeatComponent from '../../components/HeatComponent';
 import ScoringInputComponent from '../../components/ScoringInputComponent';
 import printNewHeats from '../../../main/functions/printNewHeats';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import heatService from '../../../services/heatService';
 import './HeatRacePage.css';
 
 function HeatRacePage() {
@@ -24,6 +26,14 @@ function HeatRacePage() {
   const [deleteHeatMode, setDeleteHeatMode] = useState(false);
   const [deleteRaceMode, setDeleteRaceMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [confirmData, setConfirmData] = useState(null);
+
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (!eventData && event) {
@@ -36,14 +46,14 @@ function HeatRacePage() {
     }
   }, [eventData, event]);
 
-  const fetchHeats = useCallback(() => {
+  const fetchHeats = useCallback(async () => {
     if (event?.event_id) {
-      window.electron.sqlite.heatRaceDB
-        .readAllHeats(event.event_id)
-        .then(setHeats)
-        .catch((error) =>
-          console.error('Error updating heats:', error.message),
-        );
+      try {
+        const newHeats = await heatService.readAllHeats(event.event_id);
+        setHeats(newHeats);
+      } catch (error) {
+        console.error('Error updating heats:', error.message);
+      }
     }
   }, [event]);
 
@@ -56,9 +66,7 @@ function HeatRacePage() {
   const checkFinalSeriesStarted = useCallback(async () => {
     if (event?.event_id) {
       try {
-        const data = await window.electron.sqlite.heatRaceDB.readAllHeats(
-          event.event_id,
-        );
+        const data = await heatService.readAllHeats(event.event_id);
         if (data.some((heat) => heat.heat_type === 'Final')) {
           setFinalSeriesStarted(true);
         }
@@ -73,108 +81,121 @@ function HeatRacePage() {
   }, [checkFinalSeriesStarted]);
 
   const evaluateHeatsEquality = useCallback(async () => {
-    if (event?.event_id) {
-      try {
-        const results = await window.electron.sqlite.heatRaceDB.readAllHeats(
-          event.event_id,
-        );
-        const latestHeats = results.reduce((acc, heat) => {
-          const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
-          if (match) {
-            const [, base, suffix] = match;
-            const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
-            if (!acc[base] || numericSuffix > acc[base].suffix) {
-              acc[base] = { suffix: numericSuffix, heat };
-            }
+    try {
+      const results = await window.electron.sqlite.heatRaceDB.readAllHeats(
+        event.event_id,
+      );
+
+      const latestHeats = results.reduce((acc, heat) => {
+        const match = heat.heat_name.match(/Heat ([A-Z]+)(\d*)/);
+        if (match) {
+          const [, base, suffix] = match;
+          const numericSuffix = suffix ? parseInt(suffix, 10) : 0;
+          if (!acc[base] || numericSuffix > acc[base].suffix) {
+            acc[base] = { suffix: numericSuffix, heat };
           }
-          return acc;
-        }, {});
-        const lastHeats = Object.values(latestHeats).map((entry) => entry.heat);
-        const raceCounts = await Promise.all(
-          lastHeats.map(async (heat) => {
-            const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
-              heat.heat_id,
-            );
-            return races ? races.length : null;
-          }),
-        );
-        if (raceCounts.includes(null) || raceCounts[0] === 0) {
-          setAllHeatsEqual(false);
-          return false;
         }
-        const equal = raceCounts.every((count) => count === raceCounts[0]);
-        setAllHeatsEqual(equal);
-        return equal;
-      } catch (error) {
-        console.error('Error checking heats equality:', error.message);
+        return acc;
+      }, {});
+
+      const lastHeats = Object.values(latestHeats).map((entry) => entry.heat);
+      const raceCounts = await Promise.all(
+        lastHeats.map(async (heat) => {
+          const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
+            heat.heat_id,
+          );
+          return races ? races.length : null;
+        }),
+      );
+
+      if (raceCounts.includes(null) || raceCounts[0] === 0) {
         setAllHeatsEqual(false);
         return false;
       }
-    } else {
+
+      const equal = raceCounts.every((count) => count === raceCounts[0]);
+      setAllHeatsEqual(equal);
+      return equal;
+    } catch (error) {
+      console.error('Error checking heats equality:', error.message);
+      setAllHeatsEqual(false);
       return false;
     }
   }, [event]);
 
   useEffect(() => {
-    evaluateHeatsEquality();
-  }, [heats, event, evaluateHeatsEquality]);
+    let isMounted = true;
 
-  const handleHeatDelete = useCallback(
-    async (heat) => {
-      const confirmed = window.confirm(
-        `Are you sure you want to delete heat "${heat.heat_name}"?`,
-      );
-      if (!confirmed) return;
-      try {
-        await window.electron.sqlite.heatRaceDB.deleteHeatById(heat.heat_id);
-        fetchHeats();
-        setDeleteHeatMode(false);
-      } catch (error) {
-        console.error('Error deleting heat:', error.message);
+    const checkHeats = async () => {
+      const result = await evaluateHeatsEquality();
+      if (isMounted) {
+        setAllHeatsEqual(result);
       }
-    },
-    [fetchHeats],
-  );
+    };
+
+    checkHeats();
+
+    return () => {
+      isMounted = false; // cleanup
+    };
+  }, [evaluateHeatsEquality]);
+
+  const requestDeleteHeat = (heat) => {
+    setConfirmData({ type: 'heatDelete', heat });
+  };
+
+  const requestDeleteLastHeats = () => {
+    setConfirmData({ type: 'deleteLastHeats' });
+  };
+
+  const requestDeleteRace = (heat) => {
+    setConfirmData({ type: 'raceDelete', heat });
+  };
   const cancelDeleteMode = () => {
     setDeleteHeatMode(false);
     setDeleteRaceMode(false);
     setShowDeleteModal(false);
   };
-  const handleDeleteLastHeats = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete the last heats?',
-    );
-    if (!confirmed) return;
+  const handleConfirmDeletion = async () => {
+    if (!confirmData) return;
+    const { type, heat } = confirmData;
     try {
-      await window.electron.sqlite.heatRaceDB.deleteLastCreatedHeatsWithRaces(
-        event.event_id,
-      );
-      fetchHeats();
-      setNeedsLeaderboardUpdate(true);
-    } catch (error) {
-      console.error('Error deleting last heats:', error.message);
-    }
-  }, [event.event_id, fetchHeats]);
-
-  const handleRaceDelete = useCallback(
-    async (heat) => {
-      const confirmed = window.confirm(
-        `Are you sure you want to delete the last race for heat "${heat.heat_name}"?`,
-      );
-      if (!confirmed) return;
-      try {
-        await window.electron.sqlite.heatRaceDB.deleteLastRaceForHeat(
-          heat.heat_id,
-        );
+      if (type === 'heatDelete') {
+        await heatService.deleteHeat(heat.heat_id);
+        fetchHeats();
+        setDeleteHeatMode(false);
+      } else if (type === 'deleteLastHeats') {
+        await heatService.deleteLastHeats(event.event_id);
         fetchHeats();
         setNeedsLeaderboardUpdate(true);
-        cancelDeleteMode(); // Exit delete mode on successful deletion
-      } catch (error) {
-        console.error('Error deleting race:', error.message);
+      } else if (type === 'raceDelete') {
+        await heatService.deleteLastRaceForHeat(heat.heat_id);
+        await fetchHeats(); // refetch and update state
+        setNeedsLeaderboardUpdate(true);
+        cancelDeleteMode(); // only after fetch
       }
-    },
-    [fetchHeats], // cancelDeleteMode is defined within the same scope so it can be called here.
-  );
+      setConfirmData(null);
+    } catch (error) {
+      console.error('Error deleting:', error.message);
+      setConfirmData(null);
+    }
+  };
+
+  const handleCancelDeletion = () => {
+    setConfirmData(null);
+  };
+
+  const handleHeatDelete = useCallback((heat) => {
+    requestDeleteHeat(heat);
+  }, []);
+
+  const handleDeleteLastHeats = useCallback(() => {
+    requestDeleteLastHeats();
+  }, []);
+
+  const handleRaceDelete = useCallback((heat) => {
+    requestDeleteRace(heat);
+  }, []);
 
   const handleHeatSelect = useCallback(
     (heat) => {
@@ -201,28 +222,24 @@ function HeatRacePage() {
     async (placeNumbers) => {
       console.log('Submitted place numbers:', placeNumbers);
       try {
-        const races = await window.electron.sqlite.heatRaceDB.readAllRaces(
-          selectedHeat.heat_id,
-        );
+        const races = await heatService.readAllRaces(selectedHeat.heat_id);
         const nextRaceNumber = races.length + 1;
 
-        const { lastInsertRowid: raceId } =
-          await window.electron.sqlite.heatRaceDB.insertRace(
-            selectedHeat.heat_id,
-            nextRaceNumber,
-          );
+        const { lastInsertRowid: raceId } = await heatService.insertRace(
+          selectedHeat.heat_id,
+          nextRaceNumber,
+        );
 
         await Promise.all(
           placeNumbers.map(async ({ boatNumber, place, status }) => {
-            const boats =
-              await window.electron.sqlite.heatRaceDB.readBoatsByHeat(
-                selectedHeat.heat_id,
-              );
+            const boats = await heatService.readBoatsByHeat(
+              selectedHeat.heat_id,
+            );
             const boatDetails = boats.find(
               (boat) => boat.sail_number === boatNumber,
             );
             if (boatDetails) {
-              await window.electron.sqlite.heatRaceDB.insertScore(
+              await heatService.insertScore(
                 raceId,
                 boatDetails.boat_id,
                 place,
@@ -236,10 +253,7 @@ function HeatRacePage() {
         if (!finalSeriesStarted) {
           const allEqual = await evaluateHeatsEquality();
           if (allEqual) {
-            await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
-              event.event_id,
-              false,
-            );
+            await heatService.updateEventLeaderboard(event.event_id, false);
           } else {
             console.log(
               'Not all heats have the same number of races. Local leaderboard will not be updated.',
@@ -247,9 +261,7 @@ function HeatRacePage() {
           }
         } else {
           console.log('Final series has started. Leaderboard will be updated.');
-          await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
-            event.event_id,
-          );
+          await heatService.updateFinalLeaderboard(event.event_id);
         }
 
         setIsScoring(false);
@@ -270,15 +282,13 @@ function HeatRacePage() {
 
   const handleCreateNewHeatsBasedOnLeaderboard = useCallback(async () => {
     if (finalSeriesStarted) {
-      alert(
+      displayAlert(
         'Operation not allowed: The final series has begun, so new heats cannot be created based on the leaderboard.',
       );
       return;
     }
     try {
-      await window.electron.sqlite.heatRaceDB.createNewHeatsBasedOnLeaderboard(
-        event.event_id,
-      );
+      await heatService.createNewHeatsBasedOnLeaderboard(event.event_id);
       console.log('New heats created based on leaderboard.');
       fetchHeats();
     } catch (error) {
@@ -302,15 +312,10 @@ function HeatRacePage() {
 
   const handleUpdateLeaderboard = useCallback(async () => {
     if (!finalSeriesStarted) {
-      await window.electron.sqlite.heatRaceDB.updateEventLeaderboard(
-        event.event_id,
-        false,
-      );
+      await heatService.updateEventLeaderboard(event.event_id, false);
     } else {
       console.log('Final series has started. Leaderboard will be updated.');
-      await window.electron.sqlite.heatRaceDB.updateFinalLeaderboard(
-        event.event_id,
-      );
+      await heatService.updateFinalLeaderboard(event.event_id);
     }
   }, [finalSeriesStarted, event]);
 
@@ -323,7 +328,7 @@ function HeatRacePage() {
 
   const toggleDeleteOptionsModal = () => {
     setShowDeleteModal((prev) => !prev);
-    setSelectedHeat(null); // clear selection so blue border is removed
+    setSelectedHeat(null);
   };
 
   const selectDeleteRaceMode = () => {
@@ -331,6 +336,24 @@ function HeatRacePage() {
     setDeleteHeatMode(false);
     setShowDeleteModal(false);
   };
+
+  let confirmMessage = '';
+  if (confirmData) {
+    switch (confirmData.type) {
+      case 'heatDelete':
+        confirmMessage = `Are you sure you want to delete heat "${confirmData.heat.heat_name}"?`;
+        break;
+      case 'deleteLastHeats':
+        confirmMessage = 'Are you sure you want to delete the last heats?';
+        break;
+      case 'raceDelete':
+        confirmMessage = `Are you sure you want to delete the last race for heat "${confirmData.heat.heat_name}"? After delete reload page with CTRL+R`;
+        break;
+      default:
+        confirmMessage = '';
+        break;
+    }
+  }
 
   return (
     <div className="heat-race-page">
@@ -399,7 +422,7 @@ function HeatRacePage() {
               handleFinalSeriesStarted={() => setFinalSeriesStarted(true)}
               showDeleteModal={showDeleteModal}
               deleteRaceMode={deleteRaceMode}
-              deleteHeatMode={deleteHeatMode} // newly passed
+              deleteHeatMode={deleteHeatMode}
             />
             {deleteRaceMode && (
               <div className="delete-mode-prompt">
@@ -477,6 +500,45 @@ function HeatRacePage() {
             </button>
           )}
         </footer>
+      )}
+      {confirmData && (
+        <ConfirmDialog
+          message={confirmMessage}
+          onConfirm={handleConfirmDeletion}
+          onCancel={handleCancelDeletion}
+        />
+      )}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

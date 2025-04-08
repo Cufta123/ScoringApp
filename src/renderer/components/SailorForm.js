@@ -26,6 +26,13 @@ function SailorForm({ onAddSailor, eventId }) {
   const [raceHappened, setRaceHappened] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [gender, setGender] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
+
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const fetchSailors = async () => {
     try {
@@ -139,7 +146,9 @@ function SailorForm({ onAddSailor, eventId }) {
             console.error('Error inserting club:', error);
             const errorMessage =
               error instanceof Error ? error.message : String(error);
-            alert(`There was an error inserting the club.${errorMessage}`);
+            displayAlert(
+              `There was an error inserting the club. ${errorMessage}`,
+            );
             return; // Exit the function gracefully
           }
         }
@@ -182,7 +191,9 @@ function SailorForm({ onAddSailor, eventId }) {
           console.error('Error inserting sailor:', error);
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          alert(`There was an error inserting the sailor.${errorMessage}`);
+          displayAlert(
+            `There was an error inserting the sailor. ${errorMessage}`,
+          );
           return; // Exit the function gracefully
         }
       } else {
@@ -215,7 +226,7 @@ function SailorForm({ onAddSailor, eventId }) {
       if (existingBoatInEvent) {
         const eventName =
           await window.electron.sqlite.eventDB.getEventName(eventId);
-        window.alert(
+        displayAlert(
           `Boat with sail number ${sailNumber} already exists in event ${eventName}`,
         );
         toast.error(
@@ -249,7 +260,9 @@ function SailorForm({ onAddSailor, eventId }) {
           console.error('Error inserting boat:', error);
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          alert(`There was an error inserting the boat.${errorMessage}`);
+          displayAlert(
+            `There was an error inserting the boat. ${errorMessage}`,
+          );
           return; // Exit the function gracefully
         }
       }
@@ -257,7 +270,7 @@ function SailorForm({ onAddSailor, eventId }) {
       const existingAssociation = eventBoats.find((b) => b.boat_id === boat_id);
 
       if (existingAssociation) {
-        window.alert(
+        displayAlert(
           `Boat ID ${boat_id} is already associated with event ID ${eventId}`,
         );
       } else {
@@ -269,7 +282,9 @@ function SailorForm({ onAddSailor, eventId }) {
           console.log(`Boat ID ${boat_id} associated with event ID ${eventId}`);
         } catch (error) {
           console.error('Error associating boat with event:', error);
-          alert('There was an error associating the boat with the event.');
+          displayAlert(
+            'There was an error associating the boat with the event.',
+          );
           return; // Exit the function gracefully
         }
       }
@@ -298,7 +313,7 @@ function SailorForm({ onAddSailor, eventId }) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error('Unexpected error during submission:', error);
-      alert(`An unexpected error occurred.${errorMessage}`);
+      displayAlert(`An unexpected error occurred. ${errorMessage}`);
     }
   };
   const getSuggestions = (value) => {
@@ -487,6 +502,38 @@ function SailorForm({ onAddSailor, eventId }) {
           />
           <button type="submit">Add Sailor</button>
         </form>
+      )}
+      {alertVisible && (
+        <div
+          className="custom-alert-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="custom-alert-window"
+            style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '5px',
+              textAlign: 'center',
+            }}
+          >
+            <p>{alertMessage}</p>
+            <button type="button" onClick={() => setAlertVisible(false)}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

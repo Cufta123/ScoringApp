@@ -52,7 +52,8 @@ export type Channels =
   | 'readAllScoresForEventQualifying'
   | 'readAllScoresForEventFinal'
   | 'deleteLastCreatedHeatsWithRaces'
-  | 'deleteHeatById';
+  | 'deleteHeatById'
+  | 'nukeDatabase';
 
 const electronHandler = {
   ipcRenderer: {
@@ -222,6 +223,14 @@ const electronHandler = {
           );
         } catch (error) {
           console.error('Error invoking insertEvent IPC:', error);
+          return false;
+        }
+      },
+      async nukeDatabase() {
+        try {
+          return await ipcRenderer.invoke('nukeDatabase');
+        } catch (error) {
+          console.error('Error invoking nukeDatabase IPC:', error);
           return false;
         }
       },

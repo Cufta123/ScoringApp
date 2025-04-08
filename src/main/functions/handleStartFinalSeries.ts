@@ -131,7 +131,6 @@ export default async function handleStartFinalSeries({
 
     console.log('Setting final series started to');
     setFinalSeriesStarted(true); // Final series is now started
-    alert('Final Series started successfully!');
     handleDisplayHeats(); // Refresh the heats display
   } catch (error: unknown) {
     console.error(

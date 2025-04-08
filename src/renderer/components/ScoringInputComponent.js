@@ -22,7 +22,13 @@ function ScoringInputComponent({ heat, onSubmit }) {
   const [dropIndex, setDropIndex] = useState(null);
   const inputRef = useRef(null);
   const [existingHeats, setExistingHeats] = useState([]);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVisible, setAlertVisible] = useState(false);
 
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
   useEffect(() => {
     (async () => {
       try {
@@ -212,7 +218,7 @@ function ScoringInputComponent({ heat, onSubmit }) {
     if (allBoatsAccountedFor) {
       onSubmit(boatPlaces);
     } else {
-      alert('Please assign a place or penalty to every boat.');
+      displayAlert('Please assign a place or penalty to every boat.');
     }
   }, [
     boatNumbers,
@@ -403,6 +409,38 @@ function ScoringInputComponent({ heat, onSubmit }) {
         <button type="button" onClick={handleSubmit}>
           Finalize and Submit Scores
         </button>
+        {alertVisible && (
+          <div
+            className="custom-alert-overlay"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+            }}
+          >
+            <div
+              className="custom-alert-window"
+              style={{
+                background: 'white',
+                padding: '20px',
+                borderRadius: '5px',
+                textAlign: 'center',
+              }}
+            >
+              <p>{alertMessage}</p>
+              <button type="button" onClick={() => setAlertVisible(false)}>
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

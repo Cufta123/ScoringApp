@@ -64,40 +64,45 @@ function LeaderboardComponent({ eventId }) {
   };
 
   const processQualifyingPoints = (qualifyingPoints) => {
-    const number_of_races = qualifyingPoints.length;
+    // Sort points by race_id in ascending order so that the first race is Q1, second is Q2, etc.
+    const sortedPoints = [...qualifyingPoints].sort(
+      (a, b) => Number(a.race_id) - Number(b.race_id),
+    );
+
+    const number_of_races = sortedPoints.length;
     let excludeCount = 0;
-
-    if (number_of_races >= 4) {
-      excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
+    const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+    for (let i = 0; i < thresholds.length; i += 1) {
+      if (number_of_races < thresholds[i]) {
+        excludeCount = i;
+        break;
+      }
     }
-
+    if (number_of_races >= thresholds[thresholds.length - 1]) {
+      excludeCount = thresholds.length;
+    }
     // Only consider "FINISHED" races for exclusion.
-
-    const validRaceValues = qualifyingPoints
+    const validRaceValues = sortedPoints
       .map((point) => point.points)
       .sort((a, b) => b - a);
 
     // Create a copy of the worst places to track exclusions.
     const worstPlaces = validRaceValues.slice(0, excludeCount);
     const worstPlacesTracker = [...worstPlaces];
-
     let excludeCounter = 0;
-    const markedQualifyingPoints = qualifyingPoints.map((point) => {
-      // Check if the point is among the worst places to exclude.
+    const markedQualifyingPoints = sortedPoints.map((point) => {
       const isWorstPlace =
         worstPlacesTracker.includes(point.points) &&
         excludeCounter < excludeCount;
-
       if (isWorstPlace) {
         excludeCounter += 1;
-        // Remove the point from the tracker to avoid duplicate exclusions.
         worstPlacesTracker.splice(worstPlacesTracker.indexOf(point.points), 1);
       }
-
-      // Format based on status and whether it's a worst place.
+      // Return object including race_id from the original point.
       if (point.status !== 'FINISHED') {
         return {
           ...point,
+          race_id: point.race_id,
           formatted: isWorstPlace
             ? `(${point.status} ${point.points})`
             : `${point.status} ${point.points}`,
@@ -105,10 +110,10 @@ function LeaderboardComponent({ eventId }) {
       }
       return {
         ...point,
+        race_id: point.race_id,
         formatted: isWorstPlace ? `(${point.points})` : `${point.points}`,
       };
     });
-
     return markedQualifyingPoints;
   };
 
@@ -136,11 +141,21 @@ function LeaderboardComponent({ eventId }) {
         acc[score.boat_id].push({
           points: score.points,
           status: score.status,
+          race_id: score.race_id, // Include race id here
         });
         acc[score.boat_id] = processQualifyingPoints(acc[score.boat_id]); // Process the points
         return acc;
       }, {});
       console.log('Qualifying scores:', qualifyingScoresGrouped);
+      if (finalSeriesStarted) {
+        Object.entries(qualifyingScoresGrouped).forEach(([boatId, scores]) => {
+          scores.forEach((score) => {
+            console.log(
+              `Boat ${boatId} qualifying score: ${score.formatted} with race id: ${score.race_id}`,
+            );
+          });
+        });
+      }
       // Add this helper to extract the numeric value from a race result.
       const parseRaceValue = (race) => {
         const sanitized = race.replace(/[^\d.]/g, '');
@@ -153,8 +168,15 @@ function LeaderboardComponent({ eventId }) {
           : [];
         const number_of_races = races.length;
         let excludeCount = 0;
-        if (number_of_races >= 4) {
-          excludeCount = Math.floor((number_of_races - 4) / 4) + 1;
+        const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+        for (let i = 0; i < thresholds.length; i += 1) {
+          if (number_of_races < thresholds[i]) {
+            excludeCount = i;
+            break;
+          }
+        }
+        if (number_of_races >= thresholds[thresholds.length - 1]) {
+          excludeCount = thresholds.length;
         }
         // Only consider non-DNE races for exclusion.
         const validRaces = races.filter((race) => !race.includes('DNE'));
@@ -472,6 +494,21 @@ function LeaderboardComponent({ eventId }) {
       displayAlert('Swap failed. See console for details.');
     }
   };
+
+  const handleForceFinalRecalculation = async () => {
+    try {
+      await window.electron.ipcRenderer.invoke(
+        'updateFinalLeaderboard',
+        eventId,
+      );
+      displayAlert('Final leaderboard recalculated successfully!');
+      fetchLeaderboard();
+    } catch (error) {
+      console.error('Error recalculating final leaderboard:', error);
+      displayAlert('Error recalculating final leaderboard.');
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -545,6 +582,13 @@ function LeaderboardComponent({ eventId }) {
         </select>
         <button type="button" onClick={handlePrintLeaderboard}>
           Print Leaderboard
+        </button>
+        <button
+          type="button"
+          onClick={handleForceFinalRecalculation}
+          style={{ marginLeft: '10px' }}
+        >
+          Force Recalculate Final
         </button>
       </div>
       <div style={{ marginBottom: '10px' }}>

@@ -556,7 +556,7 @@ ipcMain.handle(
           );
           const temporaryTable = calculateFinalBoatScores(results, event_id);
           temporaryTable.forEach((boat) => {
-            console.log('Updating FinalLeaderboard with:', boat);
+            //  console.log('Updating FinalLeaderboard with:', boat);
             updateFinalQuery.run(
               boat.boat_id,
               boat.totalPoints,
@@ -700,7 +700,7 @@ ipcMain.handle('updateFinalLeaderboard', async (event, event_id) => {
     const temporaryTable = calculateFinalBoatScores(results, event_id);
 
     temporaryTable.forEach((boat) => {
-      console.log('Updating FinalLeaderboard with:', boat);
+      //     console.log('Updating FinalLeaderboard with:', boat);
       updateQuery.run(
         boat.boat_id,
         boat.totalPoints,

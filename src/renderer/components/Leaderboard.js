@@ -509,6 +509,21 @@ function LeaderboardComponent({ eventId }) {
     }
   };
 
+  const handleForceQualifyingRecalculation = async () => {
+    try {
+      await window.electron.ipcRenderer.invoke(
+        'updateEventLeaderboard',
+        eventId,
+        finalSeriesStarted,
+      );
+      displayAlert('Event leaderboard recalculated successfully!');
+      fetchLeaderboard();
+    } catch (error) {
+      console.error('Error recalculating event leaderboard:', error);
+      displayAlert('Error recalculating event leaderboard.');
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -585,10 +600,16 @@ function LeaderboardComponent({ eventId }) {
         </button>
         <button
           type="button"
-          onClick={handleForceFinalRecalculation}
+          onClick={
+            finalSeriesStarted
+              ? handleForceFinalRecalculation
+              : handleForceQualifyingRecalculation
+          }
           style={{ marginLeft: '10px' }}
         >
-          Force Recalculate Final
+          {finalSeriesStarted
+            ? ' Recalculate Final'
+            : ' Recalculate Qualifying'}
         </button>
       </div>
       <div style={{ marginBottom: '10px' }}>

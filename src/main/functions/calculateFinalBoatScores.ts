@@ -17,6 +17,21 @@ interface TemporaryTableEntry {
   placement_group: string;
 }
 
+// Helper: Get qualifying leaderboard for all boats in this event
+function getQualifyingLeaderboard(event_id: any): Record<string, number> {
+  const query = db.prepare(`
+    SELECT boat_id, total_points_event
+    FROM Leaderboard
+    WHERE event_id = ?
+  `);
+  const rows = query.all(event_id);
+  const map: Record<string, number> = {};
+  rows.forEach((row: any) => {
+    map[row.boat_id] = Number(row.total_points_event);
+  });
+  return map;
+}
+
 // Update getFinalScores to order by race_number ascending
 function getFinalScores(event_id: any, boat_id: any) {
   const scoresQuery = db.prepare(`
@@ -30,6 +45,13 @@ function getFinalScores(event_id: any, boat_id: any) {
     ORDER BY r.race_number ASC
   `);
   return scoresQuery.all(event_id, boat_id);
+}
+
+function getSailNumber(boat_id: any): string {
+  const row = db
+    .prepare('SELECT sail_number FROM Boats WHERE boat_id = ?')
+    .get(boat_id);
+  return row ? row.sail_number : String(boat_id);
 }
 
 export default function calculateFinalBoatScores(
@@ -56,6 +78,9 @@ export default function calculateFinalBoatScores(
 
   console.log('Grouped Results:', groupedResults);
 
+  // Fetch qualifying leaderboard once
+  const qualifyingPointsMap = getQualifyingLeaderboard(event_id);
+
   let finalTemporaryTable: TemporaryTableEntry[] = [];
 
   // Process each placement group separately
@@ -69,16 +94,12 @@ export default function calculateFinalBoatScores(
 
       // Fetch all final scores for the boat
       const scores = getFinalScores(event_id, boat_id);
-      console.log('Scores and boat_ID', scores, boat_id);
 
       // Determine the number of scores to exclude
       const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
       const excludeCount = thresholds.filter(
         (threshold) => number_of_races >= threshold,
       ).length;
-      console.log(
-        `Boat ID: ${boat_id}, Number of Races: ${number_of_races}, Places to Exclude: ${excludeCount}`,
-      );
 
       // Include all scores (even if status is 'DNE') and convert points to numbers.
       const scoresWithPenalty = scores.map((s: any) => ({
@@ -149,184 +170,278 @@ export default function calculateFinalBoatScores(
       });
     });
 
-    // Sort the temporary table by total points
-    temporaryTable.sort((a, b) => a.totalPoints - b.totalPoints);
+    // --- Build combined points list for all boats in this group ---
+    const combinedPointsList = temporaryTable.map((entry) => ({
+      ...entry,
+      combinedPoints:
+        (qualifyingPointsMap[entry.boat_id] ?? 0) + entry.totalPoints,
+    }));
 
-    // Assign places based on the sorted order
-    temporaryTable.forEach((boat, index) => {
-      if (boat.placement_group === placement_group) {
-        boat.place = index + 1;
+    // --- Sort by combined points ---
+    combinedPointsList.sort((a, b) => a.combinedPoints - b.combinedPoints);
+
+    // --- Assign places based on combined points ---
+    combinedPointsList.forEach((boat, index) => {
+      boat.place = index + 1;
+    });
+
+    // --- Check for ties in combined points ---
+    const ties: Record<number, string[]> = {};
+    combinedPointsList.forEach((boat) => {
+      if (!ties[boat.combinedPoints]) ties[boat.combinedPoints] = [];
+      ties[boat.combinedPoints].push(boat.boat_id);
+    });
+
+    // --- For each tie, apply detailed tie-breaking logic ---
+    Object.entries(ties).forEach(([combinedPoints, boatIds]) => {
+      if (boatIds.length > 1) {
+        // Log when a tie is detected
+        console.log(
+          `TIE detected in group "${placement_group}" for combinedPoints=${combinedPoints}: Boats [${boatIds.map((id) => `${getSailNumber(id)} (id:${id})`).join(', ')}]`,
+        );
+
+        // --- Qualifying heats and scores logging ---
+        // 1. Get all qualifying heats for this event
+        const qualifyingHeats = db
+          .prepare(
+            `
+          SELECT h.heat_id, h.heat_name
+          FROM Heats h
+          WHERE h.event_id = ? AND h.heat_type = 'Qualifying'
+        `,
+          )
+          .all(event_id);
+
+        // 2. For each heat, find which boats from the tie group participated
+        const heatBoatMap: Record<string, Set<string>> = {};
+        qualifyingHeats.forEach((heat: any) => {
+          const boatRows = db
+            .prepare(
+              `
+            SELECT DISTINCT s.boat_id
+            FROM Scores s
+            JOIN Races r ON s.race_id = r.race_id
+            WHERE r.heat_id = ?
+          `,
+            )
+            .all(heat.heat_id);
+          heatBoatMap[heat.heat_id] = new Set(
+            boatRows.map((row: any) => row.boat_id),
+          );
+        });
+
+        // 3. Find heats where all tied boats participated
+        const commonQualHeats = Object.entries(heatBoatMap)
+          .filter(([_, boatSet]) => boatIds.every((id) => boatSet.has(id)))
+          .map(([heat_id]) => heat_id);
+
+        console.log(
+          `  Qualifying heats where all tied boats [${boatIds.join(', ')}] competed together:`,
+          commonQualHeats,
+        );
+
+        // 4. For each tied boat, fetch their scores in those heats
+        boatIds.forEach((boat_id) => {
+          const scores = db
+            .prepare(
+              `
+            SELECT s.points, s.status, r.race_number, r.heat_id
+            FROM Scores s
+            JOIN Races r ON s.race_id = r.race_id
+            WHERE r.heat_id IN (${commonQualHeats.map(() => '?').join(',')})
+              AND s.boat_id = ?
+            ORDER BY r.heat_id, r.race_number
+          `,
+            )
+            .all(...commonQualHeats, boat_id);
+
+          console.log(
+            `    Boat ${getSailNumber(boat_id)} (id:${boat_id}) qualifying scores in common heats:`,
+            scores.map((s: any) => `heat ${s.heat_id}: ${s.points}`),
+          );
+        });
+        // --- End of qualifying heats/scores logging ---
+
+        // Log the scores for each tied boat before sorting
+        boatIds.forEach((boat_id) => {
+          const scores = getFinalScores(event_id, boat_id);
+          console.log(
+            `  Boat ${boat_id} raw final scores:`,
+            scores.map((s: { points: any }) => s.points),
+          );
+        });
+
+        // Only apply detailed tie-breaking if there is a tie
+        const sortedScores = boatIds
+          .map((boat_id) => {
+            const scores = getFinalScores(event_id, boat_id);
+            const number_of_races =
+              groupResults.find(
+                (result: { boat_id: string }) => result.boat_id === boat_id,
+              )?.number_of_races || 0;
+            const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+            const excludeCount = thresholds.filter(
+              (threshold) => number_of_races >= threshold,
+            ).length;
+            const scoresToInclude = scores
+              .slice(excludeCount)
+              .map((s: any) => ({
+                ...s,
+                points: Number(s.points),
+              }));
+            // Log included scores after exclusion
+            console.log(
+              `  Boat ${boat_id} included scores after exclusion:`,
+              scoresToInclude.map((s: { points: any }) => s.points),
+            );
+            return {
+              boat_id,
+              scores: scoresToInclude.sort(
+                (a: { points: number }, b: { points: number }) =>
+                  a.points - b.points,
+              ),
+            };
+          })
+          .sort((a, b) => {
+            // Included scores comparison
+            const resultA = groupResults.find(
+              (result: { boat_id: string }) => result.boat_id === a.boat_id,
+            );
+            const resultB = groupResults.find(
+              (result: { boat_id: string }) => result.boat_id === b.boat_id,
+            );
+            const number_of_racesA = resultA?.number_of_races || 0;
+            const number_of_racesB = resultB?.number_of_races || 0;
+            const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+            const excludeCountA = thresholds.filter(
+              (threshold) => number_of_racesA >= threshold,
+            ).length;
+            const excludeCountB = thresholds.filter(
+              (threshold) => number_of_racesB >= threshold,
+            ).length;
+
+            // 1. Get all raw final scores for both boats (no exclusion)
+            const rawFinalScoresA = getFinalScores(event_id, a.boat_id).map(
+              (s: any) => Number(s.points),
+            );
+            const rawFinalScoresB = getFinalScores(event_id, b.boat_id).map(
+              (s: any) => Number(s.points),
+            );
+
+            // 2. Get all qualifying scores from common heats for both boats
+            const qualScoresA = db
+              .prepare(
+                `
+    SELECT s.points
+    FROM Scores s
+    JOIN Races r ON s.race_id = r.race_id
+    WHERE r.heat_id IN (${commonQualHeats.map(() => '?').join(',')})
+      AND s.boat_id = ?
+    ORDER BY r.heat_id, r.race_number
+  `,
+              )
+              .all(...commonQualHeats, a.boat_id)
+              .map((s: any) => Number(s.points));
+
+            const qualScoresB = db
+              .prepare(
+                `
+    SELECT s.points
+    FROM Scores s
+    JOIN Races r ON s.race_id = r.race_id
+    WHERE r.heat_id IN (${commonQualHeats.map(() => '?').join(',')})
+      AND s.boat_id = ?
+    ORDER BY r.heat_id, r.race_number
+  `,
+              )
+              .all(...commonQualHeats, b.boat_id)
+              .map((s: any) => Number(s.points));
+
+            // 3. Merge all raw qualifying and final scores, then sort
+            const allRawScoresA = [...qualScoresA, ...rawFinalScoresA].sort(
+              (x, y) => x - y,
+            );
+            const allRawScoresB = [...qualScoresB, ...rawFinalScoresB].sort(
+              (x, y) => x - y,
+            );
+
+            // 4. Log the merged arrays for clarity
+            console.log(
+              `    Comparing combined (qual+final) RAW scores: Boat ${a.boat_id} [${allRawScoresA}] vs Boat ${b.boat_id} [${allRawScoresB}]`,
+            );
+
+            // 5. Compare the merged arrays
+            for (
+              let i = 0;
+              i < Math.max(allRawScoresA.length, allRawScoresB.length);
+              i += 1
+            ) {
+              const scoreA = allRawScoresA[i] ?? Number.MAX_SAFE_INTEGER;
+              const scoreB = allRawScoresB[i] ?? Number.MAX_SAFE_INTEGER;
+              if (scoreA !== scoreB) {
+                return scoreA - scoreB;
+              }
+            }
+            // Raw race scores fallback
+            const rawScoresA = getFinalScores(event_id, a.boat_id)
+              .map((s: any) => ({ ...s, points: Number(s.points) }))
+              .sort((s1: any, s2: any) => s2.race_number - s1.race_number)
+              .map((s: any) => s.points);
+            const rawScoresB = getFinalScores(event_id, b.boat_id)
+              .map((s: any) => ({ ...s, points: Number(s.points) }))
+              .sort((s1: any, s2: any) => s2.race_number - s1.race_number)
+              .map((s: any) => s.points);
+
+            // Log fallback comparison
+            console.log(
+              `    Fallback: Comparing raw scores: Boat ${a.boat_id} [${rawScoresA}] vs Boat ${b.boat_id} [${rawScoresB}]`,
+            );
+
+            for (
+              let i = 0;
+              i < Math.max(rawScoresA.length, rawScoresB.length);
+              i += 1
+            ) {
+              const ptA = rawScoresA[i] ?? Number.MAX_SAFE_INTEGER;
+              const ptB = rawScoresB[i] ?? Number.MAX_SAFE_INTEGER;
+              if (ptA !== ptB) {
+                return ptA - ptB;
+              }
+            }
+            return 0;
+          });
+
+        // Log sorted order after tie-breaking
+        console.log(
+          `  Sorted order after tie-breaking: [${sortedScores.map((b) => b.boat_id).join(', ')}]`,
+        );
+
+        const tiedIndices = combinedPointsList
+          .map((b, idx) => (boatIds.includes(b.boat_id) ? idx : -1))
+          .filter((idx) => idx !== -1);
+        const minPlace = Math.min(
+          ...tiedIndices.map((idx) => combinedPointsList[idx].place),
+        );
+
+        // Assign new places in sorted order
+        sortedScores.forEach((boat, idx) => {
+          const indexInCombined = combinedPointsList.findIndex(
+            (b) => b.boat_id === boat.boat_id,
+          );
+          if (indexInCombined !== -1) {
+            combinedPointsList[indexInCombined].place = minPlace + idx;
+          }
+        });
       }
     });
 
-    // Log the temporary table with places before tie-breaking
-    console.log(
-      `Temporary Table with Places before tie-breaking for group ${placement_group}:`,
-      temporaryTable,
-    );
-
-    // Identify boats with the same total points
-    const boatsWithSamePoints = temporaryTable.reduce(
-      (acc, boat) => {
-        if (boat.placement_group === placement_group) {
-          if (!acc[boat.totalPoints]) {
-            acc[boat.totalPoints] = [];
-          }
-          acc[boat.totalPoints].push(boat.boat_id);
-        }
-        return acc;
-      },
-      {} as Record<number, string[]>,
-    );
-
-    // Fetch and display all scores for boats with the same total points
-    Object.entries(boatsWithSamePoints).forEach(([totalPoints, boatIds]) => {
-      if (boatIds.length > 1) {
-        console.log(`Boats with total points ${totalPoints}:`, boatIds);
-        const sortedScores = boatIds.map((boat_id) => {
-          const scores = getFinalScores(event_id, boat_id);
-          const number_of_races =
-            groupResults.find(
-              (result: { boat_id: string }) => result.boat_id === boat_id,
-            )?.number_of_races || 0;
-          const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
-          const excludeCount = thresholds.filter(
-            (threshold) => number_of_races >= threshold,
-          ).length;
-          const scoresToInclude = scores.slice(excludeCount).map((s: any) => ({
-            ...s,
-            points: Number(s.points),
-          }));
-          return {
-            boat_id,
-            scores: scoresToInclude.sort(
-              (a: { points: number }, b: { points: number }) =>
-                a.points - b.points,
-            ),
-          };
-        });
-
-        // A81.1 Sort the boats based on their scores using default tie-breaking logic
-        sortedScores.sort((a, b) => {
-          // Retrieve the number of races for both boats
-          const resultA = groupResults.find(
-            (result: { boat_id: string }) => result.boat_id === a.boat_id,
-          );
-          const resultB = groupResults.find(
-            (result: { boat_id: string }) => result.boat_id === b.boat_id,
-          );
-          const number_of_racesA = resultA?.number_of_races || 0;
-          const number_of_racesB = resultB?.number_of_races || 0;
-
-          const thresholds = [4, 8, 16, 24, 32, 40, 48, 56, 64, 72];
-          const excludeCountA = thresholds.filter(
-            (threshold) => number_of_racesA >= threshold,
-          ).length;
-          const excludeCountB = thresholds.filter(
-            (threshold) => number_of_racesB >= threshold,
-          ).length;
-
-          // Compute the scores each boat includes (after exclusion)
-          const includedScoresA = getFinalScores(event_id, a.boat_id)
-            .slice(excludeCountA)
-            .map((s: any) => ({ ...s, points: Number(s.points) }))
-            .sort((x: any, y: any) => x.points - y.points);
-          const includedScoresB = getFinalScores(event_id, b.boat_id)
-            .slice(excludeCountB)
-            .map((s: any) => ({ ...s, points: Number(s.points) }))
-            .sort((x: any, y: any) => x.points - y.points);
-
-          console.log(
-            `Scores for boat ${a.boat_id} (sorted):`,
-            includedScoresA.map((score: any) => score.points),
-          );
-          console.log(
-            `Scores for boat ${b.boat_id} (sorted):`,
-            includedScoresB.map((score: any) => score.points),
-          );
-
-          // Compare the included scores one by one
-          for (
-            let i = 0;
-            i < Math.max(includedScoresA.length, includedScoresB.length);
-            i += 1
-          ) {
-            const scoreA =
-              includedScoresA[i]?.points ?? Number.MAX_SAFE_INTEGER;
-            const scoreB =
-              includedScoresB[i]?.points ?? Number.MAX_SAFE_INTEGER;
-            if (scoreA !== scoreB) {
-              console.log(
-                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id}: Boat ${
-                  scoreA < scoreB ? a.boat_id : b.boat_id
-                } wins by included scores comparison`,
-              );
-              return scoreA - scoreB;
-            }
-          }
-
-          console.log(
-            `No difference found between boat ${a.boat_id} and boat ${b.boat_id} in included scores. Falling back to raw race scores.`,
-          );
-
-          // Fall back: compare using raw race scores (last race first)
-          const rawScoresA = getFinalScores(event_id, a.boat_id)
-            .map((s: any) => ({ ...s, points: Number(s.points) }))
-            .sort((s1: any, s2: any) => s2.race_number - s1.race_number)
-            .map((s: any) => s.points);
-          const rawScoresB = getFinalScores(event_id, b.boat_id)
-            .map((s: any) => ({ ...s, points: Number(s.points) }))
-            .sort((s1: any, s2: any) => s2.race_number - s1.race_number)
-            .map((s: any) => s.points);
-
-          for (
-            let i = 0;
-            i < Math.max(rawScoresA.length, rawScoresB.length);
-            i += 1
-          ) {
-            const ptA = rawScoresA[i] ?? Number.MAX_SAFE_INTEGER;
-            const ptB = rawScoresB[i] ?? Number.MAX_SAFE_INTEGER;
-            console.log(
-              `Race comparison at index ${i} (i.e., race ${i + 1} from last): Boat ${a.boat_id} score: ${ptA}, Boat ${b.boat_id} score: ${ptB}`,
-            );
-            if (ptA !== ptB) {
-              console.log(
-                `Tie broken between boat ${a.boat_id} and boat ${b.boat_id} using raw race scores (last race first): Boat ${
-                  ptA < ptB ? a.boat_id : b.boat_id
-                } wins this comparison`,
-              );
-              return ptA - ptB;
-            }
-          }
-          return 0;
-        });
-
-        sortedScores.forEach((boat, index) => {
-          const boatIndex = temporaryTable.findIndex(
-            (b) => b.boat_id === boat.boat_id,
-          );
-          if (boatIndex !== -1) {
-            temporaryTable[boatIndex].place = index + 1; // Update place based on sorted order
-          }
-        });
-        temporaryTable.sort((a, b) => {
-          if (a.totalPoints === b.totalPoints) {
-            return (a.place ?? 0) - (b.place ?? 0);
-          }
-          return a.totalPoints - b.totalPoints;
-        });
-
-        // Update places in the temporary table based on sorted order
-        temporaryTable.forEach((boat, index) => {
-          if (boat.placement_group === placement_group) {
-            boat.place = index + 1;
-          }
-        });
-
-        console.log(
-          `After tie-breaking for total points ${totalPoints}:`,
-          sortedScores,
-        );
+    // --- Copy back places to temporaryTable for output ---
+    temporaryTable.forEach((boat) => {
+      const combined = combinedPointsList.find(
+        (b) => b.boat_id === boat.boat_id,
+      );
+      if (combined) {
+        boat.place = combined.place;
       }
     });
 
